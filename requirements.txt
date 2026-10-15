@@ -1,0 +1,2 @@
+# The simulator, dashboard, and Ridge model need only Python 3.11+.
+# Optional forecasting packages are listed in requirements-ml.txt.
