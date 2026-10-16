@@ -29,8 +29,9 @@ from . import comed, lab
 from .backtest import Cancelled
 from .clock import local
 from .forecast import lightgbm_available
-from .history import backfill
+from .history import backfill, backfill_weather
 from .store import Store
+from .weather import WeatherError
 
 WEB = Path(__file__).with_name("web")
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
@@ -174,9 +175,13 @@ class App:
             with self.store() as store:
                 failed = backfill(store, start, end, self.get, progress=job.update,
                                   should_stop=job.cancel.is_set, log=lambda message: None)
-            return {"failed": failed}
+                try:
+                    backfill_weather(store, start, end, self.get, progress=job.update, should_stop=job.cancel.is_set)
+                except WeatherError as exc:  # keep the prices; say what went wrong
+                    return {"failed": failed, "weather_error": str(exc)}
+            return {"failed": failed, "weather_error": None}
 
-        return self.jobs.start("fetch", f"Fetching prices for {start} to {end}", work,
+        return self.jobs.start("fetch", f"Fetching prices and weather for {start} to {end}", work,
                                finished=self.forget_status).to_json()
 
     def backtest(self, body) -> dict:

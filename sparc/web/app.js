@@ -169,6 +169,10 @@ function blocked(choice, form) {
   if (choice.usable_from && form.start && form.start < choice.usable_from) {
     return `Can only be tested on nights from ${day(choice.usable_from)}.`;
   }
+  const data = state.server.data;
+  if (choice.weather && (data.empty || data.weather < 0.95 * data.hours)) {
+    return "Needs weather for the whole period: fetch again on the Data tab, which fetches weather too.";
+  }
   return null;
 }
 
@@ -184,13 +188,16 @@ function initialFetch() {
 
 function initialTrain() {
   const data = state.server.data;
-  if (data.empty) return { kind: "ridge", train_start: "", train_end: "", test_start: "", test_end: "", name: "" };
+  if (data.empty) {
+    return { kind: "ridge", inputs: "prices", train_start: "", train_end: "", test_start: "", test_end: "", name: "" };
+  }
   const first = addDays(data.first, 1),
     last = addDays(data.last, -1);
   const span = daysBetween(first, last);
   const trainEnd = addDays(first, Math.max(30, Math.round(span * 0.6)));
   return {
     kind: "ridge",
+    inputs: "prices",
     train_start: first,
     train_end: trainEnd,
     test_start: addDays(trainEnd, 2),
@@ -292,10 +299,14 @@ function doneMessage(job) {
   const seconds = Math.round(job.finished - job.started);
   if (job.kind === "fetch") {
     const failed = job.result.failed || [];
+    const weather = job.result.weather_error
+      ? ` Prices are saved, but weather could not be fetched (${job.result.weather_error}). Try again later.`
+      : "";
     return failed.length
       ? `Finished in ${seconds} s. ${failed.length} hourly tables could not be read: ${failed.join(", ")}. ` +
-          "Try those days again later."
-      : `Finished in ${seconds} s.`;
+          "Try those days again later." +
+          weather
+      : `Finished in ${seconds} s.${weather}`;
   }
   return `Finished in ${seconds} s.`;
 }
@@ -378,6 +389,7 @@ function renderData(panel) {
             share(data.day_ahead, data.hours),
             `${whole(data.hours - data.day_ahead)} missing`,
           ),
+          tile("Hours with a weather forecast", share(data.weather, data.hours), "Chicago, forecast a day ahead"),
           tile("Posted prices later revised", whole(data.revised), `of ${whole(data.compared)} hours compared`),
         ),
         coverageChart(data),
@@ -386,16 +398,17 @@ function renderData(panel) {
   }
   const form = state.fetch;
   const days = form.start && form.end ? daysBetween(form.start, form.end) + 1 : 0;
-  const requests = days > 0 ? Math.ceil(days / 7) + days + 1 : 0;
+  const requests = days > 0 ? Math.ceil(days / 7) + days + 1 + Math.ceil((days + 1) / 120) : 0;
   const run = () => startJob("/api/fetch", { start: form.start, end: form.end }, "fetchError");
   panel.append(
     card(
-      "Fetch from ComEd",
+      "Fetch prices and weather",
       el(
         "p",
         { class: "note" },
         "5-minute prices come from ComEd's documented API, day-ahead and settled hourly prices ",
-        "from its hourly pricing table. Days already stored are skipped, ",
+        "from its hourly pricing table. Chicago weather, as it happened and as forecast a day ahead, ",
+        "comes from Open-Meteo. Days already stored are skipped, ",
         "so an interrupted fetch picks up where it stopped.",
       ),
       el(
@@ -451,7 +464,8 @@ function renderData(panel) {
         { class: "note small" },
         "Stored in ",
         el("code", {}, `${state.server.folder}/sparc.db`),
-        " on this computer. ComEd's terms do not allow redistributing its prices, so keep the folder out of git.",
+        " on this computer. ComEd's terms do not allow redistributing its prices, so keep the folder out of git. ",
+        "Weather data by Open-Meteo.com (CC BY 4.0).",
       ),
     ),
   );
@@ -460,26 +474,29 @@ function renderData(panel) {
 function coverageChart(data) {
   const months = data.months;
   const missing = months.map(m => m.hours - m.priced),
-    noAhead = months.map(m => m.hours - m.day_ahead);
+    noAhead = months.map(m => m.hours - m.day_ahead),
+    noWeather = months.map(m => m.hours - m.weather);
   const holder = el("div");
-  if (!missing.some(Boolean) && !noAhead.some(Boolean)) {
-    holder.append(el("p", { class: "note" }, "Every stored hour has a billing price and a day-ahead price."));
+  if (!missing.some(Boolean) && !noAhead.some(Boolean) && !noWeather.some(Boolean)) {
+    holder.append(el("p", { class: "note" }, "Every stored hour has prices and a weather forecast."));
     return holder;
   }
   requestAnimationFrame(() =>
     Charts.columns(holder, {
-      title: "Hours without a price, by month",
+      title: "Hours missing data, by month",
       subtitle:
-        "Backtests leave out any night missing one of these prices. " +
+        "Backtests leave out any night missing a price; forecasts with weather need it for the whole period. " +
         "ComEd's table for the day the clocks fall back cannot be read.",
       legend: [
         { label: "No billing price", color: "var(--series-1)" },
         { label: "No day-ahead price", color: "var(--series-2)" },
+        { label: "No weather forecast", color: "var(--series-3)" },
       ],
       categories: months.map(m => m.month),
       series: [
         { name: "No billing price", color: "var(--series-1)", values: missing },
         { name: "No day-ahead price", color: "var(--series-2)", values: noAhead },
+        { name: "No weather forecast", color: "var(--series-3)", values: noWeather },
       ],
       format: v => whole(v),
       label: monthTick,
@@ -487,6 +504,7 @@ function coverageChart(data) {
       tipRows: i => [
         { value: whole(missing[i]), name: "hours without a billing price", color: "var(--series-1)" },
         { value: whole(noAhead[i]), name: "hours without a day-ahead price", color: "var(--series-2)" },
+        { value: whole(noWeather[i]), name: "hours without a weather forecast", color: "var(--series-3)" },
         { value: whole(months[i].hours), name: "hours in the month" },
       ],
       table: {
@@ -495,8 +513,15 @@ function coverageChart(data) {
           { label: "Hours", num: true },
           { label: "No billing price", num: true },
           { label: "No day-ahead price", num: true },
+          { label: "No weather forecast", num: true },
         ],
-        rows: months.map((m, i) => [month(m.month), whole(m.hours), whole(missing[i]), whole(noAhead[i])]),
+        rows: months.map((m, i) => [
+          month(m.month),
+          whole(m.hours),
+          whole(missing[i]),
+          whole(noAhead[i]),
+          whole(noWeather[i]),
+        ]),
       },
     }),
   );
@@ -1434,7 +1459,8 @@ function renderModels(panel) {
         { class: "note" },
         "A forecast predicts how far each hour's settled real-time price lands from its day-ahead price, from ",
         "what is known when the plan is made: day-ahead prices already out, the last day of 5-minute prices, ",
-        "the hour, the weekday and the season. ",
+        "the hour, the weekday and the season. With weather, it also knows holidays and Chicago's weather ",
+        "forecast made a day ahead, and how far the last few hours missed their forecast. ",
         'Backtests can also refit one every month on their own ("refit monthly" strategies); ',
         "a saved model is one fixed fit you can inspect.",
       ),
@@ -1457,6 +1483,23 @@ function renderModels(panel) {
                   "option",
                   { value: "lightgbm", selected: form.kind === "lightgbm", disabled: !server.lightgbm },
                   server.lightgbm ? "LightGBM" : "LightGBM (pip install lightgbm)",
+                ),
+              ),
+            ),
+            field(
+              "Inputs",
+              el(
+                "select",
+                {
+                  onchange: event => {
+                    form.inputs = event.target.value;
+                  },
+                },
+                el("option", { value: "prices", selected: form.inputs === "prices" }, "Prices and calendar"),
+                el(
+                  "option",
+                  { value: "weather", selected: form.inputs === "weather" },
+                  "Prices, calendar, holidays and weather",
                 ),
               ),
             ),
@@ -1506,7 +1549,9 @@ function modelCard(model, newest) {
     el(
       "p",
       { class: "note" },
-      `${model.kind === "ridge" ? "Ridge regression" : "LightGBM"}, trained on nights ${day(model.train[0])} to `,
+      `${model.kind === "ridge" ? "Ridge regression" : "LightGBM"}`,
+      model.inputs === "weather" ? " with weather and holidays" : "",
+      `, trained on nights ${day(model.train[0])} to `,
       `${day(model.train[1])}. Usable in backtests from ${day(model.usable_from)}.`,
     ),
     el(
@@ -1647,6 +1692,13 @@ const FEATURE_NAMES = {
   gap_1h: "Gap over the last hour",
   gap_3h: "Gap over 3 hours",
   gap_24h: "Gap over 24 hours",
+  holiday: "Holiday",
+  heating_fc: "Cold (degrees below 18 °C, forecast)",
+  cooling_fc: "Heat (degrees above 18 °C, forecast)",
+  dew_point_fc: "Dew point (forecast)",
+  wind_fc: "Wind speed (forecast)",
+  cloud_fc: "Cloud cover (forecast)",
+  temp_surprise: "Warmer than forecast, last 3 hours",
 };
 function featureName(name) {
   return FEATURE_NAMES[name] || name;

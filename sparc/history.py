@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
-from . import comed
+from . import comed, weather
 from .backtest import Cancelled
 from .clock import HOUR, at, local
 from .market import Market
@@ -61,6 +61,23 @@ def backfill(store: Store, first: date, last: date, get: comed.Get, *,
     return failed
 
 
+def backfill_weather(store: Store, first: date, last: date, get: comed.Get, *,
+                     progress: Callable[[int, int, str], None] | None = None,
+                     should_stop: Callable[[], bool] | None = None, today: date | None = None) -> None:
+    """Fetch Chicago weather a few months at a time, skipping finished requests like `backfill`."""
+    today = today or local(int(_time.time())).date()
+    done = store.fetched("weather")
+    spans = [span for span in weather.chunks(first, last) if f"{span[0]}/{span[1]}" not in done]
+    for number, (start, end) in enumerate(spans, 1):
+        store.add_weather(weather.fetch(start, end, get))
+        if end < today - timedelta(days=1):  # recent hours are still forecasts, so fetch them again later
+            store.mark_fetched("weather", f"{start}/{end}")
+        if progress:
+            progress(number, len(spans), f"weather {start} to {end}")
+        if should_stop and should_stop():
+            raise Cancelled
+
+
 def stored_range(store: Store) -> tuple[date, date] | None:
     """First and last Chicago dates with 5-minute prices."""
     first, last = store.db.execute("SELECT MIN(start), MAX(start) FROM rt_5min").fetchone()
@@ -76,6 +93,7 @@ class Month:
     hours: int
     priced: int  # hours with a billing price
     day_ahead: int
+    weather: int
 
 
 @dataclass
@@ -90,6 +108,7 @@ class Coverage:
     day_ahead: int = 0
     compared: int = 0  # hours with both a published price and all twelve readings
     revised: list[tuple[int, float, float]] = field(default_factory=list)  # hour, 5-min mean, published
+    weather: int = 0  # hours with a day-ahead weather forecast
     months: list[Month] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -103,6 +122,8 @@ class Coverage:
                  f"({_percent(self.complete, self.hours)})",
                  f"  day-ahead prices:                         {self.day_ahead} "
                  f"({_percent(self.day_ahead, self.hours)})",
+                 f"  weather forecasts:                        {self.weather} "
+                 f"({_percent(self.weather, self.hours)})",
                  f"  5-minute mean differs from the published price by more than rounding: "
                  f"{len(self.revised)} of {self.compared} hours"]
         for hour, mean, published in self.revised[:8]:
@@ -125,11 +146,13 @@ def check(store: Store, first: date, last: date) -> Coverage:
     report.revised = sorted(((hour, market.means[hour], published[hour]) for hour in compared
                              if abs(market.means[hour] - published[hour]) > ROUNDING),
                             key=lambda row: -abs(row[1] - row[2]))
-    report.months = _months(first, last, market)
+    forecast = sorted(hour for hour, row in store.weather(start, end).items() if row.temp_fc is not None)
+    report.weather = len(forecast)
+    report.months = _months(first, last, market, forecast)
     return report
 
 
-def _months(first: date, last: date, market: Market) -> list[Month]:
+def _months(first: date, last: date, market: Market, forecast: list[int]) -> list[Month]:
     priced, ahead = sorted(market.hourly), sorted(market.day_ahead)
     months = []
     month = first.replace(day=1)
@@ -139,7 +162,8 @@ def _months(first: date, last: date, market: Market) -> list[Month]:
         end = at(min(following, last + timedelta(days=1)), time(0))
         months.append(Month(f"{month:%Y-%m}", (end - start) // HOUR,
                             bisect_left(priced, end) - bisect_left(priced, start),
-                            bisect_left(ahead, end) - bisect_left(ahead, start)))
+                            bisect_left(ahead, end) - bisect_left(ahead, start),
+                            bisect_left(forecast, end) - bisect_left(forecast, start)))
         month = following
     return months
 

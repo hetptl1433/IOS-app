@@ -14,19 +14,20 @@ Python 3.11 or newer. No third-party packages (LightGBM is optional).
 python -m sparc serve        # opens http://127.0.0.1:8765
 ```
 
-1. **Data**: fetch prices from ComEd, for example from 2025-01-01 to today. A year
-   is about 420 requests at one a second. Everything is stored in
-   `runtime/sparc.db` on your computer; an interrupted fetch picks up where it stopped.
+1. **Data**: fetch prices from ComEd and Chicago weather from Open-Meteo, for
+   example from 2025-01-01 to today. A year is about 425 requests at one a second.
+   Everything is stored in `runtime/sparc.db` on your computer; an interrupted
+   fetch picks up where it stopped.
 2. **Run**: one click backtests every strategy below on every night with prices,
    for four example drivers (editable) and both delivery rates. 18 months takes
-   about a minute.
+   about a minute and a half.
 3. **Results**: the cheapest strategy for each driver, which others are
    statistically tied with it, savings per year, month-by-month comparisons,
    forecast accuracy, and every night as CSV. Past runs are kept.
 4. **Models**: train a ridge or LightGBM price forecast on any period, score it on
    a later one, and backtest it.
 
-The app listens on 127.0.0.1 only; the only requests it makes are to ComEd.
+The app listens on 127.0.0.1 only; the only requests it makes are to ComEd and Open-Meteo.
 `pip install lightgbm` adds the LightGBM forecast.
 
 ## What a charge costs
@@ -54,7 +55,7 @@ Other per-kWh charges are flat: they change the bill, not the best time to charg
 | Below 2¢, 3¢, 5¢ | the latest 5-minute price | charges while the price is at or under the cap, pauses above it |
 | Day-ahead plan | ComEd's day-ahead prices, out around 4:30 p.m. CT for the next day | charges in the cheapest hours |
 | Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts | re-plans every 5 minutes |
-| Forecast, refit monthly | a learned forecast of each hour's price (ridge or LightGBM) | plans from the forecast, re-plans hourly |
+| Forecast, refit monthly | a learned forecast of each hour's price (ridge or LightGBM), with or without weather and holidays | plans from the forecast, re-plans hourly |
 | Perfect hindsight | every hour's final price | the lowest cost reachable without capacity risk: a reference, not a strategy |
 
 Every strategy starts early when waiting would mean not finishing. The planned
@@ -65,7 +66,10 @@ schedule or a simple price rule would.
 
 The forecasts predict how far each hour's settled price lands from its day-ahead
 price, from what is known when the plan is made: day-ahead prices already out,
-the last day of 5-minute prices, the hour, weekday and season. In a backtest,
+the last day of 5-minute prices, the hour, weekday and season. The weather
+versions add holidays, Chicago's weather forecast made a day ahead (temperature,
+dew point, wind, cloud), and how far the last three hours missed their
+forecast. In a backtest,
 each month's model learns only from the nights before that month (minus two
 days, so no prices are shared). A model trained in the Models tab is only used
 on nights after its training period.
@@ -129,6 +133,16 @@ What the numbers say:
   from day-ahead prices: tied with the cheapest strategy for 3 of the 8 driver and
   rate combinations, behind for the other 5. Better spike forecasts don't change
   which hours are cheapest often enough.
+- **Weather and holidays don't help either.** With them, ridge's mean error went
+  from 1.872¢ to 1.880¢ and LightGBM's from 1.825¢ to 1.842¢ (day-ahead: 1.872¢),
+  and the cost per night moved by under 0.3 cents either way: still 0.1–1.7 cents
+  more than the day-ahead plan. Even given the weather that actually happened
+  instead of the forecast, neither model got better. Extreme weather does predict
+  volatility: below −7 °C the real-time price misses day-ahead by over 5 cents in
+  21% of hours, against 3% in mild weather. But it does not say which way, and
+  PJM's day-ahead prices already reflect the weather forecast. Hours that came in
+  colder or warmer than forecast show no relation to the price gap (correlation
+  −0.03).
 - **A better forecast could add at most $33–67 a year** per driver: the gap
   between the day-ahead plan and perfect hindsight.
 - **The capacity charge is the big daytime risk.** Plugging in at 2 p.m. and
@@ -149,12 +163,12 @@ folder with `--data DIR` or `SPARC_DATA`).
 
 ```sh
 python -m sparc serve [--port 8765]               # the web app
-python -m sparc fetch 2025-01-01 2026-10-15       # backfill prices; resumable
+python -m sparc fetch 2025-01-01 2026-10-15       # backfill prices and weather; resumable
 python -m sparc check 2025-01-01 2026-10-15       # coverage, and agreement with ComEd's hourly prices
 python -m sparc backtest 2025-04-02 2026-10-14    # every strategy; saved as a run the app can show
 python -m sparc backtest 2025-04-02 2026-10-14 --strategies day-ahead,cap-3 --csv nights.csv
 python -m sparc strategies                        # the strategy ids
-python -m sparc train ridge 2025-01-02 2025-12-31 --test 2026-01-02 2026-10-14
+python -m sparc train ridge 2025-01-02 2025-12-31 --test 2026-01-02 2026-10-14 [--weather]
 python -m sparc collect                           # on the Pi: record live prices every 5 minutes
 python -m unittest discover -s tests              # tests
 ```
@@ -178,6 +192,13 @@ python -m unittest discover -s tests              # tests
 - About 4% of hours miss at least one 5-minute reading. Such hours are billed at
   the published price, or at the mean of 10–11 readings when no published price
   exists. Nights with an unpriced hour are skipped and counted.
+- **Weather** comes from Open-Meteo's Previous Runs API (`gfs_seamless`, downtown
+  Chicago): each hour's analysis, and the forecast made 24 hours before it. A
+  forecast only uses a weather forecast that was already out when the plan was
+  made, and observed weather only for hours already over. Weather data by
+  Open-Meteo.com (CC BY 4.0), free for non-commercial use.
+- **Holidays** are NERC's six off-peak days as PJM publishes them, plus the day
+  after Thanksgiving.
 - Historical feeds cannot say when each price was actually published. `collect`
   records that from now on.
 - ComEd's API terms restrict redistributing its data, so `runtime/` is git-ignored.
@@ -195,6 +216,7 @@ python -m unittest discover -s tests              # tests
 | `planner.py` | cheapest-hours plan with buffer, blocked hours and hysteresis |
 | `strategies.py` | the strategies above |
 | `forecast.py` | forecast features, ridge and LightGBM fits, monthly refits |
+| `weather.py`, `holidays.py` | Chicago weather from Open-Meteo; NERC holidays |
 | `backtest.py` | night-by-night simulation and summaries |
 | `lab.py` | backtest runs and model training, shared by the app and the command line |
 | `server.py`, `web/` | the local web app |
@@ -203,7 +225,10 @@ python -m unittest discover -s tests              # tests
 ## Next
 
 1. Ship the day-ahead plan with the capacity guard. Live 5-minute reaction and
-   learned forecasts stay research: neither beat it on held-out nights.
+   learned forecasts, with or without weather, stay research: none beat it on
+   held-out nights. The one input left untested is PJM's own load forecast and
+   generation data (Data Miner, free account), though recent price gaps, which
+   the forecasts already use, should carry most of what it would add.
 2. Shadow mode on the Pi: run `collect`, plan every evening, and log what would
    have happened, without sending commands.
 3. Tesla Fleet API through `tesla-http-proxy`, using `add_charge_schedule` so the

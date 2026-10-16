@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sparc.backtest import Profile, simulate
 from sparc.clock import DAY, HOUR, SLOT, at, local
-from sparc.forecast import (FEATURES, Forecaster, Moments, Recent, Ridge, features, lightgbm_available,
+from sparc.forecast import (PRICE_FEATURES, Forecaster, Moments, Recent, Ridge, features, lightgbm_available,
                             samples, train, walk_forward)
 from sparc.market import Market, day_ahead_release, latest_visible_interval
 from sparc.strategies import DayAhead, Forecasted
@@ -43,7 +43,7 @@ class FeatureTests(unittest.TestCase):
         ahead = {h: (p if day_ahead_release(h) <= now else -999.0) for h, p in market.day_ahead.items()}
         tampered = Market(five, ahead)
         self.assertEqual(before, features(tampered, target, now, Recent.seen_by(tampered, now)))
-        self.assertEqual(len(before), len(FEATURES))
+        self.assertEqual(len(before), len(PRICE_FEATURES))
 
     def test_unreleased_day_ahead_is_flagged(self):
         market = persistent_gap_market(days=10)
@@ -59,7 +59,7 @@ class FeatureTests(unittest.TestCase):
 class MomentTests(unittest.TestCase):
     def test_sums_give_the_standardized_system_and_its_error(self):
         rng = random.Random(2)
-        k = len(FEATURES)
+        k = len(PRICE_FEATURES)
         rows = [[rng.gauss(3, 2) for _ in range(k - 1)] + [1.0] for _ in range(300)]  # last never varies
         targets = [rng.gauss(0, 1) for _ in rows]
         whole = Moments.of(rows, targets)

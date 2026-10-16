@@ -10,7 +10,7 @@ from pathlib import Path
 from fakes import FakeComEd
 from sparc import lab
 from sparc.backtest import PROFILES, Cancelled, Night, Outcome
-from sparc.history import backfill
+from sparc.history import backfill, backfill_weather
 from sparc.store import Store
 
 
@@ -23,6 +23,7 @@ class LabTests(unittest.TestCase):
         # January and February 2026: no clock change.
         backfill(store, date(2026, 1, 1), date(2026, 2, 28), FakeComEd(), log=lambda message: None,
                  today=date(2026, 3, 15))
+        backfill_weather(store, date(2026, 1, 1), date(2026, 2, 28), FakeComEd(), today=date(2026, 3, 15))
         store.close()
 
     def setUp(self):
@@ -96,11 +97,37 @@ class LabTests(unittest.TestCase):
         names = [lab.train_model(self.store, settings, self.folders)["name"] for _ in range(2)]
         self.assertEqual(names, ["Ridge, trained Jan 2026–Jan 2026", "Ridge, trained Jan 2026–Jan 2026 (2)"])
 
+    def test_a_forecast_with_weather_runs_and_needs_weather_data(self):
+        result = lab.run_backtest(self.store, self.parse(strategies=["walk:ridge+weather"]), self.folders)
+        (month,) = result["forecasts"]["Forecast: Ridge + weather, refit monthly"]["months"]
+        self.assertGreater(month["samples"], 0)
+        def eligible():
+            ready = lab.weather_ready(self.store, date(2026, 1, 6), date(2026, 2, 12))
+            return lab.eligible(lab.strategy_choices(self.folders), date(2026, 2, 5), 30, ready)
+
+        self.assertIn("walk:ridge+weather", eligible())
+        with self.store.db:
+            self.store.db.execute("DELETE FROM weather")
+        self.assertNotIn("walk:ridge+weather", eligible())
+        self.assertIn("walk:ridge", eligible())
+        with self.assertRaisesRegex(ValueError, "weather forecast"):
+            lab.run_backtest(self.store, self.parse(strategies=["walk:ridge+weather"]), self.folders)
+
+    def test_a_model_trained_with_weather_is_saved_and_reloaded(self):
+        settings = {"kind": "ridge", "inputs": "weather", "train_start": "2026-01-02", "train_end": "2026-02-03"}
+        model = lab.train_model(self.store, lab.TrainConfig.parse(settings), self.folders)
+        self.assertEqual((model["inputs"], model["name"]), ("weather", "Ridge + weather, trained Jan 2026–Feb 2026"))
+        self.assertIn("temp_surprise", model["effects"])
+        (choice,) = [c for c in lab.strategy_choices(self.folders) if c.id == f"model:{model['id']}"]
+        self.assertTrue(choice.weather)
+        lab.delete_model(self.folders, model["id"])
+
     def test_training_settings_are_checked(self):
         cases = [({"kind": "svm"}, "model type"),
                  ({"train_end": "2026-01-01"}, "must not end before"),
                  ({"test_start": "2026-02-04", "test_end": "2026-02-20"}, "two days after"),
-                 ({"train_start": "January"}, "date like")]
+                 ({"train_start": "January"}, "date like"),
+                 ({"inputs": "satellites"}, "inputs")]
         for change, message in cases:
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, message):
                 lab.TrainConfig.parse({"kind": "ridge", "train_start": "2026-01-02", "train_end": "2026-02-03",
@@ -162,8 +189,9 @@ class LabTests(unittest.TestCase):
         lab.RunConfig.parse(defaults, lab.strategy_choices(self.folders))
         status = lab.data_status(self.store)
         self.assertEqual((status["first"], status["last"], status["unpriced"]), ("2026-01-01", "2026-02-28", 0))
-        self.assertEqual(status["months"], [{"month": "2026-01", "hours": 744, "priced": 744, "day_ahead": 744},
-                                            {"month": "2026-02", "hours": 672, "priced": 672, "day_ahead": 672}])
+        self.assertEqual(status["months"],
+                         [{"month": "2026-01", "hours": 744, "priced": 744, "day_ahead": 744, "weather": 744},
+                          {"month": "2026-02", "hours": 672, "priced": 672, "day_ahead": 672, "weather": 672}])
 
 
 if __name__ == "__main__":

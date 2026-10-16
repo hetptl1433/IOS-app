@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .comed import HourRow
+from .weather import WeatherHour
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rt_5min (
@@ -20,6 +21,17 @@ CREATE TABLE IF NOT EXISTS hourly (
     real_time  REAL,                 -- ComEd's published hourly price, rounded to 0.1 cent
     da_seen_at INTEGER               -- when the live collector first saw the day-ahead price
 );
+CREATE TABLE IF NOT EXISTS weather (
+    hour      INTEGER PRIMARY KEY,  -- hour start, epoch seconds
+    temp_c    REAL,                 -- Chicago, what happened (weather-model analysis)
+    dew_c     REAL,
+    wind_kmh  REAL,
+    cloud_pct REAL,
+    temp_fc   REAL,                 -- the forecast made 24 hours before the hour
+    dew_fc    REAL,
+    wind_fc   REAL,
+    cloud_fc  REAL
+);
 CREATE TABLE IF NOT EXISTS fetched (
     kind TEXT NOT NULL,
     key  TEXT NOT NULL,
@@ -27,6 +39,9 @@ CREATE TABLE IF NOT EXISTS fetched (
     PRIMARY KEY (kind, key)
 );
 """
+
+
+WEATHER_COLUMNS = ("temp_c", "dew_c", "wind_kmh", "cloud_pct", "temp_fc", "dew_fc", "wind_fc", "cloud_fc")
 
 
 class Store:
@@ -58,6 +73,19 @@ class Store:
                 "da_seen_at = COALESCE(hourly.da_seen_at, excluded.da_seen_at)",
                 ((row.hour, row.day_ahead, row.real_time,
                   seen_at if row.day_ahead is not None else None) for row in rows))
+
+    def add_weather(self, rows: Iterable[WeatherHour]) -> None:
+        columns = WEATHER_COLUMNS
+        with self.db:
+            self.db.executemany(
+                f"INSERT INTO weather (hour, {', '.join(columns)}) VALUES ({', '.join('?' * (len(columns) + 1))}) "
+                "ON CONFLICT (hour) DO UPDATE SET "
+                + ", ".join(f"{c} = COALESCE(excluded.{c}, weather.{c})" for c in columns),
+                ((row.hour, *(getattr(row, c) for c in columns)) for row in rows))
+
+    def weather(self, start: int, end: int) -> dict[int, WeatherHour]:
+        return {row[0]: WeatherHour(*row) for row in self.db.execute(
+            f"SELECT hour, {', '.join(WEATHER_COLUMNS)} FROM weather WHERE hour >= ? AND hour < ?", (start, end))}
 
     def mark_fetched(self, kind: str, key: str) -> None:
         with self.db:

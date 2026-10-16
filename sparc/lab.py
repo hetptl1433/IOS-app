@@ -31,7 +31,9 @@ from .tariff import STANDARD, TIME_OF_DAY
 TARIFFS = {"standard": STANDARD, "time-of-day": TIME_OF_DAY}
 TIMER_STARTS = (time(21), time(22), time(23), time(0), time(1))
 PRICE_CAPS = (2, 3, 5)  # cents/kWh; overnight prices in 2025-2026 had a median of 2.5
-WALK_FORWARD = {"walk:ridge": "ridge", "walk:lightgbm": "lightgbm"}
+WALK_FORWARD = {"walk:ridge": ("ridge", "prices"), "walk:ridge+weather": ("ridge", "weather"),
+                "walk:lightgbm": ("lightgbm", "prices"), "walk:lightgbm+weather": ("lightgbm", "weather")}
+WEATHER_COVERAGE = 0.95  # share of hours a weather forecast needs, or it refuses to run
 MIN_CALIBRATION = 30  # days; for strategies that learn from the period before the first night
 MAX_PROFILES = 8
 MAX_NIGHTS = 1500
@@ -71,6 +73,7 @@ class Choice:
     group: str
     description: str
     usable_from: str | None = None  # saved models: the first night they can be tested on
+    weather: bool = False  # needs weather forecasts for the whole period
 
 
 def strategy_choices(folders: Folders) -> list[Choice]:
@@ -85,17 +88,20 @@ def strategy_choices(folders: Folders) -> list[Choice]:
                           "the next day's prices come out."))
     choices.append(Choice("live", Live.label, "Plan",
                           "The day-ahead plan, revised every 5 minutes as real-time prices are posted."))
-    choices.append(Choice("walk:ridge", f"Forecast: {WALK_FORWARD_NAMES['ridge']}", "Forecast",
-                          "Plans from a ridge-regression forecast of each hour's price, refitted "
-                          "every month on all the nights before it."))
-    if lightgbm_available():
-        choices.append(Choice("walk:lightgbm", f"Forecast: {WALK_FORWARD_NAMES['lightgbm']}", "Forecast",
-                              "Plans from a gradient-boosted-trees forecast, refitted every month on "
-                              "all the nights before it."))
+    method = {"ridge": "a ridge-regression", "lightgbm": "a gradient-boosted-trees (LightGBM)"}
+    source = {"prices": "from prices and the calendar",
+              "weather": "from prices, the calendar, holidays and Chicago weather forecasts"}
+    for ident, (kind, inputs) in WALK_FORWARD.items():
+        if kind == "lightgbm" and not lightgbm_available():
+            continue
+        choices.append(Choice(ident, f"Forecast: {WALK_FORWARD_NAMES[kind, inputs]}", "Forecast",
+                              f"Plans from {method[kind]} forecast of each hour's price {source[inputs]}, "
+                              "refitted every month on all the nights before it.", weather=inputs == "weather"))
     for model in load_all(folders.models):
         choices.append(Choice(f"model:{model.id}", f"Forecast: {model.name}", "Saved model",
-                              f"Trained on nights {_day(model.train[0])} to {_day(model.train[1])}.",
-                              model.usable_from.isoformat()))
+                              f"Trained on nights {_day(model.train[0])} to {_day(model.train[1])}"
+                              + (", with weather." if model.inputs == "weather" else "."),
+                              model.usable_from.isoformat(), weather=model.inputs == "weather"))
     choices.append(Choice("hindsight", Hindsight.label, "Reference",
                           "Knows every hour's final price in advance and, like the planners, stays out "
                           "of capacity-risk hours: the lowest cost without risking the capacity charge. "
@@ -201,17 +207,30 @@ def default_config(store: Store, folders: Folders) -> dict:
         start = max(first + timedelta(days=calibrate + 1), end - timedelta(days=MAX_NIGHTS - 1))
         if start > end:  # not enough history to calibrate
             calibrate, start = 0, min(first + timedelta(days=1), end)
-    strategies = eligible(strategy_choices(folders), start, calibrate) if start else []
+    strategies = []
+    if start:
+        strategies = eligible(strategy_choices(folders), start, calibrate,
+                              weather_ready(store, start - timedelta(days=calibrate), end))
     return {"start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
             "calibrate_days": calibrate, "tariffs": list(TARIFFS), "strategies": strategies,
             "profiles": [profile_json(p) for p in PROFILES]}
 
 
-def eligible(choices: list[Choice], start: date, calibrate_days: int) -> list[str]:
-    """Every strategy that can run from `start` with this much calibration."""
+def eligible(choices: list[Choice], start: date, calibrate_days: int, weather: bool = True) -> list[str]:
+    """Every strategy that can run from `start` with this much calibration (and weather, if there is any)."""
     return [c.id for c in choices
             if c.id != "hindsight" and (calibrate_days >= MIN_CALIBRATION or not _learns(c.id))
-            and not (c.usable_from and start < date.fromisoformat(c.usable_from))]
+            and not (c.usable_from and start < date.fromisoformat(c.usable_from)) and (weather or not c.weather)]
+
+
+def weather_ready(store: Store, first: date, last: date) -> bool:
+    """Whether weather forecasts cover the nights first..last, with the day before and the morning after."""
+    start, end = at(first, time(0)) - DAY, at(last + timedelta(days=2), time(0))
+    try:
+        _check_weather(Market({}, {}, weather=store.weather(start, end)), start, end)
+    except ValueError:
+        return False
+    return True
 
 
 def _learns(ident: str) -> bool:
@@ -228,23 +247,26 @@ def run_backtest(store: Store, config: RunConfig, folders: Folders, progress: Pr
     calibrate_from, first_night = at(first_training, time(0)), at(config.start, time(0))
     start, end = calibrate_from - DAY, at(config.end + timedelta(days=2), time(0))
     market = Market(store.five_minute(start, end), store.day_ahead(start, end),
-                    store.published_real_time(start, end))
+                    store.published_real_time(start, end), store.weather(start, end))
     days = [config.start + timedelta(days=i) for i in range((config.end - config.start).days + 1)]
     selected = ["charge-now", *config.strategies, "hindsight"]
+    saved = {m.id: m for m in load_all(folders.models)}
+    if any(_inputs(ident, saved) == "weather" for ident in selected):
+        _check_weather(market, calibrate_from, end)
 
     decay = None
     if "live" in selected:
         report(0, 0, "Fitting how long real-time price swings last")
         decay = fit_decay(market, calibrate_from, first_night)
     forecasts, walks = {}, {}
-    walking = [s for s in selected if s in WALK_FORWARD]
-    if walking:
-        report(0, 0, "Building forecast training examples")
-        examples = samples(market, first_training, config.end)
-        for ident in walking:
-            walks[ident] = walk_forward(market, WALK_FORWARD[ident], first_training, days, data=examples,
-                                        progress=lambda message: report(0, 0, message))
-    saved = {m.id: m for m in load_all(folders.models)}
+    examples = {}  # by input set
+    for ident in [s for s in selected if s in WALK_FORWARD]:
+        kind, inputs = WALK_FORWARD[ident]
+        if inputs not in examples:
+            report(0, 0, "Building forecast training examples" + (" with weather" if inputs == "weather" else ""))
+            examples[inputs] = samples(market, first_training, config.end, inputs)
+        walks[ident] = walk_forward(market, kind, first_training, days, data=examples[inputs], inputs=inputs,
+                                    progress=lambda message: report(0, 0, message))
     strategies = []
     for ident in selected:
         strategy = _strategy(ident, decay, saved, walks, config.start)
@@ -282,6 +304,22 @@ def run_backtest(store: Store, config: RunConfig, folders: Folders, progress: Pr
     backtest.write_csv(nights, folders.runs / f"{ident}.csv")
     _write_json(folders.runs / f"{ident}.json", result)  # last, so a listed run is always complete
     return result
+
+
+def _inputs(ident: str, saved: dict[str, Forecaster]) -> str | None:
+    if ident in WALK_FORWARD:
+        return WALK_FORWARD[ident][1]
+    model = saved.get(ident.removeprefix("model:")) if ident.startswith("model:") else None
+    return model.inputs if model else None
+
+
+def _check_weather(market: Market, start: int, end: int) -> None:
+    hours = (end - start) // 3600
+    forecast = sum(1 for hour in range(start, end, 3600)
+                   if (row := market.weather.get(hour)) is not None and row.temp_fc is not None)
+    if forecast < WEATHER_COVERAGE * hours:
+        raise ValueError(f"Only {forecast / hours:.0%} of the hours in this period have a weather forecast. "
+                         "Fetch prices again on the Data tab: it fetches weather too.")
 
 
 def _strategy(ident: str, decay, saved: dict[str, Forecaster], walks: dict, start: date):
@@ -379,6 +417,7 @@ class TrainConfig:
     train: tuple[date, date]  # first and last plug-in dates
     test: tuple[date, date] | None
     name: str | None
+    inputs: str = "prices"
 
     @classmethod
     def parse(cls, data: dict) -> TrainConfig:
@@ -403,7 +442,10 @@ class TrainConfig:
                 raise ValueError("Start the test period at least two days after training ends, "
                                  "so no night shares prices with the training data.")
         name = " ".join(str(data.get("name") or "").split())[:60] or None
-        return cls(kind, span, test, name)
+        inputs = data.get("inputs") or "prices"
+        if inputs not in ("prices", "weather"):
+            raise ValueError("Choose the inputs: prices, or prices with weather.")
+        return cls(kind, span, test, name, inputs)
 
 
 def train_model(store: Store, config: TrainConfig, folders: Folders, progress: Progress | None = None,
@@ -413,9 +455,11 @@ def train_model(store: Store, config: TrainConfig, folders: Folders, progress: P
     start, end = at(config.train[0], time(0)) - DAY, at(last + timedelta(days=2), time(0))
     report(0, 0, "Loading prices")
     market = Market(store.five_minute(start, end), store.day_ahead(start, end),
-                    store.published_real_time(start, end))
+                    store.published_real_time(start, end), store.weather(start, end))
+    if config.inputs == "weather":
+        _check_weather(market, start + DAY, end)
     model = train_forecaster(market, config.kind, *config.train, test=config.test, name=config.name,
-                             progress=lambda message: report(0, 0, message))
+                             progress=lambda message: report(0, 0, message), inputs=config.inputs)
     taken = {m.name for m in load_all(folders.models)} | set(WALK_FORWARD_NAMES.values())
     if config.name is None:  # number a default name rather than refuse it
         base, number = model.name, 2
@@ -463,7 +507,7 @@ def delete_run(folders: Folders, ident: str) -> None:
 
 def delete_model(folders: Folders, ident: str) -> None:
     path = folders.models / f"{ident}.json"
-    if not re.fullmatch(r"[a-z]+-\d{8}-\d{8}-[0-9a-f]{6}", ident) or not path.is_file():
+    if not re.fullmatch(r"[a-z]+(-weather)?-\d{8}-\d{8}-[0-9a-f]{6}", ident) or not path.is_file():
         raise LookupError("No such model.")
     path.unlink()
 
@@ -476,7 +520,7 @@ def data_status(store: Store) -> dict:
     return {"empty": False, "first": span[0].isoformat(), "last": span[1].isoformat(),
             "hours": coverage.hours, "published": coverage.published, "complete": coverage.complete,
             "partial": coverage.partial, "unpriced": coverage.unpriced, "day_ahead": coverage.day_ahead,
-            "revised": len(coverage.revised), "compared": coverage.compared,
+            "revised": len(coverage.revised), "compared": coverage.compared, "weather": coverage.weather,
             "months": [asdict(m) for m in coverage.months]}
 
 

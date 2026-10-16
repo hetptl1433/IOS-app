@@ -6,6 +6,7 @@ from datetime import time, timedelta
 from functools import cached_property, lru_cache
 
 from .clock import DAY, SLOT, at, hour_start, local
+from .weather import WeatherHour
 
 # ComEd: 5-minute prices "become available approximately 7 minutes after the start of the hour",
 # i.e. about 2 minutes after each interval ends.
@@ -31,6 +32,7 @@ class Market:
     five_minute: dict[int, float]  # interval start -> cents/kWh, as first posted
     day_ahead: dict[int, float]  # hour start -> cents/kWh
     published: dict[int, float] = field(default_factory=dict)  # ComEd's settled hourly price
+    weather: dict[int, WeatherHour] = field(default_factory=dict)  # Chicago, by hour start
     hourly: dict[int, float] = field(init=False)  # the billed price of each hour
     means: dict[int, float] = field(init=False)  # mean of the hour's 5-minute readings
     complete: set[int] = field(init=False)  # hours with all twelve readings

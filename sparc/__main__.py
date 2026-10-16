@@ -5,13 +5,14 @@ import argparse
 import os
 import shutil
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from . import backtest, comed, lab
 from .collector import collect
-from .history import backfill, check
+from .history import backfill, backfill_weather, check
 from .store import Store
+from .weather import WeatherError
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--no-browser", action="store_true", help="do not open a browser window")
 
-    fetch = commands.add_parser("fetch", help="download 5-minute and day-ahead prices from ComEd")
+    fetch = commands.add_parser("fetch", help="download prices from ComEd and Chicago weather from Open-Meteo")
     fetch.add_argument("start", type=date.fromisoformat)
     fetch.add_argument("end", type=date.fromisoformat)
 
@@ -53,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     learn.add_argument("--test", nargs=2, type=date.fromisoformat, metavar=("START", "END"),
                        help="score the forecast on these nights")
     learn.add_argument("--name", help="a name to show in backtests")
+    learn.add_argument("--weather", action="store_true", help="also learn from holidays and Chicago weather")
 
     commands.add_parser("collect", help="record live prices every 5 minutes (run this on the Pi)")
 
@@ -64,9 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     store = Store(folders.db)
     try:
         if args.command == "fetch":
-            failed = backfill(store, args.start, args.end, comed.Fetcher(), progress=Progress())
+            fetcher = comed.Fetcher()
+            failed = backfill(store, args.start, args.end, fetcher, progress=Progress())
             if failed:
                 print(f"{len(failed)} hourly tables could not be read: {', '.join(failed)}")
+            backfill_weather(store, args.start, args.end, fetcher, progress=Progress())
         elif args.command == "check":
             print(check(store, args.start, args.end))
         elif args.command == "backtest":
@@ -82,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
             train(store, folders, args)
         else:
             collect(store, comed.Fetcher())
-    except (ValueError, comed.ComEdError) as exc:
+    except (ValueError, comed.ComEdError, WeatherError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
@@ -117,8 +121,9 @@ class Progress:
 
 def run_backtest(store: Store, folders: lab.Folders, args) -> None:
     choices = lab.strategy_choices(folders)
+    weather = lab.weather_ready(store, args.start - timedelta(days=args.calibrate), args.end)
     strategies = (args.strategies.split(",") if args.strategies
-                  else lab.eligible(choices, args.start, args.calibrate))
+                  else lab.eligible(choices, args.start, args.calibrate, weather))
     config = lab.RunConfig.parse({"start": args.start.isoformat(), "end": args.end.isoformat(),
                                   "calibrate_days": args.calibrate, "tariffs": list(lab.TARIFFS),
                                   "strategies": strategies,
@@ -165,7 +170,7 @@ def train(store: Store, folders: lab.Folders, args) -> None:
                                     "train_end": args.end.isoformat(),
                                     "test_start": args.test[0].isoformat() if args.test else None,
                                     "test_end": args.test[1].isoformat() if args.test else None,
-                                    "name": args.name})
+                                    "name": args.name, "inputs": "weather" if args.weather else "prices"})
     model = lab.train_model(store, config, folders, progress=Progress())
     for period in ("train", "test"):
         scores = model["metrics"].get(period)

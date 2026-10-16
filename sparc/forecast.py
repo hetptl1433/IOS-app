@@ -2,9 +2,10 @@
 
 A model predicts how far an hour's real-time price lands from its day-ahead price,
 using only what was known at decision time: day-ahead prices already released,
-5-minute prices already posted, and the calendar. Planning with these forecasts is
-one more strategy in the backtest. It earns its place only by beating the plain
-day-ahead plan on nights the model never saw.
+5-minute prices already posted, and the calendar. The "weather" inputs add Chicago
+weather forecasts made a day ahead, how far the latest hours missed their forecast,
+and holidays. Planning with these forecasts is one more strategy in the backtest. It
+earns its place only by beating the plain day-ahead plan on nights the model never saw.
 """
 from __future__ import annotations
 
@@ -17,10 +18,11 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
-from .clock import HOUR, at, hour_start, local
+from .clock import DAY, HOUR, at, hour_start, local
+from .holidays import is_holiday
 from .market import Market, day_ahead_release, latest_visible_interval
 
-FEATURES = (
+PRICE_FEATURES = (
     "day_ahead",  # the hour's day-ahead price, or the same hour a day earlier if not yet released
     "day_ahead_known",  # 1 once the hour's own day-ahead price is released
     "hours_ahead",  # 0 for the hour under way
@@ -30,6 +32,17 @@ FEATURES = (
     "gap_latest",  # newest posted 5-minute price minus its hour's day-ahead price
     "gap_1h", "gap_3h", "gap_24h",  # mean of those gaps over the last 1, 3 and 24 hours
 )
+WEATHER_FEATURES = (
+    "holiday",  # 1 on NERC holidays and the day after Thanksgiving
+    "heating_fc",  # how far the hour's day-ahead temperature forecast is below 18 °C
+    "cooling_fc",  # how far it is above
+    "dew_point_fc", "wind_fc", "cloud_fc",  # the hour's day-ahead forecast (°C, km/h, %)
+    "temp_surprise",  # the last 3 hours: how much warmer it was than forecast a day before (°C)
+)
+INPUTS = {"prices": PRICE_FEATURES, "weather": PRICE_FEATURES + WEATHER_FEATURES}
+COMFORT_C = 18.0  # below it homes heat, above it they cool
+FORECAST_OUT = 18 * HOUR  # a forecast made a day ahead is out about 18 hours ahead (runs take ~5 hours)
+TYPICAL = {"temp_fc": COMFORT_C, "dew_fc": 5.0, "wind_fc": 13.0, "cloud_fc": 55.0}  # if weather is missing
 
 # Training covers the decisions one night of charging needs: every hour from 2 p.m. to
 # 6 a.m., each forecasting the hours up to 7 a.m.
@@ -64,20 +77,41 @@ class Recent:
         return cls(0.0 if latest is None else latest, *means)
 
 
-def features(market: Market, hour: int, now: int, recent: Recent) -> list[float] | None:
+def features(market: Market, hour: int, now: int, recent: Recent, inputs: str = "prices") -> list[float] | None:
     day_ahead = market.known_day_ahead(hour, now)
     if day_ahead is None:
         return None
     wall = local(hour)
     hour_angle = 2 * math.pi * wall.hour / 24
     season_angle = 2 * math.pi * (wall.timetuple().tm_yday - 1) / 365.25
-    return [day_ahead,
-            float(hour in market.day_ahead and day_ahead_release(hour) <= now),
-            (hour - hour_start(now)) / HOUR,
-            math.sin(hour_angle), math.cos(hour_angle),
-            float(wall.weekday() >= 5),
-            math.sin(season_angle), math.cos(season_angle),
-            recent.latest, recent.hour, recent.three_hours, recent.day]
+    row = [day_ahead,
+           float(hour in market.day_ahead and day_ahead_release(hour) <= now),
+           (hour - hour_start(now)) / HOUR,
+           math.sin(hour_angle), math.cos(hour_angle),
+           float(wall.weekday() >= 5),
+           math.sin(season_angle), math.cos(season_angle),
+           recent.latest, recent.hour, recent.three_hours, recent.day]
+    if inputs == "weather":
+        row += _weather(market, hour, now, wall.date())
+    return row
+
+
+def _weather(market: Market, hour: int, now: int, day: date) -> list[float]:
+    """Weather columns, from forecasts already out at `now` and the hours just observed."""
+    forecast = market.weather.get(hour if hour - now <= FORECAST_OUT else hour - DAY)
+
+    def value(name):
+        number = getattr(forecast, name) if forecast else None
+        return TYPICAL[name] if number is None else number
+
+    temp = value("temp_fc")
+    misses = []
+    for past in range(hour_start(now) - 3 * HOUR, hour_start(now), HOUR):
+        seen = market.weather.get(past)
+        if seen and seen.temp_c is not None and seen.temp_fc is not None:
+            misses.append(seen.temp_c - seen.temp_fc)
+    return [float(is_holiday(day)), max(0.0, COMFORT_C - temp), max(0.0, temp - COMFORT_C),
+            value("dew_fc"), value("wind_fc"), value("cloud_fc"), sum(misses) / len(misses) if misses else 0.0]
 
 
 @dataclass
@@ -87,7 +121,7 @@ class Samples:
     days: list[date] = field(default_factory=list)  # the night each sample belongs to
 
 
-def samples(market: Market, first: date, last: date) -> Samples:
+def samples(market: Market, first: date, last: date, inputs: str = "prices") -> Samples:
     """Training examples for the nights first..last (plug-in dates)."""
     data = Samples()
     day = first
@@ -99,7 +133,7 @@ def samples(market: Market, first: date, last: date) -> Samples:
             for hour in range(hour_start(now), end, HOUR):
                 if hour not in market.hourly:
                     continue
-                row = features(market, hour, now, recent)
+                row = features(market, hour, now, recent, inputs)
                 if row is None:
                     continue
                 data.rows.append(row)
@@ -128,9 +162,9 @@ class Ridge:
     def from_json(cls, data: dict) -> Ridge:
         return cls(data["means"], data["scales"], data["weights"], data["bias"])
 
-    def effects(self) -> dict[str, float]:
+    def importance(self) -> list[float]:
         """Change in the forecast gap (cents) for a one-standard-deviation change in each feature."""
-        return dict(zip(FEATURES, self.weights))
+        return list(self.weights)
 
 
 @dataclass
@@ -147,7 +181,7 @@ class Moments:
 
     @classmethod
     def of(cls, rows: list[list[float]], targets: list[float]) -> Moments:
-        k = len(FEATURES)
+        k = len(rows[0])
         x, xy, xx = [0.0] * k, [0.0] * k, [[0.0] * k for _ in range(k)]
         y = yy = 0.0
         for row, target in zip(rows, targets):
@@ -166,7 +200,7 @@ class Moments:
 
     @classmethod
     def total(cls, parts: list[Moments]) -> Moments:
-        k = len(FEATURES)
+        k = len(parts[0].x)
         x, xy, xx = [0.0] * k, [0.0] * k, [[0.0] * k for _ in range(k)]
         count, y, yy = 0, 0.0, 0.0
         for part in parts:
@@ -265,11 +299,11 @@ class Boosted:
     def from_json(cls, data: dict) -> Boosted:
         return cls(data["text"])
 
-    def effects(self) -> dict[str, float]:
+    def importance(self) -> list[float]:
         """Share of the total split gain each feature contributes."""
         gains = self.booster.feature_importance(importance_type="gain")
         total = float(sum(gains)) or 1.0
-        return {name: float(g) / total for name, g in zip(FEATURES, gains)}
+        return [float(g) / total for g in gains]
 
 
 LIGHTGBM_PARAMS = {"objective": "regression", "learning_rate": 0.05, "num_leaves": 15,
@@ -306,6 +340,7 @@ class Forecaster:
     metrics: dict
     model: Ridge | Boosted
     settings: dict = field(default_factory=dict)
+    inputs: str = "prices"  # a key of INPUTS
 
     def predict_many(self, rows: list[list[float]]) -> list[float]:
         return self.model.predict_many(rows)
@@ -326,12 +361,13 @@ class Forecaster:
                 "train": [d.isoformat() for d in self.train],
                 "test": [d.isoformat() for d in self.test] if self.test else None,
                 "usable_from": self.usable_from.isoformat(), "metrics": self.metrics,
-                "settings": self.settings, "effects": self.model.effects()}
+                "settings": self.settings, "inputs": self.inputs,
+                "effects": dict(zip(INPUTS[self.inputs], self.model.importance()))}
 
     def save(self, folder: Path) -> Path:
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{self.id}.json"
-        content = {**self.describe(), "features": list(FEATURES), "model": self.model.to_json()}
+        content = {**self.describe(), "features": list(INPUTS[self.inputs]), "model": self.model.to_json()}
         temporary = path.with_suffix(".tmp")
         temporary.write_text(json.dumps(content, indent=1))
         temporary.replace(path)
@@ -340,13 +376,14 @@ class Forecaster:
     @classmethod
     def load(cls, path: Path) -> Forecaster:
         data = json.loads(path.read_text())
-        if data.get("features") != list(FEATURES):
+        inputs = next((key for key, names in INPUTS.items() if data.get("features") == list(names)), None)
+        if inputs is None:
             raise ValueError(f"{path.name} was trained with different features; train it again")
         model = (Ridge if data["kind"] == "ridge" else Boosted).from_json(data["model"])
         test = tuple(date.fromisoformat(d) for d in data["test"]) if data["test"] else None
         return cls(data["id"], data["name"], data["kind"], data["created"],
                    tuple(date.fromisoformat(d) for d in data["train"]), test,
-                   data["metrics"], model, data.get("settings", {}))
+                   data["metrics"], model, data.get("settings", {}), inputs)
 
 
 def evaluate(model, data: Samples) -> dict:
@@ -366,13 +403,22 @@ def _errors(predicted: list[float], gaps: list[float]) -> dict:
 
 
 KINDS = {"ridge": "Ridge", "lightgbm": "LightGBM"}
-WALK_FORWARD_NAMES = {kind: f"{label}, refit monthly" for kind, label in KINDS.items()}
+
+
+def model_name(kind: str, inputs: str) -> str:
+    return KINDS[kind] + (" + weather" if inputs == "weather" else "")
+
+
+WALK_FORWARD_NAMES = {(kind, inputs): f"{model_name(kind, inputs)}, refit monthly"
+                      for kind in KINDS for inputs in INPUTS}
 MIN_EXAMPLES = 1000
 
 
-def _check_kind(kind: str) -> None:
+def _check_kind(kind: str, inputs: str = "prices") -> None:
     if kind not in KINDS:
         raise ValueError(f"unknown model kind {kind!r}")
+    if inputs not in INPUTS:
+        raise ValueError(f"unknown inputs {inputs!r}")
     if kind == "lightgbm" and not lightgbm_available():
         raise ValueError("LightGBM is not installed: pip install lightgbm")
 
@@ -406,24 +452,24 @@ def _nightly(data: Samples) -> list[tuple[date, Moments]]:
 
 
 def train(market: Market, kind: str, first: date, last: date, test: tuple[date, date] | None = None,
-          name: str | None = None, progress=None) -> Forecaster:
+          name: str | None = None, progress=None, inputs: str = "prices") -> Forecaster:
     """Fit on nights first..last; choose settings on the last fifth of them; score on `test`."""
-    _check_kind(kind)
+    _check_kind(kind, inputs)
     if test and test[0] <= last + timedelta(days=1):
         raise ValueError("the test period must start at least two days after training ends")
     report = progress or (lambda message: None)
     report("Building training examples")
-    data = samples(market, first, last)
-    report(f"Fitting {KINDS[kind]} on {len(data.rows):,} examples")
+    data = samples(market, first, last, inputs)
+    report(f"Fitting {model_name(kind, inputs)} on {len(data.rows):,} examples")
     model, settings = _fit(kind, data, len(data.rows))
     metrics = {"train": evaluate(model, data)}
     if test:
         report("Scoring the test period")
-        metrics["test"] = evaluate(model, samples(market, *test))
+        metrics["test"] = evaluate(model, samples(market, *test, inputs))
     created = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    ident = f"{kind}-{first:%Y%m%d}-{last:%Y%m%d}-{uuid.uuid4().hex[:6]}"
-    label = name or f"{KINDS[kind]}, trained {first:%b %Y}–{last:%b %Y}"
-    return Forecaster(ident, label, kind, created, (first, last), test, metrics, model, settings)
+    ident = f"{kind}{'-weather' if inputs == 'weather' else ''}-{first:%Y%m%d}-{last:%Y%m%d}-{uuid.uuid4().hex[:6]}"
+    label = name or f"{model_name(kind, inputs)}, trained {first:%b %Y}–{last:%b %Y}"
+    return Forecaster(ident, label, kind, created, (first, last), test, metrics, model, settings, inputs)
 
 
 @dataclass
@@ -437,6 +483,7 @@ class WalkForward:
     kind: str
     name: str
     models: list[Forecaster]  # in order of the month they forecast
+    inputs: str = "prices"
 
     def for_night(self, day: date) -> Forecaster:
         index = bisect_right([m.usable_from for m in self.models], day) - 1
@@ -453,18 +500,18 @@ class WalkForward:
                 overall[key] = sum(t[key] * t["samples"] for t in tested) / n
             for key in ("rmse", "day_ahead_rmse"):
                 overall[key] = math.sqrt(sum(t[key] ** 2 * t["samples"] for t in tested) / n)
-        return {"kind": self.kind, "name": self.name, "test": overall,
+        return {"kind": self.kind, "name": self.name, "inputs": self.inputs, "test": overall,
                 "months": [{"month": f"{m.test[0]:%Y-%m}", "train": [d.isoformat() for d in m.train],
                             **m.metrics.get("test", {}), "settings": m.settings} for m in self.models]}
 
 
 def walk_forward(market: Market, kind: str, first: date, nights: list[date], data: Samples | None = None,
-                 progress=None) -> WalkForward:
+                 progress=None, inputs: str = "prices") -> WalkForward:
     """Refit a `kind` model for each calendar month of `nights` (plug-in dates).
 
-    `data`, if given, must be `samples(market, first, last night)`.
+    `data`, if given, must be `samples(market, first, last night, inputs)`.
     """
-    _check_kind(kind)
+    _check_kind(kind, inputs)
     report = progress or (lambda message: None)
     nights = sorted(nights)
     months: list[list[date]] = []
@@ -477,24 +524,26 @@ def walk_forward(market: Market, kind: str, first: date, nights: list[date], dat
         raise ValueError("the first night must be at least two days after the first training night")
     if data is None:
         report("building training examples")
-        data = samples(market, first, nights[-1])
+        data = samples(market, first, nights[-1], inputs)
     nightly = _nightly(data) if kind == "ridge" else None
+    name = WALK_FORWARD_NAMES[kind, inputs]
     created = datetime.now(timezone.utc).isoformat(timespec="seconds")
     models = []
     for number, month in enumerate(months, 1):
         last = month[0] - timedelta(days=2)
-        report(f"Fitting {KINDS[kind]} for {month[0]:%B %Y} ({number} of {len(months)})")
+        report(f"Fitting {model_name(kind, inputs)} for {month[0]:%B %Y} ({number} of {len(months)})")
         end = bisect_right(data.days, last)
         try:
             model, settings = _fit(kind, data, end, nightly)
         except ValueError as exc:
-            raise ValueError(f"{KINDS[kind]} for {month[0]:%B %Y}: {exc}; use more calibration days") from None
+            raise ValueError(f"{model_name(kind, inputs)} for {month[0]:%B %Y}: {exc}; "
+                             "use more calibration days") from None
         start, stop = bisect_left(data.days, month[0]), bisect_right(data.days, month[-1])
         tested = Samples(data.rows[start:stop], data.gaps[start:stop], data.days[start:stop])
-        models.append(Forecaster(f"{kind}-{first:%Y%m%d}-{last:%Y%m%d}-monthly", WALK_FORWARD_NAMES[kind],
-                                 kind, created, (first, last), (month[0], month[-1]),
-                                 {"test": evaluate(model, tested)}, model, settings))
-    return WalkForward(kind, WALK_FORWARD_NAMES[kind], models)
+        models.append(Forecaster(f"{kind}-{inputs}-{first:%Y%m%d}-{last:%Y%m%d}-monthly", name, kind, created,
+                                 (first, last), (month[0], month[-1]), {"test": evaluate(model, tested)}, model,
+                                 settings, inputs))
+    return WalkForward(kind, name, models, inputs)
 
 
 def load_all(folder: Path) -> list[Forecaster]:

@@ -12,6 +12,7 @@ from pathlib import Path
 from fakes import FakeComEd
 from sparc import lab
 from sparc.backtest import PROFILES
+from sparc.comed import ComEdError
 from sparc.history import backfill
 from sparc.server import make_server
 from sparc.store import Store
@@ -32,6 +33,7 @@ class ServerTests(unittest.TestCase):
         shutil.copyfile(Path(self.source.name) / "sparc.db", root / "sparc.db")
         self.fake = FakeComEd()
         self.gate = None  # set to an Event to hold every ComEd request until it is set
+        self.weather_down = False
         self.server = make_server(lab.Folders(root), port=0, get=self.comed, quiet=True)
         self.port = self.server.server_address[1]
         thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -43,6 +45,8 @@ class ServerTests(unittest.TestCase):
     def comed(self, url):
         if self.gate:
             self.gate.wait(10)
+        if self.weather_down and "open-meteo" in url:
+            raise ComEdError(f"HTTP 503 from {url}")
         return self.fake(url)
 
     def request(self, method, path, body=None, headers=None, raw=None):
@@ -152,12 +156,22 @@ class ServerTests(unittest.TestCase):
         self.gate.set()
         self.assertEqual(self.wait(job)["state"], "cancelled")
 
-    def test_fetch_job_adds_prices(self):
+    def test_fetch_job_adds_prices_and_weather(self):
         status, job, _ = self.request("POST", "/api/fetch", {"start": "2026-03-01", "end": "2026-03-03"})
         self.assertEqual(status, 202)
         job = self.wait(job)
-        self.assertEqual((job["state"], job["result"]), ("done", {"failed": []}))
-        self.assertEqual(self.request("GET", "/api/state")[1]["data"]["last"], "2026-03-03")
+        self.assertEqual((job["state"], job["result"]), ("done", {"failed": [], "weather_error": None}))
+        data = self.request("GET", "/api/state")[1]["data"]
+        self.assertEqual(data["last"], "2026-03-03")
+        self.assertEqual(data["months"][-1]["weather"], data["months"][-1]["hours"])
+
+    def test_prices_are_kept_when_the_weather_service_fails(self):
+        self.weather_down = True
+        status, job, _ = self.request("POST", "/api/fetch", {"start": "2026-03-01", "end": "2026-03-02"})
+        job = self.wait(job)
+        self.assertEqual(job["state"], "done")
+        self.assertIn("HTTP 503", job["result"]["weather_error"])
+        self.assertEqual(self.request("GET", "/api/state")[1]["data"]["last"], "2026-03-02")
 
 
 if __name__ == "__main__":

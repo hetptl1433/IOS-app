@@ -243,7 +243,7 @@ class Forecasted(_Planned):
         missing = [hour for hour in hours if hour not in known]
         if missing:
             recent = Recent.seen_by(self.market, now)
-            rows = [features(self.market, hour, now, recent) for hour in missing]
+            rows = [features(self.market, hour, now, recent, self.forecaster.inputs) for hour in missing]
             for hour, row, gap in zip(missing, rows, self.forecaster.predict_many(rows)):
                 known[hour] = row[0] + gap
         return {hour: known[hour] + self.cents[hour] for hour in hours}
