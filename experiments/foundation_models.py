@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sparc import backtest  # noqa: E402
 from sparc.backtest import PROFILES  # noqa: E402
-from sparc.clock import DAY, HOUR, SLOT, at, hour_start  # noqa: E402
+from sparc.clock import HOUR, at, hour_start  # noqa: E402
 from sparc.forecast import DECISION_HOURS, LAST_TARGET  # noqa: E402
 from sparc.market import Market, latest_visible_interval  # noqa: E402
 from sparc.store import Store  # noqa: E402
