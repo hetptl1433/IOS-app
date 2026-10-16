@@ -48,11 +48,11 @@ class Decision:
     """One moment a plan is made, and everything a model may know then."""
 
     now: int
-    targets: list[int]  # hour starts to forecast
+    targets: list[int]  # consecutive hour starts to forecast, from the hour under way
     history: list[float]  # hourly real-time price as posted by `now`, oldest first, ending the hour before
     history_day_ahead: list[float]  # day-ahead price of the same past hours
     future_day_ahead: list[float]  # day-ahead price of the targets as known at `now`
-    actual: list[float]  # settled price of the targets (for scoring only)
+    actual: list[float | None]  # settled price of the targets, None if unpriced (for scoring only)
 
 
 def decisions(market: Market, first: date, last: date, context: int) -> list[Decision]:
@@ -64,12 +64,12 @@ def decisions(market: Market, first: date, last: date, context: int) -> list[Dec
         end = at(day + timedelta(days=1), LAST_TARGET)
         for decision in DECISION_HOURS:
             now = at(day if decision >= 14 else day + timedelta(days=1), time(decision))
-            targets = [h for h in range(hour_start(now), end, HOUR) if h in market.hourly]
+            targets = list(range(hour_start(now), end, HOUR))  # consecutive, like the models' output
             known = [market.known_day_ahead(h, now) for h in targets]
-            if not targets or any(v is None for v in known):
+            if any(v is None for v in known) or not any(h in market.hourly for h in targets):
                 continue
             history, ahead = _history(market, posted, now, context)
-            result.append(Decision(now, targets, history, ahead, known, [market.hourly[h] for h in targets]))
+            result.append(Decision(now, targets, history, ahead, known, [market.hourly.get(h) for h in targets]))
         day += timedelta(days=1)
     return result
 
@@ -82,19 +82,20 @@ def _posted_hours(market: Market) -> dict[int, list[tuple[int, float]]]:
 
 
 def _history(market, posted, now, context):
-    """Hourly means of the 5-minute prices posted by `now` (a gap repeats the previous hour)."""
+    """Hourly means of the 5-minute prices posted by `now`, one per hour up to the hour before.
+
+    A missing hour repeats the hour before it, so the series keeps its daily rhythm.
+    """
     newest = latest_visible_interval(now)
     history, ahead = [], []
-    previous = None
     for hour in range(hour_start(now) - context * HOUR, hour_start(now), HOUR):
         seen = [p for t, p in posted.get(hour, ()) if t <= newest]
-        value = sum(seen) / len(seen) if seen else previous
-        day_ahead = market.day_ahead.get(hour)
+        value = sum(seen) / len(seen) if seen else (history[-1] if history else None)
+        day_ahead = market.day_ahead.get(hour, ahead[-1] if ahead else None)
         if value is None or day_ahead is None:
-            continue
+            continue  # only before the stored history begins
         history.append(value)
         ahead.append(day_ahead)
-        previous = value
     return history, ahead
 
 
@@ -188,7 +189,11 @@ MODELS: dict[str, Callable[[], Model]] = {
 def score(batch: list[Decision], forecasts: list[list[float]]) -> dict:
     errors, baseline = [], []
     for d, forecast in zip(batch, forecasts):
+        if len(forecast) != len(d.targets):
+            raise ValueError(f"forecast of {len(forecast)} hours for {len(d.targets)} targets")
         for predicted, actual, ahead in zip(forecast, d.actual, d.future_day_ahead):
+            if actual is None:
+                continue
             errors.append(predicted - actual)
             baseline.append(ahead - actual)
     n = len(errors)
@@ -231,7 +236,7 @@ def main(argv=None) -> int:
     end = at(args.end + timedelta(days=2), time(0))
     market = Market(store.five_minute(start, end), store.day_ahead(start, end), store.published_real_time(start, end))
     batch = decisions(market, args.start, args.end, args.context)
-    print(f"{len(batch):,} decisions, {sum(len(d.targets) for d in batch):,} hourly forecasts")
+    print(f"{len(batch):,} decisions, {sum(a is not None for d in batch for a in d.actual):,} hourly forecasts scored")
     strategies = [ChargeNow(), DayAhead()]
     report = {}
     for name in args.models.split(","):
