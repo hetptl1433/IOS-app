@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, time, timedelta
 from pathlib import Path
@@ -71,6 +71,8 @@ class Night:
 def simulate(session: Session, strategy: Strategy, market: Market, delivery: Delivery) -> Outcome:
     """Charge at constant power and bill each kWh at its hour's final average price."""
     strategy.begin(session, market, delivery)
+    cents = {hour: delivery.cents(hour) for hour in session.hours}
+    risky = {hour for hour in session.hours if capacity_risk(hour)}
     result = Outcome()
     full = session.slot_kwh
     remaining = session.energy_kwh
@@ -86,8 +88,8 @@ def simulate(session: Session, strategy: Strategy, market: Market, delivery: Del
             result.pauses += 1
         hour = hour_start(now)
         result.supply += kwh * market.hourly[hour] / 100
-        result.delivery += kwh * delivery.cents(hour) / 100
-        if capacity_risk(hour):
+        result.delivery += kwh * cents[hour] / 100
+        if hour in risky:
             result.risk_kwh += kwh
         result.energy_kwh += kwh
         remaining -= kwh
@@ -104,13 +106,23 @@ def usable(session: Session, market: Market) -> bool:
                for hour in session.hours)
 
 
+class Cancelled(Exception):
+    pass
+
+
 def run(market: Market, days: Iterable[date], profiles: Sequence[Profile],
-        strategies: Sequence[Strategy], deliveries: Sequence[Delivery]) -> tuple[list[Night], dict[str, int]]:
+        strategies: Sequence[Strategy], deliveries: Sequence[Delivery], *,
+        progress: Callable[[int, int], None] | None = None,
+        should_stop: Callable[[], bool] | None = None) -> tuple[list[Night], dict[str, int]]:
     nights: list[Night] = []
     skipped: dict[str, int] = defaultdict(int)
     days = list(days)
+    total, done = len(profiles) * len(days), 0
     for profile in profiles:
         for day in days:
+            if should_stop and should_stop():
+                raise Cancelled
+            done += 1
             session = profile.session(day)
             if not usable(session, market):
                 skipped[profile.name] += 1
@@ -119,6 +131,8 @@ def run(market: Market, days: Iterable[date], profiles: Sequence[Profile],
                 for strategy in strategies:
                     outcome = simulate(session, strategy, market, delivery)
                     nights.append(Night(day, profile.name, delivery.name, strategy.label, outcome))
+            if progress:
+                progress(done, total)
     return nights, dict(skipped)
 
 
@@ -165,6 +179,7 @@ def summarize(nights: Sequence[Night], baseline: str, best: str) -> list[Summary
 def format_table(summaries: Sequence[Summary], order: Sequence[str]) -> str:
     """One table per delivery tariff and profile, in the order they were simulated."""
     lines = []
+    width = max([26, *(len(s.strategy) + 2 for s in summaries)])
     rank = {label: i for i, label in enumerate(order)}
     deliveries = {s.delivery: i for i, s in enumerate(reversed(summaries))}
     profiles = {s.profile: i for i, s in enumerate(reversed(summaries))}
@@ -175,10 +190,10 @@ def format_table(summaries: Sequence[Summary], order: Sequence[str]) -> str:
         if (s.delivery, s.profile) != current:
             current = (s.delivery, s.profile)
             lines += ["", f"{s.profile} · {s.delivery} · {s.nights} nights",
-                      f"  {'strategy':<26}{'$/night':>9}{'saved $/yr':>12}{'of max':>8}"
+                      f"  {'strategy':<{width}}{'$/night':>9}{'saved $/yr':>12}{'of max':>8}"
                       f"{'worst $':>9}{'starts':>8}{'pauses':>8}{'risk kWh/yr':>13}{'ready':>7}"]
         share = "—" if s.share is None else f"{100 * s.share:.0f}%"
-        lines.append(f"  {s.strategy:<26}{s.cost:>9.2f}{s.saved_per_year:>12.0f}{share:>8}"
+        lines.append(f"  {s.strategy:<{width}}{s.cost:>9.2f}{s.saved_per_year:>12.0f}{share:>8}"
                      f"{s.worst:>9.2f}{s.starts:>8.2f}{s.pauses:>8.2f}{s.risk_kwh_per_year:>13.0f}"
                      f"{100 * s.ready:>6.0f}%")
     return "\n".join(lines)

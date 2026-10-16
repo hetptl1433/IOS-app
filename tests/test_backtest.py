@@ -5,7 +5,7 @@ from datetime import date, time
 from sparc.backtest import Profile, run, simulate, summarize, usable
 from sparc.clock import DAY, HOUR, SLOT, at, hour_start, local
 from sparc.market import Market
-from sparc.strategies import ChargeNow, DayAhead, Hindsight, Live, Session, Timer, fit_decay
+from sparc.strategies import ChargeNow, DayAhead, Hindsight, Live, Session, Threshold, Timer, fit_decay
 from sparc.tariff import STANDARD, TIME_OF_DAY
 
 DAY0 = date(2026, 1, 12)  # a Monday in winter: no capacity-risk hours
@@ -59,11 +59,44 @@ class SimulateTests(unittest.TestCase):
         self.assertEqual(local(timer.begins).hour, 23)
         self.assertTrue(outcome.ready)
 
+    def test_timer_starts_at_once_when_plugged_in_up_to_six_hours_after_its_time(self):
+        late = Profile("t", time(22), time(6), 15, 7.7).session(DAY0)
+        simulate(late, timer := Timer(time(21)), flat_market(), STANDARD)
+        self.assertEqual(timer.begins, late.arrival)
+        # Plugged in at 3:30 a.m., six and a half hours after 21:00: wait for tonight's.
+        early = Profile("t", time(3, 30), time(23, 30), 7.7, 7.7).session(DAY0)
+        simulate(early, timer, flat_market(), STANDARD)
+        self.assertEqual(timer.begins, at(DAY0, time(21)))
+
     def test_timer_starts_early_when_its_time_is_too_late(self):
         session = Profile("t", time(22), time(6), 50, 7.7).session(DAY0)  # 55.6 kWh: 7 h 15 min
         timer = Timer(time(23))
         self.assertTrue(simulate(session, timer, flat_market(), STANDARD).ready)
         self.assertEqual(local(timer.begins).time(), time(22, 15))  # still done by 5:30
+
+    def test_price_cap_pauses_while_prices_are_high_and_still_finishes(self):
+        market = flat_market(price=2.0)
+        spike = at(DAY0, time(19))
+        market = with_hour(market, spike, prices=[9.0] * 12)
+        session = Profile("t", time(18, 55), time(7), 15, 7.7).session(DAY0)
+        cap = Threshold(3)
+        cap.begin(session, market, STANDARD)
+        # The 19:00 price is posted about 7 minutes in, so the charger stops at 19:10
+        # and restarts once 20:00's price is posted.
+        on = [t for t in range(session.arrival, session.departure, SLOT) if cap.energy(t, 10.0, True)]
+        self.assertIn(at(DAY0, time(19, 5)), on)
+        self.assertNotIn(at(DAY0, time(19, 10)), on)
+        self.assertNotIn(at(DAY0, time(20, 5)), on)
+        self.assertIn(at(DAY0, time(20, 10)), on)
+        outcome = simulate(session, cap, market, STANDARD)
+        self.assertTrue(outcome.ready)
+        self.assertEqual(outcome.pauses, 1)
+
+    def test_price_cap_starts_when_waiting_would_finish_too_late(self):
+        session = Profile("t", time(22), time(6), 50, 7.7).session(DAY0)  # needs 7 h 15 min of 8 h
+        outcome = simulate(session, Threshold(1), flat_market(price=4.0), STANDARD)
+        self.assertTrue(outcome.ready)
+        self.assertEqual(outcome.starts, 1)
 
     def test_pause_and_restart_are_counted(self):
         class OnOffOn:
@@ -163,7 +196,8 @@ class StrategyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "nights.csv"
             write_csv(nights, path)
-            rows = list(csv.DictReader(path.open()))
+            with path.open() as handle:
+                rows = list(csv.DictReader(handle))
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["tariff"], "Delivery Time-of-Day")
         self.assertAlmostEqual(float(rows[0]["cost_usd"]),

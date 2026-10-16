@@ -40,14 +40,14 @@ def plan(need: Need, cost: Mapping[int, float], blocked: Collection[int] = (), *
     soft_deadline = need.departure - need.reserve_s
     current = hour_start(need.now)
 
-    blocks = []  # the part of each hour before the soft deadline, and the part after it
+    blocks = []  # the slots of each hour before the soft deadline, and those after it
     for hour in range(current, need.departure, HOUR):
         price = cost[hour]
         if hour == current:
             price += -stickiness if charging else stickiness
-        slots = range(max(hour, need.now), min(hour + HOUR, need.departure), SLOT)
-        for late in (False, True):
-            part = [s for s in slots if (s >= soft_deadline) == late]
+        first, end = max(hour, need.now), min(hour + HOUR, need.departure)
+        split = first if soft_deadline <= first else min(end, first + ceil((soft_deadline - first) / SLOT) * SLOT)
+        for late, part in ((False, range(first, split, SLOT)), (True, range(split, end, SLOT))):
             if part:
                 blocks.append(((hour in blocked, late, price, hour), part))
     blocks.sort(key=lambda block: block[0])

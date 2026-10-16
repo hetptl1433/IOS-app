@@ -2,8 +2,32 @@
 
 Charge an EV in the cheapest hours of ComEd's Hourly Pricing plan and still be
 ready to leave on time. SPARC is built to run on a Raspberry Pi. Today it fetches
-prices, backtests charging strategies on real price history, and records live
-prices. Tesla control comes next, once a strategy has proven itself on real prices.
+prices, backtests charging strategies on real price history (from a local web app
+or the command line), trains price forecasts, and records live prices. Tesla
+control comes next, once a strategy has proven itself on real prices.
+
+## Quick start
+
+Python 3.11 or newer. No third-party packages (LightGBM is optional).
+
+```sh
+python -m sparc serve        # opens http://127.0.0.1:8765
+```
+
+1. **Data**: fetch prices from ComEd, for example from 2025-01-01 to today. A year
+   is about 420 requests at one a second. Everything is stored in
+   `runtime/sparc.db` on your computer; an interrupted fetch picks up where it stopped.
+2. **Run**: one click backtests every strategy below on every night with prices,
+   for four example drivers (editable) and both delivery rates. 18 months takes
+   about a minute.
+3. **Results**: the cheapest strategy for each driver, which others are
+   statistically tied with it, savings per year, month-by-month comparisons,
+   forecast accuracy, and every night as CSV. Past runs are kept.
+4. **Models**: train a ridge or LightGBM price forecast on any period, score it on
+   a later one, and backtest it.
+
+The app listens on 127.0.0.1 only; the only requests it makes are to ComEd.
+`pip install lightgbm` adds the LightGBM forecast.
 
 ## What a charge costs
 
@@ -23,64 +47,90 @@ Other per-kWh charges are flat: they change the bill, not the best time to charg
 
 ## Strategies
 
-| | Strategy | Knows |
+| Strategy | Knows | Does |
 |---|---|---|
-| 0 | Charge on plug-in | nothing |
-| 1 | Timer 23:00 | the clock |
-| 2 | Day-ahead plan | ComEd's day-ahead prices, published around 4:30 p.m. CT for the next day |
-| 3 | Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts |
-| – | Perfect hindsight | every hour's final price: the lowest possible cost, not a strategy |
+| Charge on plug-in | nothing | the baseline every saving is measured against |
+| Timer 21:00 … 01:00 | the clock | starts at a fixed time, or at once if plugged in up to 6 hours after it (as a Tesla's schedule does) |
+| Below 2¢, 3¢, 5¢ | the latest 5-minute price | charges while the price is at or under the cap, pauses above it |
+| Day-ahead plan | ComEd's day-ahead prices, out around 4:30 p.m. CT for the next day | charges in the cheapest hours |
+| Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts | re-plans every 5 minutes |
+| Forecast, refit monthly | a learned forecast of each hour's price (ridge or LightGBM) | plans from the forecast, re-plans hourly |
+| Perfect hindsight | every hour's final price | the lowest cost reachable without capacity risk: a reference, not a strategy |
 
-Rungs 2 and 3 share one planner (`sparc/planner.py`). It fills the cheapest
-hours first, tries to finish 30 minutes before departure, and keeps out of
-capacity-risk hours. Rung 3 re-plans every 5 minutes. When a spike lands in an
-hour it is charging in, the rest of that hour's energy moves to a cheaper hour.
-A machine-learned price forecast is worth adding only if it beats rung 3 on
-held-out years.
+Every strategy starts early when waiting would mean not finishing. The planned
+strategies share one planner (`sparc/planner.py`). It fills the cheapest hours
+first, tries to finish 30 minutes before departure, and keeps out of
+capacity-risk hours. Timers and price caps ignore those hours, as a car's own
+schedule or a simple price rule would.
+
+The forecasts predict how far each hour's settled price lands from its day-ahead
+price, from what is known when the plan is made: day-ahead prices already out,
+the last day of 5-minute prices, the hour, weekday and season. In a backtest,
+each month's model learns only from the nights before that month (minus two
+days, so no prices are shared). A model trained in the Models tab is only used
+on nights after its training period.
 
 ## Results: ComEd prices, April 2025 to October 2026
 
-Every night of the period (541–556 per profile, after skipping nights with a
-missing price), billed at ComEd's settled hourly prices. Costs are supply plus the distribution charge; flat per-kWh charges are
-left out. The live strategy's price-persistence model was fitted on January–March
-2025, before the test period.
+Every night from 2025-04-02 to 2026-10-14 (540–555 per driver, after skipping
+nights with a missing price), billed at ComEd's settled hourly prices. Costs are
+supply plus the distribution charge; flat per-kWh charges are left out. The live
+strategy and the first month's forecasts learned from the 90 days before.
 
 Commuter: plug in at 6 p.m., leave at 7 a.m., add 15 kWh at 7.7 kW.
 
 | Strategy | Standard delivery, $/night | saved $/yr | Time-of-Day delivery, $/night | saved $/yr |
 |---|---|---|---|---|
 | Charge on plug-in | 2.40 | – | 2.52 | – |
-| Timer 23:00 | 1.48 | 333 | 0.94 | 575 |
+| Timer 23:00 | 1.49 | 333 | 0.94 | 575 |
+| Timer 01:00 | 1.39 | 368 | 0.85 | 610 |
+| Below 2¢ | 1.51 | 322 | 1.07 | 529 |
+| Below 3¢ | 1.54 | 314 | 1.17 | 493 |
 | Day-ahead plan | 1.37 | 374 | 0.83 | 616 |
 | Day-ahead + live prices | 1.38 | 371 | 0.84 | 613 |
+| Forecast: ridge, refit monthly | 1.39 | 368 | 0.85 | 610 |
+| Forecast: LightGBM, refit monthly | 1.39 | 369 | 0.85 | 611 |
 | Perfect hindsight | 1.27 | 410 | 0.74 | 649 |
 
 Savings per year against charging on plug-in, standard delivery:
 
-| Profile | Timer 23:00 | Day-ahead | + live prices | Perfect hindsight |
-|---|---|---|---|---|
-| Commuter: 6 p.m.–7 a.m., +15 kWh, 7.7 kW | 333 | 374 | 371 | 410 |
-| Big day: 6 p.m.–7 a.m., +40 kWh, 7.7 kW | 502 | 517 | 518 | 573 |
-| Late arrival: 10 p.m.–6 a.m., +50 kWh, 11.5 kW | 55 | 92 | 97 | 151 |
-| Afternoon plug-in: 2 p.m.–7 a.m., +30 kWh, 7.7 kW | 451 | 489 | 494 | 556 |
+| Driver | Timer 23:00 | Below 3¢ | Day-ahead | + live prices | Ridge forecast | Perfect hindsight |
+|---|---|---|---|---|---|---|
+| Commuter: 6 p.m.–7 a.m., +15 kWh, 7.7 kW | 333 | 314 | 374 | 371 | 368 | 410 |
+| Big day: 6 p.m.–7 a.m., +40 kWh, 7.7 kW | 503 | 457 | 517 | 519 | 514 | 574 |
+| Late arrival: 10 p.m.–6 a.m., +50 kWh, 11.5 kW | 55 | 70 | 92 | 98 | 90 | 152 |
+| Afternoon plug-in: 2 p.m.–7 a.m., +30 kWh, 7.7 kW | 452 | 418 | 490 | 495 | 484 | 557 |
 
 What the numbers say:
 
 - **Charging overnight is most of the saving.** The 23:00 timer gets 81% of what
   perfect hindsight could save for the commuter (89% with Time-of-Day delivery). A
   1 a.m. timer comes within 2 cents a night of the day-ahead plan.
-- **Planning from day-ahead prices adds $13–41 a year** over the 23:00 timer across
-  the profiles and both delivery rates. It also adjusts to how much energy is needed and to unusual nights.
+- **Planning from day-ahead prices adds $12–41 a year** over the 23:00 timer across
+  the drivers and both delivery rates. It also adjusts to how much energy is needed and to unusual nights.
   It is not always safer: in the January 2026 cold snap it chose overnight hours
   that spiked, and its worst commuter night was $6.45 against the timer's $3.57.
 - **Reacting to live 5-minute prices adds nothing on average.** Against the
-  day-ahead plan it ranged from −1.4 to +1.5 cents a night. Varying the publication
-  lag, hysteresis and persistence model never lifted it above that, and strong
-  hysteresis made it clearly worse. It wins on some spike nights and loses on false
-  alarms, including spikes that ComEd later revised away.
-- **A better price forecast could add at most $33–67 a year** per profile: the gap
-  between the day-ahead plan and perfect hindsight. A forecasting model has to
-  close a real share of that gap to be worth running.
+  day-ahead plan it ranged from −1.4 to +1.5 cents a night, always within two
+  standard errors. Varying the publication lag, hysteresis and persistence model
+  never lifted it above that, and strong hysteresis made it clearly worse. It wins
+  on some spike nights and loses on false alarms, including spikes that ComEd later
+  revised away.
+- **"Stop charging when the price is high" loses to the plan.** A 2¢ cap saves the
+  commuter $322 a year against the plan's $374, starting and stopping the charger
+  six times a night (the plan: under two), and each stop is a command to the car.
+  Caps also charge in capacity-risk hours (698 kWh a year for the 2 p.m. plug-in at
+  3¢) and ignore the 10.7¢ afternoon delivery rate: on Time-of-Day delivery the
+  2 p.m. plug-in saves $953 with a 3¢ cap and $1,427 with the plan.
+- **Learned forecasts don't pay.** Refit every month, ridge regression forecast
+  each hour's settled price with the same mean error as the day-ahead price
+  (1.87¢) and an 11% lower RMS error (5.63¢ against 6.32¢); LightGBM was 2.5% and
+  5% better. Planning from them still cost 0.3–1.5 cents a night more than planning
+  from day-ahead prices: tied with the cheapest strategy for 3 of the 8 driver and
+  rate combinations, behind for the other 5. Better spike forecasts don't change
+  which hours are cheapest often enough.
+- **A better forecast could add at most $33–67 a year** per driver: the gap
+  between the day-ahead plan and perfect hindsight.
 - **The capacity charge is the big daytime risk.** Plugging in at 2 p.m. and
   charging straight away overlapped 4 of PJM's 5 peak hours in summer 2025. That
   adds about $366 a year to capacity charges from PJM's half of the formula alone;
@@ -90,25 +140,24 @@ What the numbers say:
   usage decides whether enrolling pays.
 
 Reproduce with `python -m sparc fetch 2025-01-01 2026-10-15` and then
-`python -m sparc backtest 2025-04-01 2026-10-14 --calibrate 90`.
+`python -m sparc backtest 2025-04-02 2026-10-14`, or the same dates in the app.
 
-## Usage
+## Command line
 
-Python 3.11 or newer. No third-party packages.
+The web app and the command line share everything in `runtime/` (choose another
+folder with `--data DIR` or `SPARC_DATA`).
 
 ```sh
-python -m sparc fetch 2022-01-01 2026-10-15     # backfill into runtime/sparc.db; resumable
-python -m sparc check 2022-01-01 2026-10-15     # coverage, and agreement with ComEd's hourly prices
-python -m sparc backtest 2023-01-01 2026-10-13 --csv runtime/nights.csv
-python -m sparc collect                          # on the Pi: record live prices every 5 minutes
-python -m unittest discover -s tests             # tests
+python -m sparc serve [--port 8765]               # the web app
+python -m sparc fetch 2025-01-01 2026-10-15       # backfill prices; resumable
+python -m sparc check 2025-01-01 2026-10-15       # coverage, and agreement with ComEd's hourly prices
+python -m sparc backtest 2025-04-02 2026-10-14    # every strategy; saved as a run the app can show
+python -m sparc backtest 2025-04-02 2026-10-14 --strategies day-ahead,cap-3 --csv nights.csv
+python -m sparc strategies                        # the strategy ids
+python -m sparc train ridge 2025-01-02 2025-12-31 --test 2026-01-02 2026-10-14
+python -m sparc collect                           # on the Pi: record live prices every 5 minutes
+python -m unittest discover -s tests              # tests
 ```
-
-`backtest` replays four driver profiles (in `sparc/backtest.py`) through every
-strategy, under both delivery rates. It reports dollars per night, yearly
-savings against charging on plug-in, the share of perfect hindsight's savings
-achieved, the worst night, how often the charger starts and pauses, and energy
-charged in capacity-risk hours.
 
 ## Data
 
@@ -117,9 +166,10 @@ charged in capacity-risk hours.
   interval. Averaging the labels HH:00–HH:55 reproduces ComEd's published hourly
   prices; `check` measures that agreement on everything you fetch.
 - **Day-ahead prices** come from the table behind ComEd's pricing-table page.
-  It is not part of the documented API and can change without notice. PJM Data
-  Miner (`da_hrl_lmps`, ComEd zone) is the official source. It needs a free PJM
-  account, and non-members are limited to 6 requests a minute.
+  It is not part of the documented API and can change without notice. Its table
+  for the day the clocks fall back cannot be read, so nights needing that day's
+  prices are skipped. PJM Data Miner (`da_hrl_lmps`, ComEd zone) is the official source.
+  It needs a free PJM account, and non-members are limited to 6 requests a minute.
 - The 5-minute feed keeps prices as first posted. ComEd's published hourly price
   is the settled one. Across 2025–2026 the two agree to rounding in all but 15 of
   15,020 hours. In 12 of those 15 they differ by more than a cent, and each time a
@@ -143,15 +193,17 @@ charged in capacity-risk hours.
 | `market.py` | hourly billing prices; when each price became public |
 | `tariff.py` | delivery rates, capacity-risk hours |
 | `planner.py` | cheapest-hours plan with buffer, blocked hours and hysteresis |
-| `strategies.py` | the ladder above |
+| `strategies.py` | the strategies above |
+| `forecast.py` | forecast features, ridge and LightGBM fits, monthly refits |
 | `backtest.py` | night-by-night simulation and summaries |
+| `lab.py` | backtest runs and model training, shared by the app and the command line |
+| `server.py`, `web/` | the local web app |
 | `history.py`, `collector.py` | backfill and live recording |
 
 ## Next
 
-1. Ship rung 2, the day-ahead plan, with the capacity guard. Live 5-minute
-   reaction and a learned price forecast stay research until they beat it on
-   held-out data.
+1. Ship the day-ahead plan with the capacity guard. Live 5-minute reaction and
+   learned forecasts stay research: neither beat it on held-out nights.
 2. Shadow mode on the Pi: run `collect`, plan every evening, and log what would
    have happened, without sending commands.
 3. Tesla Fleet API through `tesla-http-proxy`, using `add_charge_schedule` so the

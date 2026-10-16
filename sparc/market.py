@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import time, timedelta
-from functools import lru_cache
+from functools import cached_property, lru_cache
 
 from .clock import DAY, SLOT, at, hour_start, local
 
@@ -49,12 +49,53 @@ class Market:
         self.partial = {hour for hour in self.means
                         if hour not in self.complete and hour not in self.published}
 
+    @cached_property
+    def deviations(self) -> Deviations:
+        return Deviations(self.five_minute, self.day_ahead)
+
     def known_day_ahead(self, hour: int, now: int) -> float | None:
         """The hour's day-ahead price if published by `now`, else the same hour one day earlier."""
         for candidate in (hour, hour - DAY):
             if candidate in self.day_ahead and day_ahead_release(candidate) <= now:
                 return self.day_ahead[candidate]
         return None
+
+
+class Deviations:
+    """Each posted 5-minute price minus its hour's day-ahead price.
+
+    Running totals over a regular 5-minute grid make the mean over any run of
+    intervals two lookups.
+    """
+
+    def __init__(self, five_minute: dict[int, float], day_ahead: dict[int, float]):
+        self.values = {t: price - day_ahead[hour_start(t)] for t, price in five_minute.items()
+                       if hour_start(t) in day_ahead}
+        self.origin = min(self.values, default=0)
+        size = (max(self.values) - self.origin) // SLOT + 1 if self.values else 0
+        self.sums, self.counts, self.latest = [0.0] * (size + 1), [0] * (size + 1), [-1] * size
+        last = -1
+        for i in range(size):
+            value = self.values.get(self.origin + i * SLOT)
+            if value is not None:
+                last = i
+            self.latest[i] = last
+            self.sums[i + 1] = self.sums[i] + (value if value is not None else 0.0)
+            self.counts[i + 1] = self.counts[i] + (value is not None)
+
+    def window(self, newest: int, intervals: int) -> tuple[float, int]:
+        """Sum and number of the deviations in the `intervals` intervals up to and including `newest`."""
+        i = (newest - self.origin) // SLOT
+        high, low = min(i + 1, len(self.latest)), max(i + 1 - intervals, 0)
+        if high <= low:
+            return 0.0, 0
+        return self.sums[high] - self.sums[low], self.counts[high] - self.counts[low]
+
+    def last(self, newest: int, intervals: int) -> float | None:
+        """The most recent deviation in the `intervals` intervals up to and including `newest`."""
+        i = (newest - self.origin) // SLOT
+        j = self.latest[min(i, len(self.latest) - 1)] if i >= 0 and self.latest else -1
+        return self.values[self.origin + j * SLOT] if j >= 0 and j > i - intervals else None
 
 
 def latest_visible_interval(now: int) -> int:

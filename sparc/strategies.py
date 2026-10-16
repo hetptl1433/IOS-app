@@ -1,13 +1,15 @@
 """Charging strategies. Each one decides using only what it could have known at the time."""
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import time, timedelta
 from math import ceil
 from typing import Protocol
 
-from .clock import HOUR, SLOT, at, hour_start, local
+from .clock import DAY, HOUR, SLOT, at, hour_start, local
+from .forecast import Forecaster, Recent, WalkForward, features
 from .market import Market, day_ahead_release, latest_visible_interval
 from .planner import EPS, Need, plan
 from .tariff import Delivery, capacity_risk
@@ -50,7 +52,13 @@ class ChargeNow:
 
 
 class Timer:
-    """Start at a fixed wall-clock time, or earlier if that would finish too late."""
+    """Scheduled charging: start at a fixed wall-clock time, or earlier if that would finish too late.
+
+    As with a Tesla's "Start at" schedule, a car plugged in up to six hours after the
+    start time begins charging at once. Plugged in later, it waits for the next day's.
+    """
+
+    GRACE = 6 * HOUR
 
     def __init__(self, start: time):
         self.start = start
@@ -58,8 +66,11 @@ class Timer:
 
     def begin(self, session: Session, market: Market, delivery: Delivery) -> None:
         day = local(session.arrival).date()
-        target = at(day, self.start)
-        if target < session.arrival:
+        if at(day, self.start) > session.arrival:
+            day -= timedelta(days=1)
+        if session.arrival - at(day, self.start) <= self.GRACE:
+            target = session.arrival
+        else:
             target = at(day + timedelta(days=1), self.start)
         duration = ceil(session.energy_kwh / session.slot_kwh - EPS) * SLOT
         latest = session.departure - session.reserve_s - duration
@@ -72,6 +83,32 @@ class Timer:
         return self.full if now >= self.begins else 0.0
 
 
+class Threshold:
+    """Charges while the newest posted 5-minute price is at or below a cap, and pauses above it.
+
+    The simplest way to "stop charging when prices are high". It starts regardless
+    once waiting any longer would not leave time to finish, and it ignores the
+    delivery rate and capacity-risk hours.
+    """
+
+    def __init__(self, cents: float):
+        self.cents = cents
+        self.label = f"Below {cents:g}¢"
+
+    def begin(self, session: Session, market: Market, delivery: Delivery) -> None:
+        self.market = market
+        self.full = session.slot_kwh
+        self.deadline = session.departure - session.reserve_s
+
+    def energy(self, now: int, remaining_kwh: float, charging: bool) -> float:
+        if now + ceil(remaining_kwh / self.full - EPS) * SLOT >= self.deadline:
+            return self.full
+        price = self.market.five_minute.get(latest_visible_interval(now))
+        if price is None:  # no new price: keep doing what it was doing
+            return self.full if charging else 0.0
+        return self.full if price <= self.cents else 0.0
+
+
 class _Planned:
     """Follows a plan from `planner.plan`, rebuilt whenever `information(now)` changes."""
 
@@ -80,6 +117,8 @@ class _Planned:
     def begin(self, session: Session, market: Market, delivery: Delivery) -> None:
         self.session, self.market, self.delivery = session, market, delivery
         self.blocked = {hour for hour in session.hours if capacity_risk(hour)}
+        self.cents = {hour: delivery.cents(hour) for hour in session.hours}
+        self.releases = sorted(day_ahead_release(hour) for hour in session.hours)
         self.schedule: dict[int, float] = {}
         self.version: object = None
 
@@ -96,6 +135,10 @@ class _Planned:
     def reserve(self) -> int:
         return self.session.reserve_s
 
+    def released(self, now: int) -> int:
+        """How many of the session's hours have a published day-ahead price by `now`."""
+        return bisect_right(self.releases, now)
+
     def information(self, now: int) -> object:
         raise NotImplementedError
 
@@ -109,11 +152,10 @@ class DayAhead(_Planned):
     label = "Day-ahead plan"
 
     def information(self, now: int) -> object:
-        return sum(day_ahead_release(hour) <= now for hour in self.session.hours)
+        return self.released(now)
 
     def costs(self, now: int) -> dict[int, float]:
-        return {hour: self.market.known_day_ahead(hour, now) + self.delivery.cents(hour)
-                for hour in self.session.hours}
+        return {hour: self.market.known_day_ahead(hour, now) + self.cents[hour] for hour in self.session.hours}
 
 
 class Live(_Planned):
@@ -130,12 +172,24 @@ class Live(_Planned):
         self.decay = list(decay)
         self.stickiness = stickiness
 
+    def begin(self, session: Session, market: Market, delivery: Delivery) -> None:
+        super().begin(session, market, delivery)
+        # The day-ahead price known for an hour changes only when its own or the day
+        # before's is released.
+        self.changes = sorted({day_ahead_release(hour) for hour in session.hours}
+                              | {day_ahead_release(hour - DAY) for hour in session.hours})
+        self.known_until = None
+
     def information(self, now: int) -> object:
         return now
 
     def costs(self, now: int) -> dict[int, float]:
         market = self.market
-        expected = {hour: market.known_day_ahead(hour, now) for hour in self.session.hours}
+        changed = bisect_right(self.changes, now)
+        if changed != self.known_until:
+            self.known_until = changed
+            self.known = {hour: market.known_day_ahead(hour, now) for hour in self.session.hours}
+        expected = dict(self.known)
         latest = latest_visible_interval(now)
         reference = market.known_day_ahead(hour_start(latest), now)
         if latest in market.five_minute and reference is not None:
@@ -153,11 +207,55 @@ class Live(_Planned):
                         persists = self.decay[k - 1] if 1 <= k <= len(self.decay) else 0.0
                         total += expected[hour] + persists * deviation
                 expected[hour] = total / 12
-        return {hour: price + self.delivery.cents(hour) for hour, price in expected.items()}
+        return {hour: price + self.cents[hour] for hour, price in expected.items()}
+
+
+class Forecasted(_Planned):
+    """Plans from a learned forecast of each hour's real-time price, revised every hour.
+
+    `source` is one trained model, or a `WalkForward` series that picks the model
+    fitted for each night.
+    """
+
+    stickiness = 0.5
+    CACHE_LIMIT = 20_000
+
+    def __init__(self, source: Forecaster | WalkForward, label: str | None = None):
+        self.source = source
+        self.label = label or f"Forecast: {source.name}"
+        self.predicted: dict[tuple[str, int], dict[int, float]] = {}  # forecasts shared across sessions
+
+    def begin(self, session: Session, market: Market, delivery: Delivery) -> None:
+        if market is not getattr(self, "market", market):
+            self.predicted.clear()
+        super().begin(session, market, delivery)
+        self.forecaster = self.source.for_night(local(session.arrival).date())
+
+    def information(self, now: int) -> object:
+        return hour_start(now), self.released(now)
+
+    def costs(self, now: int) -> dict[int, float]:
+        hours = [hour for hour in self.session.hours if hour >= hour_start(now)]
+        key = (self.forecaster.id, now)
+        if key not in self.predicted and len(self.predicted) >= self.CACHE_LIMIT:
+            self.predicted.clear()
+        known = self.predicted.setdefault(key, {})
+        missing = [hour for hour in hours if hour not in known]
+        if missing:
+            recent = Recent.seen_by(self.market, now)
+            rows = [features(self.market, hour, now, recent) for hour in missing]
+            for hour, row, gap in zip(missing, rows, self.forecaster.predict_many(rows)):
+                known[hour] = row[0] + gap
+        return {hour: known[hour] + self.cents[hour] for hour in hours}
 
 
 class Hindsight(_Planned):
-    """Knows every hour's final price in advance: the lowest achievable cost, not a strategy."""
+    """Knows every hour's final price in advance: a reference, not a strategy.
+
+    It keeps the planners' guard against capacity-risk hours, so it is the lowest
+    cost reachable without that risk. A strategy that ignores the guard can cost
+    less on summer afternoons and still lose on next year's capacity charge.
+    """
 
     label = "Perfect hindsight"
 
@@ -168,15 +266,12 @@ class Hindsight(_Planned):
         return 0
 
     def costs(self, now: int) -> dict[int, float]:
-        return {hour: self.market.hourly[hour] + self.delivery.cents(hour) for hour in self.session.hours}
+        return {hour: self.market.hourly[hour] + self.cents[hour] for hour in self.session.hours}
 
 
 def fit_decay(market: Market, start: int, end: int, steps: int = 24) -> list[float]:
     """Least-squares share of a 5-minute price's deviation from day-ahead that remains k steps later."""
-    deviation = {}
-    for t, price in market.five_minute.items():
-        if start <= t < end and hour_start(t) in market.day_ahead:
-            deviation[t] = price - market.day_ahead[hour_start(t)]
+    deviation = {t: d for t, d in market.deviations.values.items() if start <= t < end}
     decay = []
     for k in range(1, steps + 1):
         cross = square = 0.0

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPARC charging lab</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/charts.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-inner">
+        <div class="brand"><strong>SPARC</strong><span>EV charging on ComEd Hourly Pricing</span></div>
+        <nav class="tabs" role="tablist" aria-label="Sections">
+          <button type="button" role="tab" data-tab="data" aria-controls="tab-data">Data</button>
+          <button type="button" role="tab" data-tab="run" aria-controls="tab-run">Run</button>
+          <button type="button" role="tab" data-tab="results" aria-controls="tab-results">Results</button>
+          <button type="button" role="tab" data-tab="models" aria-controls="tab-models">Models</button>
+        </nav>
+      </div>
+      <div id="job" class="job" role="status" aria-live="polite" hidden></div>
+    </header>
+    <main>
+      <section id="tab-data" class="panel" role="tabpanel" aria-label="Data"></section>
+      <section id="tab-run" class="panel" role="tabpanel" aria-label="Run" hidden></section>
+      <section id="tab-results" class="panel" role="tabpanel" aria-label="Results" hidden></section>
+      <section id="tab-models" class="panel" role="tabpanel" aria-label="Models" hidden></section>
+    </main>
+  </body>
+</html>

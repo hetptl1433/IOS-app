@@ -1,51 +1,81 @@
 """Backfill ComEd price history, and check what was stored."""
 from __future__ import annotations
 
+import time as _time
+from bisect import bisect_left
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
 from . import comed
+from .backtest import Cancelled
 from .clock import HOUR, at, local
 from .market import Market
 from .store import Store
 
 
-def backfill(store: Store, first: date, last: date, get: comed.Get,
-             log: Callable[[str], None] = print) -> list[str]:
+def backfill(store: Store, first: date, last: date, get: comed.Get, *,
+             progress: Callable[[int, int, str], None] | None = None,
+             should_stop: Callable[[], bool] | None = None,
+             log: Callable[[str], None] = print, today: date | None = None) -> list[str]:
     """Fetch 5-minute prices a week at a time and hourly tables a day at a time.
 
     Finished requests are recorded, so an interrupted backfill resumes where it
-    stopped. Returns the dates whose hourly table could not be read.
+    stopped. Requests reaching today or later are not recorded, because their prices
+    are still coming in. Returns the dates whose hourly table could not be read.
     """
-    done = store.fetched("five-minute")
-    chunks = [c for c in comed.day_chunks(first, last) if f"{c[0]}/{c[1]}" not in done]
-    for n, (start, end) in enumerate(chunks, 1):
+    today = today or local(int(_time.time())).date()
+    chunks = [c for c in comed.day_chunks(first, last)
+              if f"{c[0]}/{c[1]}" not in store.fetched("five-minute")]
+    # The table for date D starts with the hour before midnight, so one extra day
+    # covers the last evening.
+    done_days = store.fetched("hourly")
+    days = [d for d in _days(first, last + timedelta(days=1)) if d.isoformat() not in done_days]
+    total, finished, failed = len(chunks) + len(days), 0, []
+
+    def step(message: str) -> None:
+        nonlocal finished
+        finished += 1
+        if progress:
+            progress(finished, total, message)
+        if should_stop and should_stop():
+            raise Cancelled
+
+    for start, end in chunks:
         prices = comed.five_minute_prices(datetime.combine(start, time(0)),
                                           datetime.combine(end, time(23, 55)), get)
         store.add_five_minute(prices)
-        store.mark_fetched("five-minute", f"{start}/{end}")
-        log(f"5-minute prices {start} to {end}: {len(prices)} intervals ({n}/{len(chunks)})")
-
-    # The table for date D starts with the hour before midnight, so one extra day
-    # covers the last evening.
-    done = store.fetched("hourly")
-    days = [d for d in _days(first, last + timedelta(days=1)) if d.isoformat() not in done]
-    failed = []
-    for n, day in enumerate(days, 1):
+        if end < today:
+            store.mark_fetched("five-minute", f"{start}/{end}")
+        step(f"5-minute prices {start} to {end}")
+    for day in days:
         try:
             store.add_hourly(comed.hourly_table(day, get))
         except comed.ComEdError as exc:
             failed.append(day.isoformat())
             log(f"hourly table {day}: {exc}")
-            continue
-        store.mark_fetched("hourly", day.isoformat())
-        if n % 30 == 0 or n == len(days):
-            log(f"hourly tables through {day} ({n}/{len(days)})")
+        else:
+            if day < today:
+                store.mark_fetched("hourly", day.isoformat())
+        step(f"hourly table {day}")
     return failed
 
 
+def stored_range(store: Store) -> tuple[date, date] | None:
+    """First and last Chicago dates with 5-minute prices."""
+    first, last = store.db.execute("SELECT MIN(start), MAX(start) FROM rt_5min").fetchone()
+    return (local(first).date(), local(last).date()) if first is not None else None
+
+
 ROUNDING = 0.15  # both series are rounded to 0.1 cent, so their difference can reach ~0.1
+
+
+@dataclass(frozen=True)
+class Month:
+    month: str  # YYYY-MM
+    hours: int
+    priced: int  # hours with a billing price
+    day_ahead: int
 
 
 @dataclass
@@ -60,6 +90,7 @@ class Coverage:
     day_ahead: int = 0
     compared: int = 0  # hours with both a published price and all twelve readings
     revised: list[tuple[int, float, float]] = field(default_factory=list)  # hour, 5-min mean, published
+    months: list[Month] = field(default_factory=list)
 
     def __str__(self) -> str:
         lines = [f"{self.first} to {self.last}: {self.hours} hours",
@@ -94,7 +125,23 @@ def check(store: Store, first: date, last: date) -> Coverage:
     report.revised = sorted(((hour, market.means[hour], published[hour]) for hour in compared
                              if abs(market.means[hour] - published[hour]) > ROUNDING),
                             key=lambda row: -abs(row[1] - row[2]))
+    report.months = _months(first, last, market)
     return report
+
+
+def _months(first: date, last: date, market: Market) -> list[Month]:
+    priced, ahead = sorted(market.hourly), sorted(market.day_ahead)
+    months = []
+    month = first.replace(day=1)
+    while month <= last:
+        following = (month + timedelta(days=32)).replace(day=1)
+        start = at(max(month, first), time(0))
+        end = at(min(following, last + timedelta(days=1)), time(0))
+        months.append(Month(f"{month:%Y-%m}", (end - start) // HOUR,
+                            bisect_left(priced, end) - bisect_left(priced, start),
+                            bisect_left(ahead, end) - bisect_left(ahead, start)))
+        month = following
+    return months
 
 
 def _days(first: date, last: date):

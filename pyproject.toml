@@ -16,3 +16,6 @@ sparc = "sparc.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["sparc*"]
+
+[tool.setuptools.package-data]
+sparc = ["web/*"]
