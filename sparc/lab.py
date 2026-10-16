@@ -18,7 +18,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from . import backtest
-from .backtest import PROFILES, Cancelled, Night, Profile
+from .backtest import PROFILES, TIERS, Cancelled, Night, Profile
 from .clock import DAY, at
 from .forecast import WALK_FORWARD_NAMES, Forecaster, lightgbm_available, load_all, samples, walk_forward
 from .forecast import train as train_forecaster
@@ -35,6 +35,7 @@ WALK_FORWARD = {"walk:ridge": ("ridge", "prices"), "walk:ridge+weather": ("ridge
                 "walk:lightgbm": ("lightgbm", "prices"), "walk:lightgbm+weather": ("lightgbm", "weather")}
 WEATHER_COVERAGE = 0.95  # share of hours a weather forecast needs, or it refuses to run
 MIN_CALIBRATION = 30  # days; for strategies that learn from the period before the first night
+DRIVERS = {"tiers": ("Average, moderate and heavy drivers", TIERS), "examples": ("The four example drivers", PROFILES)}
 MAX_PROFILES = 8
 MAX_NIGHTS = 1500
 Progress = Callable[[int, int, str], None]  # (done, total, message); total 0 when unknown
@@ -213,7 +214,7 @@ def default_config(store: Store, folders: Folders) -> dict:
                               weather_ready(store, start - timedelta(days=calibrate), end))
     return {"start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
             "calibrate_days": calibrate, "tariffs": list(TARIFFS), "strategies": strategies,
-            "profiles": [profile_json(p) for p in PROFILES]}
+            "profiles": [profile_json(p) for p in TIERS]}
 
 
 def eligible(choices: list[Choice], start: date, calibrate_days: int, weather: bool = True) -> list[str]:
@@ -295,6 +296,7 @@ def run_backtest(store: Store, config: RunConfig, folders: Folders, progress: Pr
         "tariffs": [TARIFFS[t].name for t in config.tariffs],
         "nights": _counts(nights), "skipped": skipped,
         "summaries": [asdict(s) for s in summaries],
+        "default_setup": against_default(nights),
         "winners": winners(nights, labels),
         "monthly": monthly(nights),
         "decay": decay, "forecasts": forecasts,
@@ -399,6 +401,28 @@ def winners(nights: Sequence[Night], labels: Sequence[str]) -> list[dict]:
                 tied.append(s)
         result.append({"profile": profile, "tariff": tariff, "best": best, "cost": means[best],
                        "tied": tied, "behind": behind})
+    return result
+
+
+def against_default(nights: Sequence[Night]) -> list[dict]:
+    """Each strategy on Time-of-Day delivery against the default setup: standard delivery, charging on plug-in.
+
+    This is what a driver saves by letting SPARC choose both the delivery rate and the hours. Time-of-Day
+    delivery costs more than standard from 1 to 7 p.m., so it only pays when charging stays out of
+    those hours. Empty unless the run has both delivery rates.
+    """
+    default = {(n.profile, n.day): n.outcome.cost for n in nights
+               if n.delivery == STANDARD.name and n.strategy == ChargeNow.label}
+    groups: dict[tuple[str, str], list[Night]] = defaultdict(list)
+    for n in nights:
+        if n.delivery == TIME_OF_DAY.name and (n.profile, n.day) in default:
+            groups[n.profile, n.strategy].append(n)
+    result = []
+    for (profile, strategy), group in groups.items():
+        before = sum(default[profile, n.day] for n in group) / len(group)
+        after = sum(n.outcome.cost for n in group) / len(group)
+        result.append({"profile": profile, "strategy": strategy, "cost": after, "default_cost": before,
+                       "saved_per_year": (before - after) * 365, "cheaper": 1 - after / before if before else None})
     return result
 
 

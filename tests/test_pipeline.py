@@ -48,13 +48,22 @@ class PipelineTests(unittest.TestCase):
                            "--csv", str(folder / "nights.csv")])
         text = output.getvalue()
         self.assertEqual(status, 0)
-        self.assertIn("Commuter · Standard delivery · 5 nights", text)
+        self.assertIn("Average · Standard delivery · 5 nights", text)
+        self.assertIn("Heavy · Delivery Time-of-Day · 5 nights", text)
         self.assertIn("Below 3¢", text)
         self.assertIn("Perfect hindsight", text)
+        self.assertIn("Saved a year against the default setup", text)
         self.assertNotIn("Day-ahead + live prices", text)  # needs 30 calibration days
         self.assertNotIn("skipped", text)
-        self.assertEqual(len((folder / "nights.csv").read_text().splitlines()), 1 + 5 * 4 * 2 * 11)
+        self.assertEqual(len((folder / "nights.csv").read_text().splitlines()), 1 + 5 * 3 * 2 * 11)
         self.assertEqual(len(list((folder / "runs").glob("*.json"))), 1)
+
+        output = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(io.StringIO()):
+            status = main(["--data", str(folder), "backtest", "2026-01-12", "2026-01-13", "--calibrate", "6",
+                           "--drivers", "examples", "--strategies", "day-ahead"])
+        self.assertEqual(status, 0)
+        self.assertIn("Commuter · Standard delivery · 2 nights", output.getvalue())
 
 
 class CollectorTests(unittest.TestCase):

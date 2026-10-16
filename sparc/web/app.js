@@ -792,17 +792,19 @@ function profilesCard(form, changed) {
         },
         "Add driver",
       ),
-      el(
-        "button",
-        {
-          class: "link",
-          type: "button",
-          onclick: () => {
-            form.profiles = structuredClone(state.server.defaults.profiles);
-            changed();
+      Object.values(state.server.drivers).map(preset =>
+        el(
+          "button",
+          {
+            class: "link",
+            type: "button",
+            onclick: () => {
+              form.profiles = structuredClone(preset.profiles);
+              changed();
+            },
           },
-        },
-        "Reset to the four examples",
+          preset.label,
+        ),
       ),
     ),
   );
@@ -1028,6 +1030,9 @@ function renderResults(panel) {
     ),
   );
 
+  const headline = defaultSetupCard(run);
+  if (headline) panel.append(headline);
+
   panel.append(
     card(
       "Cheapest strategy",
@@ -1121,6 +1126,76 @@ function renderResults(panel) {
   const forecasts = forecastCard(run);
   if (forecasts) panel.append(forecasts);
   panel.append(detailsCard(run, summaries));
+}
+
+// Each strategy on Time-of-Day delivery against standard delivery and charging on plug-in.
+function defaultSetupCard(run) {
+  const rows = run.default_setup || [];
+  if (!rows.length) return null;
+  const find = (profile, strategy) => rows.find(r => r.profile === profile && r.strategy === strategy);
+  const best = profile =>
+    run.strategies
+      .filter(s => s !== HINDSIGHT)
+      .map(s => find(profile, s))
+      .filter(Boolean)
+      .sort((a, b) => a.cost - b.cost)[0];
+  const top = new Map(run.profiles.map(p => [p.name, best(p.name)]));
+  return card(
+    "Against the default setup",
+    el(
+      "p",
+      { class: "note" },
+      "What each driver saves a year when SPARC picks both the delivery rate and the hours: each strategy on ",
+      "Time-of-Day delivery, against standard delivery and charging as soon as the car is plugged in.",
+    ),
+    el(
+      "div",
+      { class: "tiles" },
+      run.profiles.map(p => {
+        const r = top.get(p.name);
+        return r
+          ? tile(p.name, `${perYear(r.saved_per_year)} a year`, `${percent(r.cheaper)} cheaper · ${r.strategy}`)
+          : null;
+      }),
+    ),
+    el(
+      "div",
+      { class: "table-wrap" },
+      el(
+        "table",
+        {},
+        el(
+          "thead",
+          {},
+          el(
+            "tr",
+            {},
+            el("th", {}, "Strategy"),
+            run.profiles.map(p => el("th", { class: "num" }, p.name)),
+          ),
+        ),
+        el(
+          "tbody",
+          {},
+          run.strategies.map(s =>
+            el(
+              "tr",
+              {},
+              el("td", {}, s),
+              run.profiles.map(p => {
+                const r = find(p.name, s);
+                return el(
+                  "td",
+                  { class: top.get(p.name)?.strategy === s ? "num best" : "num" },
+                  r ? `${perYear(r.saved_per_year)} (${percent(r.cheaper)})` : "—",
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 function summaryTip(s) {

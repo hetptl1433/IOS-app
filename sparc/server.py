@@ -157,6 +157,8 @@ class App:
         return {"data": self.data_status(), "defaults": defaults,
                 "choices": [asdict(c) for c in lab.strategy_choices(self.folders)], "groups": lab.GROUPS,
                 "tariffs": {key: {"name": d.name, "bands": d.bands} for key, d in lab.TARIFFS.items()},
+                "drivers": {key: {"label": label, "profiles": [lab.profile_json(p) for p in profiles]}
+                            for key, (label, profiles) in lab.DRIVERS.items()},
                 "profiles_max": lab.MAX_PROFILES, "nights_max": lab.MAX_NIGHTS,
                 "min_calibration": lab.MIN_CALIBRATION, "lightgbm": lightgbm_available(),
                 "models": lab.list_models(self.folders), "runs": lab.list_runs(self.folders),

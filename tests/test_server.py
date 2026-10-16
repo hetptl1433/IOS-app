@@ -87,6 +87,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual((state["data"]["first"], state["data"]["last"]), ("2026-01-01", "2026-02-28"))
         self.assertIn("walk:ridge", [c["id"] for c in state["choices"]])
+        self.assertEqual([len(d["profiles"]) for d in state["drivers"].values()], [3, 4])
         self.assertEqual(state["runs"], [])
         self.assertEqual(self.request("GET", "/api/nothing")[0], 404)
         self.assertEqual(self.request("DELETE", "/api/state")[0], 405)

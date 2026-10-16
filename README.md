@@ -19,11 +19,12 @@ python -m sparc serve        # opens http://127.0.0.1:8765
    Everything is stored in `runtime/sparc.db` on your computer; an interrupted
    fetch picks up where it stopped.
 2. **Run**: one click backtests every strategy below on every night with prices,
-   for four example drivers (editable) and both delivery rates. 18 months takes
-   about a minute and a half.
-3. **Results**: the cheapest strategy for each driver, which others are
-   statistically tied with it, savings per year, month-by-month comparisons,
-   forecast accuracy, and every night as CSV. Past runs are kept.
+   for an average, a moderate and a heavy driver (or the four example drivers;
+   both editable) and both delivery rates. 18 months takes about a minute.
+3. **Results**: what each driver saves against the default setup, the cheapest
+   strategy for each driver, which others are statistically tied with it,
+   savings per year, month-by-month comparisons, forecast accuracy, and every
+   night as CSV. Past runs are kept.
 4. **Models**: train a ridge or LightGBM price forecast on any period, score it on
    a later one, and backtest it.
 
@@ -74,7 +75,46 @@ each month's model learns only from the nights before that month (minus two
 days, so no prices are shared). A model trained in the Models tab is only used
 on nights after its training period.
 
-## Results: ComEd prices, April 2025 to October 2026
+## What a driver saves
+
+One Cybertruck on an 11.5 kW Wall Connector, plugged in from 8 p.m. to 7 a.m.
+every night from 2025-04-02 to 2026-10-14 (554 nights), for three amounts of driving.
+The default setup is standard delivery and charging as soon as the car is
+plugged in. SPARC puts the car on Time-of-Day delivery and charges it in the
+cheapest hours of the day-ahead plan.
+
+| Driver | Charged a night | Default setup, $/night | SPARC, $/night | Saved a year | Cheaper |
+|---|---|---|---|---|---|
+| Average, about 37 miles a day | 15 kWh | 1.80 | 0.83 | $355 | 54% |
+| Moderate, about 75 miles a day | 30 kWh | 3.43 | 1.67 | $643 | 51% |
+| Heavy, about 200 miles a day | 80 kWh | 8.21 | 4.85 | $1,224 | 41% |
+
+Every strategy on Time-of-Day delivery, saved a year against the default setup:
+
+| Strategy | Average | Moderate | Heavy |
+|---|---|---|---|
+| Charge on plug-in (the rate alone) | 165 | 363 | 1,020 |
+| Timer 01:00 | 346 | 638 | 1,167 |
+| Below 3¢ | 290 | 553 | 1,173 |
+| Day-ahead plan | 355 | 643 | 1,224 |
+| Day-ahead + live prices | 348 | 641 | 1,228 |
+| Forecast: LightGBM + weather, refit monthly | 345 | 636 | 1,226 |
+| Perfect hindsight | 393 | 697 | 1,297 |
+
+- The delivery rate alone is worth $165–1,020 a year here, and the plan's timing
+  adds $190, $280 and $204 on top. Time-of-Day delivery charges 10.7¢ from 1 to
+  7 p.m., against 6.2¢ on standard, so it only pays when charging stays out of
+  the afternoon.
+- The plan gets 90–94% of what perfect hindsight would save. It saves more than
+  every timer and price cap; live prices and the learned forecasts, with or
+  without weather, come within $12 a year of it.
+- Heavy driving leaves the least room to choose: 80 kWh takes nearly eight of
+  the eleven hours plugged in.
+
+Reproduce with `python -m sparc backtest 2025-04-02 2026-10-14`; the app shows
+the same table at the top of Results.
+
+## Four example drivers
 
 Every night from 2025-04-02 to 2026-10-14 (540–555 per driver, after skipping
 nights with a missing price), billed at ComEd's settled hourly prices. Costs are
@@ -154,7 +194,8 @@ What the numbers say:
   usage decides whether enrolling pays.
 
 Reproduce with `python -m sparc fetch 2025-01-01 2026-10-15` and then
-`python -m sparc backtest 2025-04-02 2026-10-14`, or the same dates in the app.
+`python -m sparc backtest 2025-04-02 2026-10-14 --drivers examples`, or the same
+dates and the four example drivers in the app.
 
 ## Command line
 
@@ -166,6 +207,7 @@ python -m sparc serve [--port 8765]               # the web app
 python -m sparc fetch 2025-01-01 2026-10-15       # backfill prices and weather; resumable
 python -m sparc check 2025-01-01 2026-10-15       # coverage, and agreement with ComEd's hourly prices
 python -m sparc backtest 2025-04-02 2026-10-14    # every strategy; saved as a run the app can show
+python -m sparc backtest 2025-04-02 2026-10-14 --drivers examples    # the four example drivers
 python -m sparc backtest 2025-04-02 2026-10-14 --strategies day-ahead,cap-3 --csv nights.csv
 python -m sparc strategies                        # the strategy ids
 python -m sparc train ridge 2025-01-02 2025-12-31 --test 2026-01-02 2026-10-14 [--weather]

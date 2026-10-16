@@ -43,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument("--strategies", metavar="IDS",
                         help="comma-separated strategy ids (default: every one that can run; "
                              "see `python -m sparc strategies`)")
+    replay.add_argument("--drivers", choices=list(lab.DRIVERS), default="tiers",
+                        help="tiers: average, moderate and heavy drivers of one car (default); "
+                             "examples: the four example drivers")
     replay.add_argument("--csv", type=Path, help="also copy every night's result to this file")
 
     commands.add_parser("strategies", help="list the strategy ids that backtest accepts")
@@ -127,7 +130,7 @@ def run_backtest(store: Store, folders: lab.Folders, args) -> None:
     config = lab.RunConfig.parse({"start": args.start.isoformat(), "end": args.end.isoformat(),
                                   "calibrate_days": args.calibrate, "tariffs": list(lab.TARIFFS),
                                   "strategies": strategies,
-                                  "profiles": [lab.profile_json(p) for p in backtest.PROFILES]}, choices)
+                                  "profiles": [lab.profile_json(p) for p in lab.DRIVERS[args.drivers][1]]}, choices)
     result = lab.run_backtest(store, config, folders, progress=Progress())
     print_run(result)
     if args.csv:
@@ -149,6 +152,10 @@ def print_run(result: dict) -> None:
           "on summer weekday afternoons, when the capacity charge is set.")
     summaries = [backtest.Summary(**s) for s in result["summaries"]]
     print(backtest.format_table(summaries, result["strategies"]))
+    if result["default_setup"]:
+        print("\nSaved a year against the default setup (standard delivery, charging on plug-in), "
+              "with each strategy on Time-of-Day delivery:")
+        print(format_default(result["default_setup"], result["strategies"], [p["name"] for p in result["profiles"]]))
     print("\nCheapest strategy (\"tied\": within two standard errors, comparing night by night):")
     for w in result["winners"]:
         tied = f"; tied: {', '.join(w['tied'])}" if w["tied"] else ""
@@ -163,6 +170,19 @@ def print_run(result: dict) -> None:
     if result["skipped"]:
         print("\nNights skipped for missing prices: "
               + ", ".join(f"{name} {count}" for name, count in result["skipped"].items()))
+
+
+def format_default(rows: list[dict], strategies: list[str], profiles: list[str]) -> str:
+    cell = {(r["profile"], r["strategy"]): ("-" if r["saved_per_year"] < -0.5 else "")
+            + f"${abs(r['saved_per_year']):,.0f}" + (f" {r['cheaper']:4.0%}" if r["cheaper"] is not None else "")
+            for r in rows}
+    width = max(len(s) for s in strategies) + 2
+    columns = max([14, *(len(p) + 2 for p in profiles), *(len(c) + 2 for c in cell.values())])
+    lines = ["  " + "strategy".ljust(width) + "".join(p.rjust(columns) for p in profiles)]
+    for strategy in strategies:
+        lines.append("  " + strategy.ljust(width) + "".join(cell.get((p, strategy), "-").rjust(columns)
+                                                          for p in profiles))
+    return "\n".join(lines)
 
 
 def train(store: Store, folders: lab.Folders, args) -> None:

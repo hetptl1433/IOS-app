@@ -43,6 +43,14 @@ PROFILES = (
     Profile("Afternoon plug-in", time(14), time(7), 30, 7.7),
 )
 
+# One Cybertruck on an 11.5 kW Wall Connector, plugged in from 8 p.m. to 7 a.m., by how far it is driven:
+# about 37 miles a day (the US average), 75 and 200.
+TIERS = (
+    Profile("Average", time(20), time(7), 15, 11.5),
+    Profile("Moderate", time(20), time(7), 30, 11.5),
+    Profile("Heavy", time(20), time(7), 80, 11.5),
+)
+
 
 @dataclass
 class Outcome:

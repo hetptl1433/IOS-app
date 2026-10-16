@@ -155,6 +155,21 @@ class LabTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, message):
                 self.parse(**change)
 
+    def test_savings_against_the_default_setup(self):
+        result = lab.run_backtest(self.store, self.parse(strategies=["day-ahead"]), self.folders)
+        summary = {(s["profile"], s["delivery"], s["strategy"]): s["cost"] for s in result["summaries"]}
+        rows = {(r["profile"], r["strategy"]): r for r in result["default_setup"]}
+        self.assertEqual(len(rows), 2 * 3)  # two drivers; charging on plug-in, the plan and hindsight
+        for (profile, strategy), row in rows.items():
+            default = summary[profile, "Standard delivery", "Charge on plug-in"]
+            cost = summary[profile, "Delivery Time-of-Day", strategy]
+            self.assertAlmostEqual(row["default_cost"], default)
+            self.assertAlmostEqual(row["saved_per_year"], (default - cost) * 365)
+            self.assertAlmostEqual(row["cheaper"], 1 - cost / default)
+        one_rate = lab.run_backtest(self.store, self.parse(strategies=["day-ahead"], tariffs=["time-of-day"]),
+                                    self.folders)
+        self.assertEqual(one_rate["default_setup"], [])
+
     def test_ties_are_within_two_standard_errors(self):
         nights = []
         for i in range(200):
@@ -186,6 +201,7 @@ class LabTests(unittest.TestCase):
                          ("2026-01-02", "2026-02-27", 0))
         self.assertNotIn("live", defaults["strategies"])
         self.assertIn("cap-2", defaults["strategies"])
+        self.assertEqual([p["name"] for p in defaults["profiles"]], ["Average", "Moderate", "Heavy"])
         lab.RunConfig.parse(defaults, lab.strategy_choices(self.folders))
         status = lab.data_status(self.store)
         self.assertEqual((status["first"], status["last"], status["unpriced"]), ("2026-01-01", "2026-02-28", 0))

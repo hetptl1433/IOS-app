@@ -451,7 +451,8 @@ th.num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-tr.best td {
+tr.best td,
+td.best {
   font-weight: 600;
 }
 .profiles input {
