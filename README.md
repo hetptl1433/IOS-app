@@ -1,98 +1,95 @@
-# SPARC Lab
+# SPARC
 
-A local research workbench for comparing electricity-price forecasts and EV charging schedules. Enter a charging request, choose forecasting models, and replay it against five-minute price data with **hourly ComEd billing**. The dashboard shows whether each strategy reaches the target, what it costs, forecast error, and when charging happens.
+Charge an EV in the cheapest hours of ComEd's Hourly Pricing plan and still be
+ready to leave on time. SPARC is built to run on a Raspberry Pi. Today it fetches
+prices, backtests charging strategies on real price history, and records live
+prices. Tesla control comes next, once a strategy has proven itself on real prices.
 
-**No vehicle commands are sent.** This repository is the model-testing and simulation stage of SPARC. Tesla integration can be developed separately after a strategy has been validated.
+## What a charge costs
 
-## Run in one command
+- **Supply.** ComEd bills every kWh at the average of the twelve 5-minute
+  real-time prices in its hour. If prices spike at 1:10, every kWh charged
+  anywhere from 1:00 to 2:00 pays the spiked average.
+- **Delivery.** 6.228¢/kWh on the standard rate. On Delivery Time-of-Day it is
+  2.984¢ overnight (9 p.m.–6 a.m.) and 10.712¢ from 1 to 7 p.m. (single-family
+  home without electric heat, CUB fact sheet, March 2026).
+- **Capacity charge.** Next year's charge follows your demand in the ten summer
+  hours when PJM and ComEd peak, historically weekday afternoons. Charging at
+  7.7–11.5 kW through one of those hours adds roughly $90–140 to a year of bills,
+  so the planner avoids summer weekday afternoons unless that's the only way to
+  finish.
 
-From this repository, with Python 3.11 or newer:
+Other per-kWh charges are flat: they change the bill, not the best time to charge.
 
-```bash
-python3 -m sparc_lab
+## Strategies
+
+| | Strategy | Knows |
+|---|---|---|
+| 0 | Charge on plug-in | nothing |
+| 1 | Timer 23:00 | the clock |
+| 2 | Day-ahead plan | ComEd's day-ahead prices, published around 4:30 p.m. CT for the next day |
+| 3 | Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts |
+| – | Perfect hindsight | every hour's final price: the lowest possible cost, not a strategy |
+
+Rungs 2 and 3 share one planner (`sparc/planner.py`). It fills the cheapest
+hours first, tries to finish 30 minutes before departure, and keeps out of
+capacity-risk hours. Rung 3 re-plans every 5 minutes. When a spike lands in an
+hour it is charging in, the rest of that hour's energy moves to a cheaper hour.
+A machine-learned price forecast is worth adding only if it beats rung 3 on
+held-out years.
+
+## Usage
+
+Python 3.11 or newer. No third-party packages.
+
+```sh
+python -m sparc fetch 2022-01-01 2026-10-15     # backfill into runtime/sparc.db; resumable
+python -m sparc check 2022-01-01 2026-10-15     # coverage, and agreement with ComEd's hourly prices
+python -m sparc backtest 2023-01-01 2026-10-13 --csv runtime/nights.csv
+python -m sparc collect                          # on the Pi: record live prices every 5 minutes
+python -m unittest discover -s tests             # tests
 ```
 
-Open **http://127.0.0.1:8765**. No API key, npm build, Python package installation, or GPU is required for the included simulator and Ridge model. For optional ML packages, use a separate Python 3.11 or 3.12 virtual environment.
-
-The included 190-day dataset is **deterministic synthetic data**, including synthetic day-ahead forecasts. It is useful for verifying the experiment pipeline; it is not evidence of real-world savings. The default session runs October 14, 2026 at 6 p.m. through October 15 at 7 a.m., America/Chicago.
-
-## First experiment
-
-1. Open **Simulator** and enter arrival, departure, battery capacity, current/target charge, power, and charging efficiency.
-2. Select the synthetic sample or a dataset imported on the **Data** page.
-3. Select available forecasting strategies and run the comparison. Charge-now and a clearly labeled perfect-foresight oracle are included automatically.
-4. Compare **readiness first**, then cost, savings, forecast error, and switching. A cheaper strategy that undercharges has not fulfilled the same request.
-5. Open **Models**, train the built-in Ridge model, and compare it on a session strictly after the model's training/validation cutoff.
-6. Reopen saved experiments or export their comparison as CSV on **Experiments**.
-
-The app stores imported data, trained models, jobs, and results in ignored `runtime/`. Everything stays on the machine running the server.
-
-## Models
-
-| Model | Default setup | Purpose |
-|---|---|---|
-| Same hour last week | Included | Seasonal forecasting baseline |
-| Published day-ahead | Included when data contains publication vintages | Existing external price guidance |
-| Ridge regression | Train locally, no extra packages | Genuine lightweight learned baseline |
-| LightGBM | Optional packages + training | Feature-based learned forecast |
-| Chronos-Bolt Tiny | Optional packages + explicitly prepared local weights | Pretrained general time-series forecasting |
-| Kronos mean adapter | Experimental, unavailable until implemented | Financial candlesticks require a validated hourly-mean adaptation |
-
-Unavailable optional models are shown honestly and cannot generate substitute results. See [model setup and training](docs/MODELS.md) for supported adapters, dependencies, and validation details.
+`backtest` replays four driver profiles (in `sparc/backtest.py`) through every
+strategy, under both delivery rates. It reports dollars per night, yearly
+savings against charging on plug-in, the share of perfect hindsight's savings
+achieved, the worst night, how often the charger starts and pauses, and energy
+charged in capacity-risk hours.
 
 ## Data
 
-Upload a CSV or paste its contents on the Data page. Canonical columns are:
+- **5-minute prices** come from ComEd's documented API
+  (`hourlypricing.comed.com/api?type=5minutefeed`). Each label is the start of its
+  interval. Averaging the labels HH:00–HH:55 reproduces ComEd's published hourly
+  prices; `check` measures that agreement on everything you fetch.
+- **Day-ahead prices** come from the table behind ComEd's pricing-table page.
+  It is not part of the documented API and can change without notice. PJM Data
+  Miner (`da_hrl_lmps`, ComEd zone) is the official source. It needs a free PJM
+  account, and non-members are limited to 6 requests a minute.
+- ComEd settles real-time prices over 24 hours, so the feed can differ from the
+  final billing price. Historical feeds also cannot say when each price was
+  published. `collect` records that from now on.
+- ComEd's API terms restrict redistributing its data, so `runtime/` is git-ignored.
+  Keep price databases local.
 
-```csv
-timestamp,price,published_at,day_ahead,day_ahead_available_at
-2026-10-14T23:00:00Z,6.2,2026-10-14T23:05:00Z,5.8,2026-10-13T22:00:00Z
-```
+## Layout
 
-Each row represents the **start of a five-minute interval**. `price` and `day_ahead` are **cents/kWh**. The example above demonstrates schema only; it is not a complete billing hour. Include all twelve intervals to form an hour.
+| Module | |
+|---|---|
+| `clock.py` | epoch-second timestamps; Chicago wall-clock rules |
+| `comed.py` | ComEd client: 5-minute feed, hourly table, polite fetcher |
+| `store.py` | SQLite storage |
+| `market.py` | hourly billing prices; when each price became public |
+| `tariff.py` | delivery rates, capacity-risk hours |
+| `planner.py` | cheapest-hours plan with buffer, blocked hours and hysteresis |
+| `strategies.py` | the ladder above |
+| `backtest.py` | night-by-night simulation and summaries |
+| `history.py`, `collector.py` | backfill and live recording |
 
-`published_at` defaults to interval end when omitted; this is an explicit availability assumption. Day-ahead prices require `day_ahead_available_at`, so the simulator can avoid using information before publication. Duplicate timestamps and invalid/non-finite values are rejected. Negative prices remain valid.
+## Next
 
-The Data page also downloads bounded historical ranges from ComEd's public five-minute API. These downloads have no historical day-ahead forecast vintages. Publication/revision timing is approximated and clearly reported. Imported records are never described as perfectly reconstructed live data. Details: [data and billing](docs/DATA.md).
-
-## How the simulator makes decisions
-
-The scheduler replans from information available at each decision time. Forecasts estimate prices; a separate constrained scheduler selects charging periods. Five-minute observations update the current-hour estimate without revealing the remainder of that hour. All realized costs use the completed hour's average price for every kWh charged in that hour.
-
-Charging efficiency separates grid kWh from battery kWh. The last interval can use fractional energy to finish exactly at the target. The initial implementation assumes constant available charging power; vehicle-specific taper, cabin conditioning, battery temperature, outages, and demand/capacity charges are not modeled. An optional variable delivery adder can be included; the result is not a complete utility bill.
-
-**Ready-by policy** can override the soft forecast price threshold when needed to preserve the departure target. **Strict-price policy** respects the predicted-price threshold and reports any shortfall. A forecast threshold cannot guarantee the final billed hourly rate. Minimum session duration reduces switching, with exceptions for completion, hard forecast caps, and deadline feasibility.
-
-An oracle uses future prices and is an analysis-only lower bound under the implemented physical assumptions. It is excluded from deployable-model winner selection. Review all assumptions and warnings beside each result.
-
-## Reproducible validation
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 -m compileall -q sparc_lab scripts
-node --check sparc_lab/web/app.js
-```
-
-The manually triggered GitHub Actions workflow runs the Python suite on Python 3.11, 3.12, and 3.13 and checks browser JavaScript syntax. It does not run automatically when code is pushed. Core tests do not download weights or install ML packages. Optional heavy adapters require their own environment and real-weight benchmark before deployment.
-
-## Raspberry Pi
-
-Use 64-bit Raspberry Pi OS, Python 3.11+, and the same launch command. Begin with included baselines/Ridge and benchmark optional models on the actual Pi. Do not assume the AI HAT automatically accelerates PyTorch transformers.
-
-By default the app listens only on localhost. For an explicitly trusted local network, use `--host 0.0.0.0`; this is a development server with no authentication. Do not expose it to the public internet. See [deployment notes](docs/DEPLOYMENT.md) for a sample systemd service.
-
-Docker is optional:
-
-```bash
-docker compose up --build
-```
-
-## Sources
-
-- [ComEd five-minute API](https://hourlypricing.comed.com/hp-api/)
-- [ComEd hourly billing, day-ahead guidance, and settlement](https://hourlypricing.comed.com/live-prices/)
-- [Amazon Chronos](https://github.com/amazon-science/chronos-forecasting)
-- [Financial Kronos](https://github.com/shiyu-coder/Kronos)
-- [Tesla Fleet API](https://developer.tesla.com/docs/fleet-api)
-
-MIT licensed. This independent research project is not affiliated with ComEd, Tesla, Amazon, or the Kronos authors. Third-party models retain their own licenses.
+1. Run the backtest on four years of prices and pick the rung to ship.
+2. Shadow mode on the Pi: decide live, log, but send no commands.
+3. Tesla Fleet API through `tesla-http-proxy`, using `add_charge_schedule` so the
+   car still charges if the Pi goes offline. Commands cost $1 per 1,000 and data
+   reads $1 per 500, with a $10 monthly credit, so the controller must not poll.

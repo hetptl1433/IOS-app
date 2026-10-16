@@ -2,21 +2,14 @@ __pycache__/
 *.py[cod]
 .venv/
 .venv-*/
-runtime/
-models/*
-!models/.gitkeep
-data/*
-!data/.gitkeep
-!data/example.csv
-.env
-.env.*
-!.env.example
-.DS_Store
 *.egg-info/
 build/
 dist/
-.pytest_cache/
-.coverage
-htmlcov/
-work/
-*.log
+
+# Price databases and backtest output stay local: ComEd's API terms restrict
+# redistributing its data.
+runtime/
+
+.env
+.env.*
+.DS_Store
