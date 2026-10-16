@@ -45,46 +45,55 @@ def backfill(store: Store, first: date, last: date, get: comed.Get,
     return failed
 
 
+ROUNDING = 0.15  # both series are rounded to 0.1 cent, so their difference can reach ~0.1
+
+
 @dataclass
 class Coverage:
     first: date
     last: date
     hours: int = 0
-    complete_hours: int = 0
-    day_ahead_hours: int = 0
-    compared: int = 0
-    agree: int = 0
-    worst: list[tuple[int, float, float]] = field(default_factory=list)  # hour, 5-min mean, published
+    published: int = 0  # billed at ComEd's settled hourly price
+    complete: int = 0  # all twelve 5-minute readings
+    partial: int = 0  # unpublished, billed from 10-11 readings
+    unpriced: int = 0
+    day_ahead: int = 0
+    compared: int = 0  # hours with both a published price and all twelve readings
+    revised: list[tuple[int, float, float]] = field(default_factory=list)  # hour, 5-min mean, published
 
     def __str__(self) -> str:
         lines = [f"{self.first} to {self.last}: {self.hours} hours",
-                 f"  complete 5-minute hours: {self.complete_hours} "
-                 f"({_percent(self.complete_hours, self.hours)})",
-                 f"  day-ahead prices:        {self.day_ahead_hours} "
-                 f"({_percent(self.day_ahead_hours, self.hours)})",
-                 f"  5-minute mean matches ComEd's published hourly price (to 0.05 cents): "
-                 f"{self.agree} of {self.compared} ({_percent(self.agree, self.compared)})"]
-        for hour, mean, published in self.worst:
-            lines.append(f"    {local(hour):%Y-%m-%d %H:%M %Z}: 5-minute mean {mean:.3f}, published {published}")
+                 f"  billed at ComEd's published hourly price: {self.published} "
+                 f"({_percent(self.published, self.hours)})",
+                 f"  billed from the 5-minute feed only:       {self.hours - self.published - self.unpriced}"
+                 f" ({self.partial} of them from 10-11 readings)",
+                 f"  no price:                                 {self.unpriced}",
+                 f"  all twelve 5-minute readings:             {self.complete} "
+                 f"({_percent(self.complete, self.hours)})",
+                 f"  day-ahead prices:                         {self.day_ahead} "
+                 f"({_percent(self.day_ahead, self.hours)})",
+                 f"  5-minute mean differs from the published price by more than rounding: "
+                 f"{len(self.revised)} of {self.compared} hours"]
+        for hour, mean, published in self.revised[:8]:
+            lines.append(f"    {local(hour):%Y-%m-%d %H:%M %Z}: 5-minute mean {mean:.2f}, published {published}")
         return "\n".join(lines)
 
 
-def check(store: Store, first: date, last: date, show: int = 5) -> Coverage:
+def check(store: Store, first: date, last: date) -> Coverage:
     start, end = at(first, time(0)), at(last + timedelta(days=1), time(0))
-    market = Market(store.five_minute(start, end), store.day_ahead(start, end))
     published = store.published_real_time(start, end)
+    market = Market(store.five_minute(start, end), store.day_ahead(start, end), published)
     report = Coverage(first, last, hours=(end - start) // HOUR)
-    report.complete_hours = len(market.hourly)
-    report.day_ahead_hours = len(market.day_ahead)
-    gaps = []
-    for hour, price in published.items():
-        if hour in market.hourly:
-            report.compared += 1
-            gap = abs(market.hourly[hour] - price)
-            report.agree += gap <= 0.05 + 1e-9
-            gaps.append((gap, hour))
-    report.worst = [(hour, market.hourly[hour], published[hour])
-                    for gap, hour in sorted(gaps, reverse=True)[:show] if gap > 0.05 + 1e-9]
+    report.published = len(published)
+    report.complete = len(market.complete)
+    report.partial = len(market.partial)
+    report.unpriced = report.hours - len(market.hourly)
+    report.day_ahead = len(market.day_ahead)
+    compared = [hour for hour in published if hour in market.complete]
+    report.compared = len(compared)
+    report.revised = sorted(((hour, market.means[hour], published[hour]) for hour in compared
+                             if abs(market.means[hour] - published[hour]) > ROUNDING),
+                            key=lambda row: -abs(row[1] - row[2]))
     return report
 
 

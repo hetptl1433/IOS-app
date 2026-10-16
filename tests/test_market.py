@@ -11,11 +11,18 @@ def utc(*args):
 
 
 class MarketTests(unittest.TestCase):
-    def test_hourly_price_needs_all_twelve_intervals(self):
+    def test_billed_hourly_price_and_feed_gaps(self):
         t0 = utc(2026, 1, 5, 6)
-        five = {t0 + i * SLOT: float(i) for i in range(12)}
-        five.update({t0 + HOUR + i * SLOT: 1.0 for i in range(11)})
-        self.assertEqual(Market(five, {}).hourly, {t0: 5.5})
+        five = {t0 + i * SLOT: float(i) for i in range(12)}  # complete, settled lower: billed 4.1
+        five.update({t0 + HOUR + i * SLOT: 2.0 for i in range(11)})  # one reading missing
+        five.update({t0 + 2 * HOUR + i * SLOT: 9.0 for i in range(6)})  # outage, but published
+        five.update({t0 + 3 * HOUR + i * SLOT: 9.0 for i in range(9)})  # too few readings
+        five.update({t0 + 4 * HOUR + i * SLOT: 3.0 for i in range(12)})  # complete, unpublished
+        market = Market(five, {}, published={t0: 4.1, t0 + 2 * HOUR: 4.4})
+        self.assertEqual(market.hourly, {t0: 4.1, t0 + HOUR: 2.0, t0 + 2 * HOUR: 4.4, t0 + 4 * HOUR: 3.0})
+        self.assertEqual(market.means[t0], 5.5)
+        self.assertEqual(market.complete, {t0, t0 + 4 * HOUR})
+        self.assertEqual(market.partial, {t0 + HOUR})
 
     def test_day_ahead_release_is_the_afternoon_before_the_operating_day(self):
         midnight = utc(2026, 7, 2, 5)  # 00:00 CDT, operating day Jul 2

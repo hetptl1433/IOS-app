@@ -152,12 +152,32 @@ class StrategyTests(unittest.TestCase):
                     self.assertAlmostEqual(outcome.energy_kwh, session.energy_kwh, places=9)
                     self.assertLessEqual(outcomes["Perfect hindsight"].cost, outcome.cost + 1e-9, label)
 
+    def test_csv_round_trip(self):
+        import csv
+        import tempfile
+        from pathlib import Path
+        from sparc.backtest import write_csv
+        market = flat_market()
+        days = [DAY0, DAY0 + date.resolution]
+        nights, _ = run(market, days, [Profile("p", time(18), time(7), 15, 7.7)], [ChargeNow()], [TIME_OF_DAY])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "nights.csv"
+            write_csv(nights, path)
+            rows = list(csv.DictReader(path.open()))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["tariff"], "Delivery Time-of-Day")
+        self.assertAlmostEqual(float(rows[0]["cost_usd"]),
+                               float(rows[0]["supply_usd"]) + float(rows[0]["delivery_usd"]), places=5)
+
     def test_sessions_with_missing_prices_are_skipped(self):
         market = flat_market()
         session = Profile("p", time(18), time(7), 15, 7.7).session(DAY0)
         self.assertTrue(usable(session, market))
         gap = dict(market.five_minute)
         del gap[at(DAY0, time(23, 5))]
+        self.assertTrue(usable(session, Market(gap, market.day_ahead)))  # 11 readings still bill
+        for minute in (10, 15):
+            del gap[at(DAY0, time(23, minute))]
         self.assertFalse(usable(session, Market(gap, market.day_ahead)))
 
 

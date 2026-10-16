@@ -67,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
 def run_backtest(store: Store, first: date, last: date, calibrate_days: int, csv: Path | None) -> None:
     calibrate_from = at(first - timedelta(days=calibrate_days), time(0))
     start, end = calibrate_from - DAY, at(last + timedelta(days=2), time(0))
-    market = Market(store.five_minute(start, end), store.day_ahead(start, end))
+    market = Market(store.five_minute(start, end), store.day_ahead(start, end),
+                    store.published_real_time(start, end))
     decay = fit_decay(market, calibrate_from, at(first, time(0)))
     print("Share of a 5-minute price's gap from day-ahead still present after "
           + ", ".join(f"{5 * k} min: {decay[k - 1]:.2f}" for k in (1, 3, 6, 12, 24)))

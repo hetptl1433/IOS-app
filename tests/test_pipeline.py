@@ -61,9 +61,12 @@ class PipelineTests(unittest.TestCase):
 
         coverage = check(store, first, last)
         self.assertEqual(coverage.hours, 14 * 24)
-        self.assertEqual(coverage.complete_hours, coverage.hours)
-        self.assertEqual(coverage.day_ahead_hours, coverage.hours)
-        self.assertEqual(coverage.agree, coverage.compared)
+        self.assertEqual(coverage.complete, coverage.hours)
+        self.assertEqual(coverage.published, coverage.hours)
+        self.assertEqual((coverage.partial, coverage.unpriced), (0, 0))
+        self.assertEqual(coverage.day_ahead, coverage.hours)
+        self.assertEqual(coverage.compared, coverage.hours)
+        self.assertEqual(coverage.revised, [])
 
         # Resuming does not repeat finished requests.
         fake.requests.clear()

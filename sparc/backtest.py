@@ -4,7 +4,7 @@ from __future__ import annotations
 import csv
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, time, timedelta
 from pathlib import Path
 
@@ -211,13 +211,17 @@ def head_to_head(nights: Sequence[Night], better: str, worse: str, margin: float
     return sorted(result, key=lambda h: deliveries.index(h.delivery))  # stable: profiles keep their order
 
 
+CSV_COLUMNS = ("day", "profile", "tariff", "strategy", "cost_usd", "supply_usd", "delivery_usd",
+               "energy_kwh", "risk_kwh", "starts", "pauses", "ready")
+
+
 def write_csv(nights: Sequence[Night], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle)
-        fields = list(asdict(Outcome()))
-        writer.writerow(["day", "profile", "delivery", "strategy", "cost", *fields])
+        writer.writerow(CSV_COLUMNS)
         for n in nights:
-            values = asdict(n.outcome)
-            writer.writerow([n.day.isoformat(), n.profile, n.delivery, n.strategy,
-                             round(n.outcome.cost, 6), *(values[f] for f in fields)])
+            o = n.outcome
+            writer.writerow([n.day.isoformat(), n.profile, n.delivery, n.strategy, round(o.cost, 6),
+                             round(o.supply, 6), round(o.delivery, 6), round(o.energy_kwh, 6),
+                             round(o.risk_kwh, 6), o.starts, o.pauses, o.ready])
