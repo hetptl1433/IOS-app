@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SPARC Forecast Accuracy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="accuracy">
+<header class="bar">
+  <div class="bar-inner">
+    <a class="brand" href="index.html"><strong>SPARC</strong><span>EV charging on ComEd Hourly Pricing</span></a>
+    <nav class="nav" aria-label="Pages">
+      <a href="/" data-app-link>Test models</a>
+      <a href="index.html">Results</a>
+      <a href="accuracy.html" aria-current="page">Accuracy</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="details.html">Details</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <section>
+    <h1>How accurate is each forecast?</h1>
+    <p class="lede">
+      To plan tonight's charging you need a guess of each hour's price. This page shows how far off each guess was,
+      over 554 nights. A shorter bar is better.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Typical miss, in cents per kWh</h2>
+    <p class="note" id="rms-summary"></p>
+    <div class="legend">
+      <span><i class="swatch plan"></i>Day-ahead price (what SPARC uses)</span>
+      <span><i class="swatch ai"></i>AI model</span>
+      <span><i class="swatch"></i>SPARC's own model</span>
+      <span><i class="swatch ref"></i>Simple rule</span>
+    </div>
+    <div class="bars" id="rms-bars"></div>
+  </section>
+
+  <section class="panel">
+    <h2>What "RMS error" means</h2>
+    <p>
+      For every hour, take the miss: the forecast minus the real price. Square each miss, average them, and take the
+      square root. The result is a typical miss in cents per kWh, where big misses count extra. A forecast with a 5¢
+      RMS error is usually about 5¢ off, and sometimes much more.
+    </p>
+    <p class="note">
+      Every forecast was scored the same way: made with only the prices known at the time, for each hour up to 7 a.m.,
+      and compared with the price ComEd actually billed.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Being more accurate didn't save money</h2>
+    <p>
+      Every AI model beat the day-ahead price on accuracy, yet each one saved a little less when SPARC planned with it.
+      Planning only needs to know which hours are cheapest, and the day-ahead price already ranks the hours well.
+      <a href="index.html">See the savings</a>.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>The numbers</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Forecast</th><th>Kind</th><th class="num">RMS error (¢/kWh)</th>
+          <th class="num">Day-ahead, same test</th><th class="num">Change</th>
+        </tr></thead>
+        <tbody id="rms-table"></tbody>
+      </table>
+    </div>
+    <p class="note">
+      SPARC's own models (ridge and LightGBM) were scored in the backtest run, on nearly the same hours as the AI
+      models, so each is compared with the day-ahead price in its own run.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  From <code>experiments/foundation_models.py</code>,
+  <code>experiments/forecasting/results/foundation_models_baselines.txt</code> and
+  <code>experiments/scenarios/results/pitch_all_strategies.txt</code>, collected in <code>results/data.js</code>.
+</footer>
+<script src="data.js"></script>
+<script src="pages.js"></script>
+</body>
+</html>

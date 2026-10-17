@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPARC Model Tests</title>
+    <link rel="stylesheet" href="/home.css" />
+    <script src="/home.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="bar-inner">
+        <a class="brand" href="/"><strong>SPARC</strong><span>EV charging on ComEd Hourly Pricing</span></a>
+        <nav class="nav" aria-label="Pages">
+          <a href="/" aria-current="page">Test models</a>
+          <a href="/results/index.html">Results</a>
+          <a href="/results/accuracy.html">Accuracy</a>
+          <a href="/results/how-it-works.html">How it works</a>
+          <a href="/results/details.html">Details</a>
+          <a href="/lab">Advanced lab</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="intro">
+        <h1>Test AI price forecasters</h1>
+        <p>
+          SPARC plans when to charge from ComEd's day-ahead prices. Here you can check whether an AI model that
+          forecasts prices would save more money. Pick some models, pick which nights to replay, and press
+          <b>Run test</b>. Everything runs on this computer, and nothing starts until you press a button.
+        </p>
+      </section>
+
+      <section class="step" id="step-data" aria-labelledby="step-data-title">
+        <div class="step-head">
+          <span class="num" aria-hidden="true">1</span>
+          <h2 id="step-data-title">Prices</h2>
+        </div>
+        <p id="data-line" class="line">Checking the price data…</p>
+        <div class="actions">
+          <button type="button" id="update" class="secondary">Update prices</button>
+          <span class="hint">Adds the newest days from ComEd. Takes a minute or two.</span>
+        </div>
+      </section>
+
+      <section class="step" id="step-models" aria-labelledby="step-models-title">
+        <div class="step-head">
+          <span class="num" aria-hidden="true">2</span>
+          <h2 id="step-models-title">Pick models</h2>
+          <div class="quick" role="group" aria-label="Quick picks">
+            <button type="button" id="pick-all">Select all</button>
+            <button type="button" id="pick-fast">Fast ones</button>
+            <button type="button" id="pick-none">Clear</button>
+          </div>
+        </div>
+        <p class="line">
+          The day-ahead price is always included: it is what SPARC uses today, so every model is compared with it.
+        </p>
+        <div id="models" class="models"></div>
+        <p id="env-warning" class="notice warn" hidden></p>
+        <div class="actions">
+          <button type="button" id="download" class="secondary">Download picked models</button>
+          <span class="hint" id="download-hint">Optional: Run test downloads anything missing by itself.</span>
+        </div>
+      </section>
+
+      <section class="step" id="step-period" aria-labelledby="step-period-title">
+        <div class="step-head">
+          <span class="num" aria-hidden="true">3</span>
+          <h2 id="step-period-title">Pick nights</h2>
+        </div>
+        <div id="periods" class="periods" role="radiogroup" aria-labelledby="step-period-title"></div>
+      </section>
+
+      <section class="run" aria-label="Run">
+        <button type="button" id="run" class="primary">Run test</button>
+        <p id="estimate" class="hint"></p>
+      </section>
+
+      <section id="job" class="job" aria-live="polite" hidden>
+        <div class="job-top">
+          <strong id="job-title"></strong>
+          <button type="button" id="cancel" class="secondary small">Cancel</button>
+        </div>
+        <div class="meter" id="meter"><span id="meter-fill"></span></div>
+        <p id="job-message" class="hint"></p>
+      </section>
+
+      <p id="error" class="notice bad" role="alert" hidden></p>
+
+      <section id="result" class="result" hidden aria-labelledby="result-title"></section>
+
+      <section id="past" class="past" aria-labelledby="past-title">
+        <h2 id="past-title">Earlier tests</h2>
+        <p class="hint" id="past-folder"></p>
+        <ul id="tests" class="tests"></ul>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Prices from ComEd's Hourly Pricing program. Models from Hugging Face. Charging is simulated, not real: see
+      <a href="/results/how-it-works.html">How it works</a>.
+    </footer>
+  </body>
+</html>

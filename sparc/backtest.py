@@ -76,8 +76,12 @@ class Night:
     outcome: Outcome = field(compare=False)
 
 
-def simulate(session: Session, strategy: Strategy, market: Market, delivery: Delivery) -> Outcome:
-    """Charge at constant power and bill each kWh at its hour's final average price."""
+def simulate(session: Session, strategy: Strategy, market: Market, delivery: Delivery,
+             trace: dict[int, float] | None = None) -> Outcome:
+    """Charge at constant power and bill each kWh at its hour's final average price.
+
+    `trace`, if given, collects the kWh charged in each hour.
+    """
     strategy.begin(session, market, delivery)
     cents = {hour: delivery.cents(hour) for hour in session.hours}
     risky = {hour for hour in session.hours if capacity_risk(hour)}
@@ -100,6 +104,8 @@ def simulate(session: Session, strategy: Strategy, market: Market, delivery: Del
         if hour in risky:
             result.risk_kwh += kwh
         result.energy_kwh += kwh
+        if trace is not None and on:
+            trace[hour] = trace.get(hour, 0.0) + kwh
         remaining -= kwh
         charging = on and kwh >= full - EPS and remaining > EPS
         if on and not charging and remaining > EPS:

@@ -139,6 +139,11 @@ code {
   font-size: 0.9rem;
   margin-left: 6px;
 }
+.home-link {
+  margin-left: auto;
+  font-size: 0.9rem;
+  color: var(--series-1);
+}
 .tabs {
   display: flex;
   gap: 4px;

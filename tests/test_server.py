@@ -8,9 +8,10 @@ import time
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 from fakes import FakeComEd
-from sparc import lab
+from sparc import foundation, lab
 from sparc.backtest import PROFILES
 from sparc.comed import ComEdError
 from sparc.history import backfill
@@ -29,12 +30,13 @@ class ServerTests(unittest.TestCase):
         store.close()
 
     def setUp(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         shutil.copyfile(Path(self.source.name) / "sparc.db", root / "sparc.db")
         self.fake = FakeComEd()
         self.gate = None  # set to an Event to hold every ComEd request until it is set
         self.weather_down = False
-        self.server = make_server(lab.Folders(root), port=0, get=self.comed, quiet=True)
+        self.server = make_server(lab.Folders(root), port=0, get=self.comed, quiet=True,
+                                  prices=root / "comed-data", tests=root / "model-tests")
         self.port = self.server.server_address[1]
         thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         thread.start()
@@ -77,11 +79,11 @@ class ServerTests(unittest.TestCase):
                 "profiles": [lab.profile_json(PROFILES[0])], **changes}
 
     def test_pages_and_state(self):
-        status, page, response = self.request("GET", "/")
+        status, page, response = self.request("GET", "/lab")
         self.assertEqual(status, 200)
         self.assertIn(b"<title>SPARC charging lab</title>", page)
         self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
-        for path in ("/app.js", "/charts.js", "/style.css"):
+        for path in ("/app.js", "/charts.js", "/style.css", "/home.js", "/home.css"):
             self.assertEqual(self.request("GET", path)[0], 200, path)
         status, state, _ = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
@@ -91,6 +93,59 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(state["runs"], [])
         self.assertEqual(self.request("GET", "/api/nothing")[0], 404)
         self.assertEqual(self.request("DELETE", "/api/state")[0], 405)
+
+    def test_home_page_and_results_pages(self):
+        status, page, _ = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn(b"<title>SPARC Model Tests</title>", page)
+        for path in ("/results/index.html", "/results/how-it-works.html", "/results/accuracy.html",
+                     "/results/details.html", "/results/data.js", "/results/pages.js", "/results/style.css"):
+            status, _, response = self.request("GET", path)
+            self.assertEqual(status, 200, path)
+        self.assertIn("cdnjs.cloudflare.com", response.getheader("Content-Security-Policy"))
+        self.assertEqual(self.request("GET", "/results/")[0], 200)
+        self.assertEqual(self.request("GET", "/results/../sparc/server.py")[0], 404)
+        self.assertEqual(self.request("GET", "/results/missing.html")[0], 404)
+
+    def test_model_tests(self):
+        status, info, _ = self.request("GET", "/api/ai")
+        self.assertEqual(status, 200)
+        self.assertIn("timesfm-3", [m["id"] for m in info["models"]])
+        self.assertEqual(info["data"]["five_minute"], ["2026-01-01", "2026-02-28"])
+        self.assertEqual(info["periods"], {})  # two months of prices: too short for 2,048 hours of history
+        status, body, _ = self.request("POST", "/api/ai/test", {"models": ["seasonal-naive"], "period": "study"})
+        self.assertEqual(status, 400)
+        self.assertIn("Update prices", body["error"])
+        status, body, _ = self.request("POST", "/api/ai/install", {"models": ["seasonal-naive"]})
+        self.assertEqual((status, body["error"]), (400, "Pick at least one AI model to download."))
+        status, body, _ = self.request("POST", "/api/ai/test", {"models": ["teleport"]})
+        self.assertEqual((status, body["error"]), (400, "Unknown model: teleport."))
+        status, body, _ = self.request("POST", "/api/ai/test", {"models": "seasonal-naive"})
+        self.assertEqual((status, body["error"]), (400, "Send the models as a list of ids."))
+        with mock.patch.object(foundation, "CONTEXT", 24 * 7):  # a week of history fits the test data
+            status, info, _ = self.request("GET", "/api/ai")
+            self.assertEqual(set(info["periods"]), {"year", "all"})
+            status, job, _ = self.request("POST", "/api/ai/test", {"models": ["seasonal-naive"], "period": "all"})
+            self.assertEqual(status, 202)
+            job = self.wait(job)
+        self.assertEqual(job["state"], "done", job["error"])
+        status, test, _ = self.request("GET", f"/api/ai/tests/{job['result']['test']}")
+        self.assertEqual(status, 200)
+        self.assertEqual([r["id"] for r in test["rows"]], ["day-ahead", "seasonal-naive"])
+        self.assertTrue((self.root / "model-tests" / f"{test['id']}.md").is_file())
+        status, info, _ = self.request("GET", "/api/ai")
+        self.assertEqual([t["id"] for t in info["tests"]], [test["id"]])
+        self.assertEqual(self.request("GET", "/api/ai/tests/nothing-here")[0], 404)
+
+    def test_update_prices_fetches_new_days_and_saves_them_as_csv(self):
+        status, job, _ = self.request("POST", "/api/data/update", {})
+        self.assertEqual(status, 202)
+        job = self.wait(job)
+        self.assertEqual(job["state"], "done", job["error"])
+        self.assertEqual(job["result"]["from"], "2026-02-27")
+        self.assertTrue((self.root / "comed-data" / "hourly" / "2026.csv").is_file())
+        status, info, _ = self.request("GET", "/api/ai")
+        self.assertGreater(info["data"]["five_minute"][1], "2026-02-28")
 
     def test_changes_need_the_header_and_a_local_host(self):
         status, body, _ = self.request("POST", "/api/backtest", self.settings(), headers={"X-Sparc": ""})

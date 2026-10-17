@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How SPARC Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="how">
+<header class="bar">
+  <div class="bar-inner">
+    <a class="brand" href="index.html"><strong>SPARC</strong><span>EV charging on ComEd Hourly Pricing</span></a>
+    <nav class="nav" aria-label="Pages">
+      <a href="/" data-app-link>Test models</a>
+      <a href="index.html">Results</a>
+      <a href="accuracy.html">Accuracy</a>
+      <a href="how-it-works.html" aria-current="page">How it works</a>
+      <a href="details.html">Details</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <section>
+    <h1>How it works</h1>
+    <p class="lede">
+      How SPARC works out what a night of charging costs, how much it saves, and how the simulation replays real
+      nights. All it takes is adding up.
+    </p>
+  </section>
+
+  <section class="panel" id="price">
+    <h2>1. The price of one kWh</h2>
+    <div class="formula">
+      <span class="term">Price of a kWh</span><span class="op">=</span>
+      <span class="term">ComEd's price for that hour</span><span class="op">+</span>
+      <span class="term">Delivery charge for that hour</span>
+    </div>
+    <ul class="plain">
+      <li>
+        <b>ComEd's price</b> changes every hour. ComEd posts a price every 5 minutes, and you pay the average of the
+        hour's twelve prices. At night it is usually 2 to 5 cents per kWh, but it can spike, and it can even go below
+        zero.
+      </li>
+      <li><b>The delivery charge</b> depends on which ComEd delivery plan you are on:</li>
+    </ul>
+    <div class="strip">
+      <span class="strip-name">Standard delivery: the same <span id="standard-rate"></span> every hour</span>
+      <div id="rate-standard"></div>
+    </div>
+    <div class="strip">
+      <span class="strip-name">Time-of-Day delivery: cheap at night, expensive from 1 to 7 p.m.</span>
+      <div id="rate-tod"></div>
+    </div>
+    <p class="note">
+      A real bill also has a fixed monthly charge, and per-kWh charges that are the same at every hour, such as taxes.
+      They don't change when it is best to charge, so SPARC leaves them out. The costs on these pages are the part of
+      the bill that the timing of charging can change.
+    </p>
+  </section>
+
+  <section class="panel" id="night">
+    <h2>2. The cost of one night</h2>
+    <div class="formula">
+      <span class="term">Cost of a night</span><span class="op">=</span><span>for every hour, add up</span>
+      <span class="term">kWh charged in that hour</span><span class="op">×</span>
+      <span class="term">price of a kWh in that hour</span>
+    </div>
+    <ul class="plain">
+      <li>
+        Charging loses about <span id="loss"></span> of the energy as heat. To add <span id="battery-kwh"></span> to the
+        battery, <span id="grid-kwh"></span> comes from the wall, and that is what you pay for.
+      </li>
+      <li>
+        The Wall Connector charges at <span id="power"></span>, which is <span id="slot-kwh"></span> every 5 minutes.
+        Charging that much takes about <span id="charge-time"></span>, out of the 11 hours the car is plugged in.
+      </li>
+    </ul>
+  </section>
+
+  <section class="panel" id="example">
+    <h2>3. A real night, hour by hour</h2>
+    <p>
+      The Average driver on <b id="example-night"></b>, plugged in at 8 p.m. The default setup charges straight away on
+      standard delivery. SPARC waits for the cheapest hours, on Time-of-Day delivery.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2">Hour</th><th class="num" rowspan="2">ComEd price</th>
+            <th class="num" rowspan="2">Day-ahead price</th><th colspan="3">Default setup</th><th colspan="3">SPARC</th>
+          </tr>
+          <tr>
+            <th class="num">kWh</th><th class="num">Delivery</th><th class="num">Cost</th>
+            <th class="num">kWh</th><th class="num">Delivery</th><th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="example-rows"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3">The night</td>
+            <td colspan="3" class="num" id="example-total-default"></td>
+            <td colspan="3" class="num" id="example-total-plan"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <ul class="plain">
+      <li id="example-formula"></li>
+      <li>Default setup: <span id="example-split-default"></span>.</li>
+      <li>SPARC: <span id="example-split-plan"></span>.</li>
+      <li>SPARC saved <b id="example-saving"></b> that night, about the same as on an average night.</li>
+    </ul>
+    <p class="callout" id="example-why"></p>
+  </section>
+
+  <section class="panel" id="year">
+    <h2>4. From one night to a year</h2>
+    <ol class="steps">
+      <li>Do the same for all <span id="year-nights"></span> nights from April 2, 2025 to October 14, 2026.</li>
+      <li>The default setup cost <b id="year-default"></b> a night on average, and SPARC cost <b id="year-plan"></b>.</li>
+      <li>
+        The difference is <b id="year-gap"></b> a night. Times 365 nights, that is <b id="year-saving"></b> a year:
+        the saving on the Results page.
+      </li>
+      <li>"Percent cheaper" is the saving divided by the default cost: <b id="year-share"></b> here.</li>
+    </ol>
+    <p class="note">
+      Perfect hindsight, which knows every price in advance, would save <span id="year-hindsight"></span> a year on the
+      same nights. Nobody can do that, so it marks the most that was possible.
+    </p>
+  </section>
+
+  <section class="panel" id="simulation">
+    <h2>5. How the simulation works</h2>
+    <ol class="steps">
+      <li><b>Pick a night and a driver.</b> The car plugs in at 8 p.m. and has to be charged by 7 a.m.</li>
+      <li><b>Cut the night into 5-minute steps</b>, 132 of them.</li>
+      <li>
+        <b>At each step, the strategy decides</b> whether to charge at full power or wait. It may only use what was known
+        at that moment: the day-ahead prices, which come out around 4:30 p.m. the day before (the simulation waits until
+        5 p.m. to be safe), and the 5-minute prices posted so far, each about 7 minutes after it starts.
+      </li>
+      <li>
+        <b>SPARC's plan ranks the night's hours</b> by day-ahead price plus delivery charge, and fills the cheapest hours
+        first. It aims to finish 30 minutes early, and it stays out of summer weekday afternoons, when using power raises
+        next year's capacity charge.
+      </li>
+      <li><b>Bill each kWh</b> at its hour's final price plus delivery. No strategy sees the final price ahead of time.</li>
+      <li><b>Check the car is charged by 7 a.m.</b> In these tests it always was.</li>
+      <li>
+        <b>Repeat</b> for every night and all three drivers. A night with missing prices is skipped for every strategy
+        alike, so the comparison stays fair.
+      </li>
+    </ol>
+  </section>
+
+  <section class="panel" id="compare">
+    <h2>6. What we compare</h2>
+    <dl class="words">
+      <dt>The default setup</dt>
+      <dd>Standard delivery, charging as soon as the car is plugged in. Most drivers start here, and every saving is measured against it.</dd>
+      <dt>SPARC's plan</dt>
+      <dd>Time-of-Day delivery, charging in the hours the day-ahead prices say are cheapest.</dd>
+      <dt>Perfect hindsight</dt>
+      <dd>Knows every real price in advance. Impossible in real life; it shows the most anyone could save on a night.</dd>
+      <dt>Battery buffer</dt>
+      <dd>Buys more on cheap nights and less on expensive ones, keeping the battery between 20% and 90% full. Tested with scripts, not in the app yet.</dd>
+      <dt>AI forecasts</dt>
+      <dd>SPARC's planner using an AI model's price forecast instead of the day-ahead price. Try them on the <a href="/" data-app-link>Test models</a> page.</dd>
+    </dl>
+  </section>
+
+  <section class="panel" id="tied">
+    <h2>7. When is a difference real?</h2>
+    <p>
+      Two strategies are compared night by night, on the same nights. Some nights one wins, some nights the other. If the
+      average gap is smaller than about two "standard errors" (a measure of how much the nightly gaps jump around), we
+      call it a tie, because the gap could be luck. That is why some small differences are reported as "about the same".
+    </p>
+  </section>
+
+  <section class="panel" id="words">
+    <h2>Words used on these pages</h2>
+    <dl class="words">
+      <dt>kWh (kilowatt-hour)</dt><dd>A unit of energy. A Cybertruck's battery holds 123 kWh; driving 37 miles uses about 15.</dd>
+      <dt>¢/kWh</dt><dd>Cents per kilowatt-hour: the price of one kWh.</dd>
+      <dt>Day-ahead price</dt><dd>The price for each hour of tomorrow, set by the PJM market the afternoon before. A good forecast, but not what you pay.</dd>
+      <dt>Real-time price</dt><dd>What each hour actually costs: the average of its twelve 5-minute prices. This is what ComEd Hourly Pricing bills.</dd>
+      <dt>Delivery charge</dt><dd>What ComEd charges, per kWh, to bring the power to your home.</dd>
+      <dt>Time-of-Day delivery</dt><dd>A ComEd delivery plan that is cheap at night and expensive from 1 to 7 p.m.</dd>
+      <dt>Capacity charge</dt><dd>Part of next year's bill, set by how much power you use in the grid's busiest summer afternoon hours.</dd>
+      <dt>RMS error</dt><dd>The typical size of a forecast's miss, where big misses count extra. See <a href="accuracy.html">Accuracy</a>.</dd>
+    </dl>
+  </section>
+</main>
+
+<footer class="foot">
+  The worked night comes from <code>experiments/scenarios/worked_example.py</code>, which uses the same simulation as every
+  result (<code>sparc/backtest.py</code>). Delivery rates: ComEd's Distribution Facility Charge for a single-family home
+  without electric heat.
+</footer>
+<script src="data.js"></script>
+<script src="example.js"></script>
+<script src="pages.js"></script>
+</body>
+</html>

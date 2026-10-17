@@ -1,9 +1,10 @@
-"""The local web app: fetch prices, run backtests, train models and compare the results.
+"""The local web app: test AI price forecasters, fetch prices, run backtests and train models.
 
     python -m sparc serve        # then open http://127.0.0.1:8765
 
-It listens on 127.0.0.1 only and runs one job (a fetch, a backtest or a training)
-at a time, in the background. Requests that change anything must carry an
+The home page tests AI forecasters in one click; /lab is the full lab (data, runs, results,
+models); /results/ serves the results pages from the repository. It listens on 127.0.0.1 only
+and runs one job (a fetch, a download, a test, a backtest or a training) at a time, in the background. Requests that change anything must carry an
 X-Sparc header, which a page on another site cannot add without a CORS
 preflight that this server never approves. The Host header is checked too,
 so a hostile DNS name pointed at 127.0.0.1 is refused.
@@ -19,22 +20,26 @@ import uuid
 import webbrowser
 from contextlib import closing
 from dataclasses import asdict
-from datetime import date
+from datetime import date, timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import comed, lab
+from . import comed, dataset, foundation, lab
 from .backtest import Cancelled
 from .clock import local
 from .forecast import lightgbm_available
-from .history import backfill, backfill_weather
+from .history import backfill, backfill_weather, stored_range
 from .store import Store
 from .weather import WeatherError
 
 WEB = Path(__file__).with_name("web")
-STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
+RESULTS = Path(__file__).resolve().parents[1] / "results"
+STATIC = {"/": ("home.html", "text/html; charset=utf-8"),
+          "/home.js": ("home.js", "text/javascript; charset=utf-8"),
+          "/home.css": ("home.css", "text/css; charset=utf-8"),
+          "/lab": ("lab.html", "text/html; charset=utf-8"),
           "/app.js": ("app.js", "text/javascript; charset=utf-8"),
           "/charts.js": ("charts.js", "text/javascript; charset=utf-8"),
           "/style.css": ("style.css", "text/css; charset=utf-8")}
@@ -44,8 +49,17 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
 }
+# The results pages draw charts with d3 from a CDN and keep their scripts inline, so they get their own policy.
+RESULTS_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
+               "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+RESULT_TYPES = {"html": "text/html; charset=utf-8", "js": "text/javascript; charset=utf-8",
+                "css": "text/css; charset=utf-8", "json": "application/json; charset=utf-8",
+                "md": "text/markdown; charset=utf-8"}
+RESULT_FILE = re.compile(r"/results/((?:model-tests/)?[\w-]+(?:\.[\w-]+)*\.(html|js|css|json|md))")
 MAX_BODY = 1_000_000
-FIRST_FETCH_DATE = date(2010, 1, 1)
+FIRST_FETCH_DATE = date(2007, 1, 1)
+NEW_PRICES_FROM = date(2024, 1, 1)  # where "Update prices" starts when there are none yet
 
 
 class ApiError(Exception):
@@ -127,9 +141,12 @@ class Jobs:
 
 
 class App:
-    def __init__(self, folders: lab.Folders, get: comed.Get | None = None):
+    def __init__(self, folders: lab.Folders, get: comed.Get | None = None, prices: Path | None = None,
+                 tests: Path | None = None):
         self.folders = folders
         self.get = get or comed.Fetcher()
+        self.prices = prices or dataset.FOLDER  # the CSV copy of the prices, kept in git
+        self.tests = tests or foundation.tests_folder(folders.root)  # saved model tests
         self.jobs = Jobs()
         self.status_lock = threading.Lock()
         self.status: dict | None = None  # coverage takes a second to compute, so it is kept until a fetch
@@ -227,6 +244,83 @@ class App:
         lab.delete_run(self.folders, ident)
         return {"deleted": ident}
 
+    # The home page: one-click tests of AI price forecasters.
+
+    def ai(self, body) -> dict:
+        with self.store() as store:
+            span = stored_range(store)
+            hourly = store.db.execute("SELECT MIN(hour), MAX(hour) FROM hourly WHERE day_ahead IS NOT NULL").fetchone()
+        current = self.jobs.current
+        return {"models": foundation.status(), "environment": foundation.environment(),
+                "periods": foundation.periods(*span) if span else {},
+                "data": {"five_minute": [d.isoformat() for d in span] if span else None,
+                         "hourly": [local(t).date().isoformat() for t in hourly] if hourly[0] else None},
+                "tests": foundation.list_tests(self.tests), "tests_folder": _shown(self.tests),
+                "job": current.to_json() if current else None,
+                "today": local(int(time.time())).date().isoformat()}
+
+    def ai_install(self, body) -> dict:
+        ids = [i for i in _model_ids(body) if foundation.MODELS[i].packages]
+        if not ids:
+            raise ValueError("Pick at least one AI model to download.")
+
+        def work(job: Job) -> dict:
+            return foundation.install(ids, job.update, job.cancel.is_set)
+
+        return self.jobs.start("install", f"Downloading {_count(len(ids), 'model')}", work).to_json()
+
+    def ai_test(self, body) -> dict:
+        ids = _model_ids(body)
+        if not ids:
+            raise ValueError("Pick at least one model to test.")
+        period = body.get("period", "study")
+        with self.store() as store:
+            span = stored_range(store)
+        options = foundation.periods(*span) if span else {}
+        if period not in options:
+            raise ValueError("There are not enough prices for that test period. Press Update prices first.")
+        first, last = (date.fromisoformat(options[period][key]) for key in ("first", "last"))
+
+        def work(job: Job) -> dict:
+            foundation.install(ids, job.update, job.cancel.is_set)  # one click: download anything missing first
+            job.update(0, 0, "Loading prices")
+            with self.store() as store:
+                market = foundation.market_for(store, first, last)
+            result = foundation.run_test(market, ids, first, last, cache_folder=self.folders.root / "ai-forecasts",
+                                         out_folder=self.tests, progress=job.update,
+                                         should_stop=job.cancel.is_set, period=period)
+            return {"test": result["id"]}
+
+        title = f"Testing {_count(len(ids), 'model')} on {options[period]['nights']:,} nights"
+        return self.jobs.start("test", title, work).to_json()
+
+    def ai_saved(self, body, ident) -> dict:
+        return foundation.load_test(self.tests, ident)
+
+    def update_prices(self, body) -> dict:
+        """Fetch every price since the newest stored one, then write them to comed-data/ for git."""
+        today = local(int(time.time())).date()
+        with self.store() as store:
+            span = stored_range(store)
+        start = span[1] - timedelta(days=1) if span else NEW_PRICES_FROM
+
+        def work(job: Job) -> dict:
+            weather_error = None
+            with self.store() as store:
+                failed = backfill(store, start, today, self.get, progress=job.update,
+                                  should_stop=job.cancel.is_set, log=lambda message: None)
+                try:
+                    backfill_weather(store, max(start, NEW_PRICES_FROM), today, self.get, progress=job.update,
+                                     should_stop=job.cancel.is_set)
+                except WeatherError as exc:  # keep the prices; say what went wrong
+                    weather_error = str(exc)
+                job.update(0, 0, "Saving the new prices in comed-data")
+                dataset.export(store, self.prices, years=range(start.year, today.year + 1))
+            return {"failed": failed, "weather_error": weather_error, "from": start.isoformat()}
+
+        return self.jobs.start("fetch", f"Updating prices from {start} to {today}", work,
+                               finished=self.forget_status).to_json()
+
     def models(self, body) -> list:
         return lab.list_models(self.folders)
 
@@ -247,7 +341,13 @@ ROUTES = [(method, re.compile(pattern), name) for method, pattern, name in (
     ("DELETE", r"/api/runs/([\w-]+)", "delete_run"),
     ("GET", r"/api/models", "models"),
     ("DELETE", r"/api/models/([\w-]+)", "delete_model"),
+    ("GET", r"/api/ai", "ai"),
+    ("POST", r"/api/ai/install", "ai_install"),
+    ("POST", r"/api/ai/test", "ai_test"),
+    ("GET", r"/api/ai/tests/([\w-]+)", "ai_saved"),
+    ("POST", r"/api/data/update", "update_prices"),
 )]
+JOB_ROUTES = {"fetch", "backtest", "train", "ai_install", "ai_test", "update_prices"}
 CSV_ROUTE = re.compile(r"/api/runs/([\w-]+)/nights\.csv")
 
 
@@ -273,6 +373,10 @@ class Handler(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             if method == "GET" and path in STATIC:
                 return self.send_static(*STATIC[path])
+            if method == "GET" and path in ("/results", "/results/"):
+                path = "/results/index.html"
+            if method == "GET" and (match := RESULT_FILE.fullmatch(path)):
+                return self.send_result(match[1], match[2])
             if method == "GET" and (match := CSV_ROUTE.fullmatch(path)):
                 return self.send_csv(lab.run_csv(app.folders, match[1]), match[1])
             if method != "GET" and self.headers.get("X-Sparc") != "1":
@@ -281,8 +385,7 @@ class Handler(BaseHTTPRequestHandler):
                 match = pattern.fullmatch(path)
                 if match and route_method == method:
                     result = getattr(app, name)(body, *match.groups())
-                    return self.send_json(HTTPStatus.ACCEPTED if name in ("fetch", "backtest", "train")
-                                          else HTTPStatus.OK, result)
+                    return self.send_json(HTTPStatus.ACCEPTED if name in JOB_ROUTES else HTTPStatus.OK, result)
             if any(pattern.fullmatch(path) for _, pattern, _ in ROUTES):
                 raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, f"{method} is not supported here.")
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
@@ -323,6 +426,13 @@ class Handler(BaseHTTPRequestHandler):
     def send_static(self, name: str, content_type: str) -> None:
         self.send_bytes(HTTPStatus.OK, (WEB / name).read_bytes(), content_type)
 
+    def send_result(self, name: str, suffix: str) -> None:
+        path = RESULTS / name
+        if not path.is_file():
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
+        self.send_bytes(HTTPStatus.OK, path.read_bytes(), RESULT_TYPES[suffix],
+                        {"Content-Security-Policy": RESULTS_CSP})
+
     def send_csv(self, path: Path, ident: str) -> None:
         self.send_bytes(HTTPStatus.OK, path.read_bytes(), "text/csv; charset=utf-8",
                         {"Content-Disposition": f'attachment; filename="sparc-{ident}.csv"'})
@@ -347,12 +457,34 @@ class Handler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
 
+def _model_ids(body) -> list[str]:
+    ids = body.get("models")
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise ValueError("Send the models as a list of ids.")
+    unknown = [i for i in ids if i not in foundation.MODELS]
+    if unknown:
+        raise ValueError(f"Unknown model: {', '.join(unknown)}.")
+    return list(dict.fromkeys(i for i in ids if i != "day-ahead"))
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}" + ("" if n == 1 else "s")
+
+
+def _shown(folder: Path) -> str:
+    """A folder as a path inside the repository, where it is one."""
+    try:
+        return str(folder.resolve().relative_to(RESULTS.parent))
+    except ValueError:
+        return str(folder)
+
+
 def make_server(folders: lab.Folders, port: int = 8765, get: comed.Get | None = None,
-                quiet: bool = False) -> ThreadingHTTPServer:
+                quiet: bool = False, prices: Path | None = None, tests: Path | None = None) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     server.quiet = quiet
-    server.app = App(folders, get)
+    server.app = App(folders, get, prices, tests)
     bound = server.server_address[1]
     server.hosts = {f"127.0.0.1:{bound}", f"localhost:{bound}"}
     return server

@@ -1,4 +1,4 @@
-"""python -m sparc {serve,fetch,check,backtest,strategies,train,collect}"""
+"""python -m sparc {serve,load,export,fetch,check,backtest,strategies,train,test-models,collect}"""
 from __future__ import annotations
 
 import argparse
@@ -8,9 +8,9 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import backtest, comed, lab
+from . import backtest, comed, dataset, foundation, lab
 from .collector import collect
-from .history import backfill, backfill_weather, check
+from .history import backfill, backfill_weather, check, stored_range
 from .store import Store
 from .weather import WeatherError
 
@@ -26,6 +26,13 @@ def main(argv: list[str] | None = None) -> int:
     web = commands.add_parser("serve", help="open the web app: fetch prices, run backtests, train models")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--no-browser", action="store_true", help="do not open a browser window")
+
+    loader = commands.add_parser("load", help="load prices and weather from comed-data/ (seconds, not hours)")
+    loader.add_argument("folder", type=Path, nargs="?", default=dataset.FOLDER)
+
+    exporter = commands.add_parser("export", help="write prices and weather to comed-data/, one CSV per year")
+    exporter.add_argument("folder", type=Path, nargs="?", default=dataset.FOLDER)
+    exporter.add_argument("--years", type=int, nargs="+", help="only these years (default: all)")
 
     fetch = commands.add_parser("fetch", help="download prices from ComEd and Chicago weather from Open-Meteo")
     fetch.add_argument("start", type=date.fromisoformat)
@@ -59,16 +66,33 @@ def main(argv: list[str] | None = None) -> int:
     learn.add_argument("--name", help="a name to show in backtests")
     learn.add_argument("--weather", action="store_true", help="also learn from holidays and Chicago weather")
 
+    tester = commands.add_parser("test-models", help="test AI price forecasters against the day-ahead plan")
+    tester.add_argument("models", nargs="?", default="",
+                        help="comma-separated model ids (default: list them); " + ", ".join(foundation.MODELS))
+    tester.add_argument("--period", choices=["study", "year", "all"], default="study",
+                        help="study: the report's nights (default); year: the last 12 months; all: every night")
+
     commands.add_parser("collect", help="record live prices every 5 minutes (run this on the Pi)")
 
     args = parser.parse_args(argv)
     folders = lab.Folders(args.data)
     if args.command == "serve":
         from .server import serve
+        load_if_empty(folders)
         return serve(folders, args.port, open_browser=not args.no_browser)
     store = Store(folders.db)
     try:
-        if args.command == "fetch":
+        if args.command == "load":
+            counts = dataset.load(store, args.folder, progress=Progress())
+            print(f"Loaded {counts['five_minute']:,} 5-minute prices, {counts['hourly']:,} hourly prices and "
+                  f"{counts['weather']:,} hours of weather from {args.folder}")
+        elif args.command == "export":
+            counts = dataset.export(store, args.folder, args.years)
+            print(f"Wrote {counts.get('five_minute', 0):,} 5-minute prices, {counts.get('hourly', 0):,} hourly "
+                  f"prices and {counts.get('weather', 0):,} hours of weather to {args.folder}")
+        elif args.command == "test-models":
+            test_models(store, folders, args)
+        elif args.command == "fetch":
             fetcher = comed.Fetcher()
             failed = backfill(store, args.start, args.end, fetcher, progress=Progress())
             if failed:
@@ -97,6 +121,43 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         store.close()
     return 0
+
+
+def load_if_empty(folders: lab.Folders) -> None:
+    """On the first start, fill the database from comed-data/ if the prices are there."""
+    store = Store(folders.db)
+    try:
+        if stored_range(store) is None and dataset.available():
+            print(f"First start: loading prices from {dataset.FOLDER} (about a minute)...")
+            counts = dataset.load(store, progress=Progress())
+            print(f"Loaded {counts['five_minute']:,} 5-minute and {counts['hourly']:,} hourly prices.")
+    finally:
+        store.close()
+
+
+def test_models(store: Store, folders: lab.Folders, args) -> None:
+    if not args.models:
+        for row in foundation.status():
+            state = "ready" if row["ready"] else f"needs download ({row['size_mb']:,} MB)"
+            print(f"  {row['id']:<26}{row['name']:<24}{state}")
+        print("\nTest some: python -m sparc test-models chronos-2,timesfm-3")
+        return
+    ids = [m.strip() for m in args.models.split(",") if m.strip()]
+    unknown = [m for m in ids if m not in foundation.MODELS]
+    if unknown:
+        raise ValueError(f"Unknown model: {', '.join(unknown)}. Run python -m sparc test-models to list them.")
+    span = stored_range(store)
+    options = foundation.periods(*span) if span else {}
+    if args.period not in options:
+        raise ValueError("Not enough prices for that period. Load or fetch prices first.")
+    first, last = (date.fromisoformat(options[args.period][k]) for k in ("first", "last"))
+    foundation.install(ids, progress=Progress())
+    market = foundation.market_for(store, first, last)
+    result = foundation.run_test(market, ids, first, last, cache_folder=folders.root / "ai-forecasts",
+                                 out_folder=foundation.tests_folder(folders.root), progress=Progress(),
+                                 period=args.period)
+    print(foundation.markdown(result))
+    print(f"Saved in {foundation.tests_folder(folders.root)}")
 
 
 class Progress:

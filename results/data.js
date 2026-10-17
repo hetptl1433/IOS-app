@@ -4,10 +4,11 @@ window.SPARC_RESULTS = {
   // experiments/README.md, experiments/scenarios/results/pitch_all_strategies.txt and
 // experiments/battery_buffer/results/buffer_headline.txt. Pitch setup, nights 2025-04-02 to 2026-10-14.
 // $ a year saved against the default setup (standard delivery, charging on plug-in), Time-of-Day delivery.
+// default_per_night is the default setup's average cost per night (pitch_all_strategies.txt).
   headline: [
-    {"driver": "Average", "kwh_per_day": 15, "miles_per_day": 37, "default_per_night": 1.8, "rate_alone": 165, "plan": 355, "plan_pct": 54, "hindsight": 393, "buffer": 410, "buffer_pct": 62, "buffer_vs_plan": 54, "nights": 554},
-    {"driver": "Moderate", "kwh_per_day": 30, "miles_per_day": 75, "default_per_night": 3.43, "rate_alone": 363, "plan": 643, "plan_pct": 51, "hindsight": 697, "buffer": 697, "buffer_pct": 56, "buffer_vs_plan": 54, "nights": 554},
-    {"driver": "Heavy", "kwh_per_day": 80, "miles_per_day": 200, "default_per_night": 8.21, "rate_alone": 1020, "plan": 1224, "plan_pct": 41, "hindsight": 1297, "buffer": 1233, "buffer_pct": 41, "buffer_vs_plan": 10, "nights": 554},
+    {"driver": "Average", "kwh_per_day": 15, "miles_per_day": 37, "default_per_night": 1.8024, "rate_alone": 165, "plan": 355, "plan_pct": 54, "hindsight": 393, "buffer": 410, "buffer_pct": 62, "buffer_vs_plan": 54, "nights": 554},
+    {"driver": "Moderate", "kwh_per_day": 30, "miles_per_day": 75, "default_per_night": 3.4308, "rate_alone": 363, "plan": 643, "plan_pct": 51, "hindsight": 697, "buffer": 697, "buffer_pct": 56, "buffer_vs_plan": 54, "nights": 554},
+    {"driver": "Heavy", "kwh_per_day": 80, "miles_per_day": 200, "default_per_night": 8.206, "rate_alone": 1020, "plan": 1224, "plan_pct": 41, "hindsight": 1297, "buffer": 1233, "buffer_pct": 41, "buffer_vs_plan": 10, "nights": 554},
   ],
   // experiments/scenarios/results/pitch_all_strategies.txt; the battery buffer row from
 // experiments/battery_buffer/results/buffer_headline.txt. $ a year and % cheaper against the default setup.

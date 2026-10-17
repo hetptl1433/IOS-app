@@ -2,7 +2,7 @@ const { chromium } = require("playwright");
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.goto("http://127.0.0.1:8765/#" + (process.argv[2] || "results"));
+  await page.goto("http://127.0.0.1:8765/lab#" + (process.argv[2] || "results"));
   await page.waitForTimeout(1500);
   const wide = await page.evaluate(() => {
     const limit = document.documentElement.clientWidth;

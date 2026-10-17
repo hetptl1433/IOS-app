@@ -1,6 +1,6 @@
 const { chromium } = require("playwright");
 const out = process.argv[2];
-const base = "http://127.0.0.1:8765/";
+const base = "http://127.0.0.1:8765/lab";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) process.exitCode = 1; };
 
 (async () => {

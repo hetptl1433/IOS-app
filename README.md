@@ -6,7 +6,7 @@ prices, backtests charging strategies on real price history (from a local web ap
 or the command line), trains price forecasts, and records live prices. Tesla
 control comes next, once a strategy has proven itself on real prices.
 
-## On a Mac
+## Start here (on a Mac)
 
 ```sh
 git clone https://github.com/hetptl1433/sparc.git
@@ -14,18 +14,33 @@ cd sparc
 ./start.command        # or double-click start.command in Finder
 ```
 
+Your browser opens SPARC at http://127.0.0.1:8765. Keep the Terminal window open while you use it; close
+it to stop SPARC.
+
+- **Test models**, the home page: pick AI price forecasters, pick which nights to replay, and press
+  **Run test**. That one click downloads any model that is missing, runs the test and saves the result in
+  `results/model-tests/`, ready to commit. Nothing runs until you press a button.
+- **Results**, **Accuracy** and **How it works**: the findings in plain words, how far off each price
+  forecast was, and exactly how costs, savings and the simulation are worked out, with one real night added
+  up hour by hour. They also open without SPARC running: `open results/index.html`.
+- **Advanced lab**: fetch any range of prices, backtest any strategy, train price forecasts.
+
 It needs Python 3.11 or newer ([python.org](https://www.python.org/downloads/) or
-`brew install python@3.12`). The first run downloads the prices (about 20 minutes, resumable), then the
-app opens at http://127.0.0.1:8765. Every experiment in `experiments/` runs from the same folder, for
-example `python3 experiments/battery_buffer/buffer_skip.py 2025-04-02 2026-10-14`.
+`brew install python@3.12`). The first start makes SPARC's own Python environment in `.venv` and loads the
+prices: in seconds from `comed-data/` when that folder is there, otherwise from ComEd in about 20 minutes
+(resumable). The AI models need about 1 GB of libraries plus 0.1 to 1.3 GB per model, downloaded the first
+time you test them. Every experiment in `experiments/` runs from the same folder, for example
+`.venv/bin/python experiments/battery_buffer/buffer_skip.py 2025-04-02 2026-10-14`.
 
 ## Quick start
 
 Python 3.11 or newer. No third-party packages (LightGBM is optional).
 
 ```sh
-python -m sparc serve        # opens http://127.0.0.1:8765
+python -m sparc serve        # opens http://127.0.0.1:8765; the lab is at http://127.0.0.1:8765/lab
 ```
+
+The home page tests AI price forecasters (above). The **Advanced lab** has four tabs:
 
 1. **Data**: fetch prices from ComEd and Chicago weather from Open-Meteo, for
    example from 2025-01-01 to today. A year is about 425 requests at one a second.
@@ -219,10 +234,9 @@ output and what it showed:
 - a battery buffer across nights, which adds about $54 a year for the average and moderate drivers.
   The buffer is not in the app yet.
 
-[`results/index.html`](results/README.md) shows the headline results on one page, with charts: open it
-in a browser.
-
-ComEd's prices are not in this repository; `python -m sparc fetch` downloads them.
+[`results/`](results/README.md) shows the headline results in plain words (`index.html`), the error of every
+price forecast (`accuracy.html`) and how costs, savings and the simulation work (`how-it-works.html`).
+Open them in a browser, or from SPARC's menu.
 
 ## Command line
 
@@ -231,6 +245,8 @@ folder with `--data DIR` or `SPARC_DATA`).
 
 ```sh
 python -m sparc serve [--port 8765]               # the web app
+python -m sparc load                              # read prices and weather from comed-data/ (seconds)
+python -m sparc export                            # write them to comed-data/, one CSV per year
 python -m sparc fetch 2025-01-01 2026-10-15       # backfill prices and weather; resumable
 python -m sparc check 2025-01-01 2026-10-15       # coverage, and agreement with ComEd's hourly prices
 python -m sparc backtest 2025-04-02 2026-10-14    # every strategy; saved as a run the app can show
@@ -238,6 +254,8 @@ python -m sparc backtest 2025-04-02 2026-10-14 --drivers examples    # the four 
 python -m sparc backtest 2025-04-02 2026-10-14 --strategies day-ahead,cap-3 --csv nights.csv
 python -m sparc strategies                        # the strategy ids
 python -m sparc train ridge 2025-01-02 2025-12-31 --test 2026-01-02 2026-10-14 [--weather]
+python -m sparc test-models                       # the AI price forecasters, and which are downloaded
+python -m sparc test-models chronos-2,timesfm-3 [--period study|year|all]   # what Run test does
 python -m sparc collect                           # on the Pi: record live prices every 5 minutes
 python -m unittest discover -s tests              # tests
 ```
@@ -270,8 +288,11 @@ python -m unittest discover -s tests              # tests
   after Thanksgiving.
 - Historical feeds cannot say when each price was actually published. `collect`
   records that from now on.
-- ComEd's API terms restrict redistributing its data, so `runtime/` is git-ignored.
-  Keep price databases local.
+- `runtime/` holds the working database and is git-ignored. `python -m sparc export` writes the same
+  prices and weather to `comed-data/`, one CSV per year (5-minute prices from 2012-10-29, hourly ones from
+  2007-01-01), and `python -m sparc load` reads them back in seconds. **Update prices** on the Test models
+  page does both: it fetches the newest days and rewrites the current year's files. ComEd's API terms
+  restrict redistributing its data, so share `comed-data/` only in a private repository.
 
 ## Layout
 
@@ -288,7 +309,9 @@ python -m unittest discover -s tests              # tests
 | `weather.py`, `holidays.py` | Chicago weather from Open-Meteo; NERC holidays |
 | `backtest.py` | night-by-night simulation and summaries |
 | `lab.py` | backtest runs and model training, shared by the app and the command line |
-| `server.py`, `web/` | the local web app |
+| `foundation.py` | AI price forecasters: install, download, the one-click test |
+| `dataset.py` | prices and weather as yearly CSV files (`comed-data/`) |
+| `server.py`, `web/` | the local web app: `home.*` is the Test models page, `lab.html` and `app.js` the lab |
 | `history.py`, `collector.py` | backfill and live recording |
 
 ## Next

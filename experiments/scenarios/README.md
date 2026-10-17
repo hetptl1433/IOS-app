@@ -12,6 +12,7 @@ here runs SPARC's own backtest (`sparc.lab.run_backtest`) on nights 2025-04-02 t
 | `cybertruck.py` | Nightly energy from 20 to 120 kWh, plugged in at 6 p.m. or 10 p.m. | `results/cybertruck.txt` |
 | `afternoon_plug_in.py` | Plugged in from noon with 80–100 kWh to add | `results/afternoon_plug_in.txt` |
 | `biggest.py` | The configuration with the largest yearly saving | `results/biggest.txt` |
+| `worked_example.py` | One typical night hour by hour, for `results/how-it-works.html` | `results/worked_example.txt`, `../../results/example.js` |
 
 The two command-line runs behind the main README's tables are saved too:
 `results/cli_tiers.txt` (`python -m sparc backtest 2025-04-02 2026-10-14`) and
