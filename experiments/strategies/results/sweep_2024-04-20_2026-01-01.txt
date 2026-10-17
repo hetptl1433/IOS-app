@@ -1,0 +1,27 @@
+# Run 2, made in a second environment with prices from 2024-01-01 (fetched with `python -m sparc fetch`),
+# with this script as it was before it moved into the repository (the same code; only its paths changed):
+#   python experiments/strategies/sweep.py 2024-04-20 2026-10-14 2026-01-01
+# Output copied verbatim.
+strategy                                                                 train avg/mod/heavy            test avg/mod/heavy
+Live, fitted persistence, stickiness 0, risk penalty 0.5                       324/595/1,198                 369/658/1,245  rank 1  vs plan on test: -3±6  -2±9  +5±9
+Live, fitted persistence, stickiness 0, risk penalty 1                         324/595/1,197                 368/655/1,247  rank 2  vs plan on test: -4±6  -5±9  +7±8
+Live, fitted persistence, stickiness 0, risk penalty 0.25                      323/595/1,197                 370/660/1,244  rank 3  vs plan on test: -3±6  +0±9  +4±10
+Live, fitted persistence, stickiness 0.1                                       323/595/1,197                 370/659/1,244  rank 4  vs plan on test: -2±6  -0±9  +4±10
+Live, none persistence, stickiness 0.1                                         323/595/1,197                 372/663/1,247  rank 5  vs plan on test: -1±6  +4±7  +7±7
+Live, none persistence, stickiness 0                                           323/594/1,197                 372/663/1,249  rank 6  vs plan on test: -1±6  +3±7  +9±7
+Live, fitted persistence, stickiness 0                                         323/594/1,197                 370/660/1,243  rank 7  vs plan on test: -3±6  -0±9  +3±10
+Live, half persistence, stickiness 0.1                                         323/595/1,196                 371/657/1,242  rank 8  vs plan on test: -1±6  -3±10  +2±9
+Live, half persistence, stickiness 0                                           323/593/1,196                 371/656/1,243  rank 9  vs plan on test: -1±6  -4±10  +3±9
+Live, none persistence, stickiness 0.25                                        321/594/1,196                 371/662/1,247  rank 10  vs plan on test: -2±6  +2±7  +7±7
+Live, fitted persistence, stickiness 0.25                                      321/594/1,196                 369/659/1,242  rank 11  vs plan on test: -4±7  -1±9  +2±10
+Live, half persistence, stickiness 0.25                                        320/593/1,196                 369/657/1,242  rank 12  vs plan on test: -3±6  -3±10  +2±9
+Live, fitted persistence, stickiness 0.5, risk penalty 1                       321/593/1,195                 366/655/1,246  rank 13  vs plan on test: -6±6  -4±9  +6±8
+Live, fitted persistence, stickiness 0.5, risk penalty 0.5                     320/592/1,196                 368/658/1,242  rank 14  vs plan on test: -4±6  -2±9  +2±9
+Live, fitted persistence, stickiness 0.5, risk penalty 0.25                    318/592/1,196                 366/657/1,240  rank 15  vs plan on test: -6±6  -2±9  +0±10
+Live, fitted persistence, stickiness 0.5                                       318/591/1,195                 363/655/1,238  rank 16  vs plan on test: -10±7  -5±9  -2±10
+Live, none persistence, stickiness 0.5                                         318/591/1,194                 362/656/1,246  rank 17  vs plan on test: -10±6  -4±8  +6±7
+Live, half persistence, stickiness 0.5                                         317/590/1,195                 364/655/1,242  rank 18  vs plan on test: -9±6  -5±10  +2±9
+Live, full persistence, stickiness 0.1                                         322/587/1,192                 372/643/1,232  rank 19  vs plan on test: -0±5  -16±10  -7±10
+Live, full persistence, stickiness 0                                           322/587/1,192                 373/643/1,233  rank 20  vs plan on test: -0±5  -16±10  -6±9
+Day-ahead plan                                                                 318/587/1,185                 373/660/1,240  rank 43  vs plan on test: +0±0  +0±0  +0±0
+Perfect hindsight                                                              351/633/1,236                 417/727/1,329  rank -  vs plan on test: +45±6  +68±9  +89±9

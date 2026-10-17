@@ -6,6 +6,19 @@ prices, backtests charging strategies on real price history (from a local web ap
 or the command line), trains price forecasts, and records live prices. Tesla
 control comes next, once a strategy has proven itself on real prices.
 
+## On a Mac
+
+```sh
+git clone https://github.com/hetptl1433/sparc.git
+cd sparc
+./start.command        # or double-click start.command in Finder
+```
+
+It needs Python 3.11 or newer ([python.org](https://www.python.org/downloads/) or
+`brew install python@3.12`). The first run downloads the prices (about 20 minutes, resumable), then the
+app opens at http://127.0.0.1:8765. Every experiment in `experiments/` runs from the same folder, for
+example `python3 experiments/battery_buffer/buffer_skip.py 2025-04-02 2026-10-14`.
+
 ## Quick start
 
 Python 3.11 or newer. No third-party packages (LightGBM is optional).
@@ -196,6 +209,17 @@ What the numbers say:
 Reproduce with `python -m sparc fetch 2025-01-01 2026-10-15` and then
 `python -m sparc backtest 2025-04-02 2026-10-14 --drivers examples`, or the same
 dates and the four example drivers in the app.
+
+## Experiments
+
+Every study behind these results is in [`experiments/`](experiments/README.md), with its script, its
+output and what it showed:
+- scenarios for different drivers and plug-in times, and a 97-strategy sweep;
+- Tesla's scheduler modes, learned forecasts, weather, and six time-series foundation models;
+- a battery buffer across nights, which adds about $54 a year for the average and moderate drivers.
+  The buffer is not in the app yet.
+
+ComEd's prices are not in this repository; `python -m sparc fetch` downloads them.
 
 ## Command line
 

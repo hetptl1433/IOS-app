@@ -1,0 +1,76 @@
+# Run in a second environment with prices from 2024-01-01 (fetched with `python -m sparc fetch`), with this
+# repository's script: python experiments/battery_buffer/buffer_live.py 2024-04-20 2026-10-14
+# Output copied verbatim. "2025" here is the whole calendar year.
+Data /home/user/sparc/runtime/sparc.db, nights 2024-04-20 to 2026-10-14
+
+Average (15 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                              +0 ±  0        +0 ±  0        +0 ±  0        +0 ±  0     50%
+  fill-up                                  +19 ±  8       +33 ±  8       +35 ± 13       +36 ± 15     20%
+  fill-up + live q20                       +27 ±  8       +46 ± 10       +69 ± 29       +49 ± 14     20%
+  fill-up + live q20-0.5                   +28 ±  8       +46 ± 10       +71 ± 30       +50 ± 14     20%
+  fill-up + live q10                       +27 ±  8       +45 ± 10       +69 ± 31       +49 ± 14     20%
+  fill-up + live q30                       +25 ±  6       +46 ± 10       +63 ± 24       +46 ± 12     20%
+  fill-up + live q20 add-only              +27 ±  8       +45 ±  9       +70 ± 28       +51 ± 15     20%
+  fill-up + live q20 confirm               +26 ±  7       +44 ±  9       +69 ± 28       +48 ± 14     20%
+  fill-up + live q20 back60                +29 ±  8       +43 ± 10       +63 ± 27       +46 ± 13     20%
+  fill-up g2 + live q20                    +23 ±  6       +43 ±  9       +64 ± 28       +45 ± 12     20%
+  fill-up 80% + live q20                   +26 ±  7       +44 ±  9       +67 ± 28       +48 ± 13     20%
+  fill-up 80%                              +19 ±  7       +30 ±  7       +34 ± 13       +35 ± 14     20%
+  floor 10%: fill-up                       +19 ±  8       +35 ±  9       +34 ± 13       +36 ± 12     10%
+  floor 10%: fill-up + live q20            +27 ±  7       +48 ± 11       +69 ± 29       +49 ± 14     10%
+  nightly + live q20                        -1 ±  2        +1 ±  1        -2 ±  2        -1 ±  2     50%
+  each rule against the one it adds to (same months resampled):
+    live q20, added to fill-up                +7 ±  5       +14 ±  4       +34 ± 19       +13 ±  7
+    live q20-0.5, added to fill-up            +8 ±  5       +13 ±  3       +36 ± 19       +14 ±  5
+    live q10, added to fill-up                +8 ±  5       +12 ±  3       +34 ± 19       +13 ±  5
+    live q30, added to fill-up                +6 ±  5       +14 ±  5       +28 ± 17       +10 ±  8
+  nights: 2024 253, 2025 360, 2026 284; nightly plan ¢/kWh: 2024 4.20, 2025 5.15, 2026 4.84
+
+Moderate (30 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                              +0 ±  0        +0 ±  0        +0 ±  0        +0 ±  0     50%
+  fill-up                                  +19 ±  9       +31 ±  8       +24 ± 11       +25 ± 11     20%
+  fill-up + live q20                       +30 ± 11       +47 ± 11       +65 ± 25       +49 ± 14     20%
+  fill-up + live q20-0.5                   +28 ± 10       +46 ± 11       +59 ± 25       +43 ± 14     20%
+  fill-up + live q10                       +29 ± 10       +46 ± 11       +58 ± 23       +44 ± 12     20%
+  fill-up + live q30                       +30 ± 10       +49 ± 11       +71 ± 25       +54 ± 15     20%
+  fill-up + live q20 add-only              +30 ± 10       +47 ± 11       +67 ± 25       +51 ± 14     20%
+  fill-up + live q20 confirm               +28 ± 10       +46 ± 12       +62 ± 25       +45 ± 13     20%
+  fill-up + live q20 back60                +31 ± 10       +47 ± 12       +68 ± 28       +52 ± 15     20%
+  fill-up g2 + live q20                    +28 ±  9       +46 ± 11       +66 ± 25       +49 ± 14     20%
+  fill-up 80% + live q20                   +26 ±  9       +40 ±  9       +61 ± 22       +45 ± 12     20%
+  fill-up 80%                              +16 ±  7       +26 ±  6       +23 ±  9       +24 ± 10     20%
+  floor 10%: fill-up                       +21 ± 11       +36 ± 10       +27 ± 14       +27 ± 12     10%
+  floor 10%: fill-up + live q20            +32 ± 11       +53 ± 13       +71 ± 29       +54 ± 17     10%
+  nightly + live q20                        -2 ±  2        +1 ±  2        -3 ±  3        -0 ±  2     50%
+  each rule against the one it adds to (same months resampled):
+    live q20, added to fill-up               +11 ±  5       +16 ±  5       +41 ± 17       +24 ±  5
+    live q20-0.5, added to fill-up            +9 ±  4       +15 ±  4       +34 ± 17       +18 ±  4
+    live q10, added to fill-up                +9 ±  4       +16 ±  5       +34 ± 16       +19 ±  4
+    live q30, added to fill-up               +11 ±  6       +18 ±  6       +47 ± 19       +29 ±  6
+  nights: 2024 253, 2025 360, 2026 284; nightly plan ¢/kWh: 2024 4.21, 2025 5.17, 2026 4.91
+
+Heavy (80 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                              +0 ±  0        +0 ±  0        +0 ±  0        +0 ±  0     25%
+  fill-up                                   +3 ±  1        +4 ±  1        +4 ±  1        +4 ±  1     20%
+  fill-up + live q20                        +6 ±  2        +8 ±  2       +10 ±  3        +9 ±  3     20%
+  fill-up + live q20-0.5                    +5 ±  1        +7 ±  2        +8 ±  3        +7 ±  2     20%
+  fill-up + live q10                        +5 ±  1        +7 ±  2        +8 ±  3        +8 ±  2     20%
+  fill-up + live q30                        +6 ±  2        +8 ±  2       +10 ±  4       +10 ±  3     20%
+  fill-up + live q20 add-only               +6 ±  2        +8 ±  2       +10 ±  3        +9 ±  2     20%
+  fill-up + live q20 confirm                +5 ±  2        +8 ±  2        +9 ±  3        +9 ±  2     20%
+  fill-up + live q20 back60                 +6 ±  2        +8 ±  2       +10 ±  3       +10 ±  3     20%
+  fill-up g2 + live q20                     +6 ±  1        +8 ±  2       +10 ±  3        +9 ±  2     20%
+  fill-up 80% + live q20                    -0 ±  1        +1 ±  1        +1 ±  0        +1 ±  1     20%
+  fill-up 80%                               -0 ±  1        +0 ±  0        +0 ±  0        +0 ±  0     20%
+  floor 10%: fill-up                        +8 ±  3       +10 ±  3        +9 ±  3        +9 ±  3     10%
+  floor 10%: fill-up + live q20            +13 ±  4       +17 ±  4       +17 ±  6       +15 ±  5     10%
+  nightly + live q20                        -0 ±  0        +1 ±  1        +1 ±  0        +1 ±  1     25%
+  each rule against the one it adds to (same months resampled):
+    live q20, added to fill-up                +3 ±  1        +5 ±  2        +6 ±  2        +5 ±  2
+    live q20-0.5, added to fill-up            +2 ±  1        +4 ±  1        +4 ±  2        +3 ±  1
+    live q10, added to fill-up                +2 ±  1        +4 ±  1        +4 ±  2        +3 ±  1
+    live q30, added to fill-up                +3 ±  1        +5 ±  2        +6 ±  3        +6 ±  2
+  nights: 2024 253, 2025 360, 2026 284; nightly plan ¢/kWh: 2024 4.52, 2025 5.54, 2026 5.40

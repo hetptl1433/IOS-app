@@ -1,0 +1,8 @@
+Charge on plug-in                                 Average: $   165 (1.0 switches)  Moderate: $   363 (1.0 switches)  Heavy: $ 1,020 (1.0 switches)
+Day-ahead plan                                    Average: $   355 (2.4 switches)  Moderate: $   643 (2.6 switches)  Heavy: $ 1,224 (2.7 switches)
+Live, as backtested (some hysteresis)             Average: $   348 (2.8 switches)  Moderate: $   641 (3.0 switches)  Heavy: $ 1,228 (3.0 switches)
+Live, free switching every 5 min                  Average: $   356 (5.6 switches)  Moderate: $   644 (7.1 switches)  Heavy: $ 1,230 (4.4 switches)
+Live, free switching, sees prices 2 min sooner    Average: $   357 (5.6 switches)  Moderate: $   645 (6.7 switches)  Heavy: $ 1,229 (4.3 switches)
+Below 2¢                                          Average: $   290 (8.9 switches)  Moderate: $   552 (11.3 switches)  Heavy: $ 1,166 (6.5 switches)
+Below 3¢                                          Average: $   290 (7.9 switches)  Moderate: $   553 (10.0 switches)  Heavy: $ 1,173 (8.9 switches)
+Perfect hindsight                                 Average: $   393 (3.2 switches)  Moderate: $   697 (3.4 switches)  Heavy: $ 1,297 (3.2 switches)

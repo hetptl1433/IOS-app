@@ -1,0 +1,28 @@
+Grid 1: the twelve largest savings
+$3,256/yr  12:00-08:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.29 -> $6.37/night (58% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,247/yr  12:00-08:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.29 -> $6.39/night (58% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,235/yr  12:00-07:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.29 -> $6.43/night (58% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,219/yr  12:00-07:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.29 -> $6.47/night (58% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,190/yr  13:00-08:00 +80  Delivery Time-of-Day  Day-ahead plan           plug-in $13.60 -> $4.86/night (64% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,188/yr  13:00-08:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.14 -> $6.41/night (58% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,187/yr  13:00-07:00 +80  Delivery Time-of-Day  Day-ahead plan           plug-in $13.60 -> $4.86/night (64% cheaper)  98% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,185/yr  13:00-08:00 +80  Delivery Time-of-Day  Day-ahead + live prices  plug-in $13.60 -> $4.87/night (64% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,175/yr  13:00-08:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.14 -> $6.44/night (57% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,173/yr  13:00-07:00 +80  Delivery Time-of-Day  Day-ahead + live prices  plug-in $13.60 -> $4.90/night (64% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,163/yr  13:00-07:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.14 -> $6.48/night (57% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+$3,143/yr  13:00-07:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.14 -> $6.53/night (57% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 7649 -> 0  nights 540
+
+Grid 2: the twelve largest savings
+$3,314/yr  11:00-09:00 +110 Delivery Time-of-Day  Day-ahead + live prices  plug-in $16.17 -> $7.09/night (56% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,298/yr  11:00-09:00 +110 Delivery Time-of-Day  Day-ahead plan           plug-in $16.17 -> $7.13/night (56% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,298/yr  11:00-09:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.33 -> $6.29/night (59% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,287/yr  11:00-09:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.33 -> $6.32/night (59% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,278/yr  11:00-08:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.33 -> $6.35/night (59% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,277/yr  11:00-08:00 +110 Delivery Time-of-Day  Day-ahead plan           plug-in $16.17 -> $7.19/night (56% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,275/yr  11:00-08:00 +110 Delivery Time-of-Day  Day-ahead + live prices  plug-in $16.17 -> $7.19/night (56% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,275/yr  12:00-09:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.29 -> $6.32/night (59% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,272/yr  11:00-08:00 +100 Delivery Time-of-Day  Day-ahead + live prices  plug-in $15.33 -> $6.36/night (58% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,264/yr  12:00-09:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.29 -> $6.35/night (58% cheaper)  96% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,256/yr  12:00-08:00 +100 Delivery Time-of-Day  Day-ahead plan           plug-in $15.29 -> $6.37/night (58% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+$3,254/yr  12:00-09:00 +90  Delivery Time-of-Day  Day-ahead + live prices  plug-in $14.46 -> $5.54/night (62% cheaper)  97% of max  ready 100%  peak-hour kWh/yr 8924 -> 0  nights 540
+

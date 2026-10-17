@@ -1,0 +1,19 @@
+# Run in a second environment with prices from 2024-01-01 (fetched with `python -m sparc fetch`), with this
+# repository's script: python experiments/battery_buffer/buffer_bound.py 2024-04-20 2026-10-14
+# Output copied verbatim. "2025" here is the whole calendar year.
+¢/kWh billed (and $ a year against the nightly day-ahead plan, as in buffer.py), nights 2024-04-20-2026-10-14
+
+Average: nightly day-ahead plan 2024 4.201, 2025 5.151, 2026 4.842
+  nightly hindsight             2024 3.799 ($+24)   2025 4.507 ($+39)   2026 4.109 ($+45)
+  buffer hindsight              2024 3.027 ($+71)   2025 3.536 ($+98)   2026 2.708 ($+130)
+  buffer, day-ahead foresight   2024 3.774 ($+26)   2025 4.390 ($+46)   2026 4.388 ($+28)
+
+Moderate: nightly day-ahead plan 2024 4.210, 2025 5.168, 2026 4.915
+  nightly hindsight             2024 3.943 ($+33)   2025 4.715 ($+55)   2026 4.359 ($+68)
+  buffer hindsight              2024 3.572 ($+78)   2025 4.218 ($+116)   2026 3.642 ($+155)
+  buffer, day-ahead foresight   2024 4.018 ($+23)   2025 4.756 ($+50)   2026 4.691 ($+27)
+
+Heavy: nightly day-ahead plan 2024 4.517, 2025 5.543, 2026 5.397
+  nightly hindsight             2024 4.409 ($+35)   2025 5.350 ($+62)   2026 5.122 ($+89)
+  buffer hindsight              2024 4.380 ($+44)   2025 5.306 ($+77)   2026 5.066 ($+107)
+  buffer, day-ahead foresight   2024 4.495 ($+7)   2025 5.510 ($+10)   2026 5.362 ($+11)

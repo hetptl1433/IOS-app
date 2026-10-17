@@ -1,0 +1,52 @@
+Plug in 20:00, leave 07:00
+  +15 kWh Standard delivery     Day-ahead plan           saves $159/yr  $1.80 -> $1.37/day (24% cheaper)  ready 100%  days 554
+  +15 kWh Standard delivery     Day-ahead + live prices  saves $151/yr  $1.80 -> $1.39/day (23% cheaper)  ready 100%  days 554
+  +15 kWh Standard delivery     Perfect hindsight        saves $197/yr  $1.80 -> $1.26/day (30% cheaper)  ready 100%  days 554
+  +15 kWh Delivery Time-of-Day  Day-ahead plan           saves $190/yr  $1.35 -> $0.83/day (39% cheaper)  ready 100%  days 554
+  +15 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $182/yr  $1.35 -> $0.85/day (37% cheaper)  ready 100%  days 554
+  +15 kWh Delivery Time-of-Day  Perfect hindsight        saves $228/yr  $1.35 -> $0.73/day (46% cheaper)  ready 100%  days 554
+  +30 kWh Standard delivery     Day-ahead plan           saves $249/yr  $3.43 -> $2.75/day (20% cheaper)  ready 100%  days 554
+  +30 kWh Standard delivery     Day-ahead + live prices  saves $247/yr  $3.43 -> $2.75/day (20% cheaper)  ready 100%  days 554
+  +30 kWh Standard delivery     Perfect hindsight        saves $306/yr  $3.43 -> $2.59/day (24% cheaper)  ready 100%  days 554
+  +30 kWh Delivery Time-of-Day  Day-ahead plan           saves $280/yr  $2.44 -> $1.67/day (32% cheaper)  ready 100%  days 554
+  +30 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $279/yr  $2.44 -> $1.67/day (31% cheaper)  ready 100%  days 554
+  +30 kWh Delivery Time-of-Day  Perfect hindsight        saves $334/yr  $2.44 -> $1.52/day (38% cheaper)  ready 100%  days 554
+  +80 kWh Standard delivery     Day-ahead plan           saves $179/yr  $8.21 -> $7.71/day (6% cheaper)  ready 100%  days 554
+  +80 kWh Standard delivery     Day-ahead + live prices  saves $184/yr  $8.21 -> $7.70/day (6% cheaper)  ready 100%  days 554
+  +80 kWh Standard delivery     Perfect hindsight        saves $265/yr  $8.21 -> $7.48/day (9% cheaper)  ready 100%  days 554
+  +80 kWh Delivery Time-of-Day  Day-ahead plan           saves $203/yr  $5.41 -> $4.85/day (10% cheaper)  ready 100%  days 554
+  +80 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $208/yr  $5.41 -> $4.84/day (11% cheaper)  ready 100%  days 554
+  +80 kWh Delivery Time-of-Day  Perfect hindsight        saves $276/yr  $5.41 -> $4.65/day (14% cheaper)  ready 100%  days 554
++15 Standard delivery best: Day-ahead plan tied: []
++15 Delivery Time-of-Day best: Day-ahead plan tied: []
++30 Standard delivery best: Day-ahead plan tied: ['Day-ahead + live prices']
++30 Delivery Time-of-Day best: Day-ahead plan tied: ['Day-ahead + live prices']
++80 Standard delivery best: Day-ahead + live prices tied: ['Day-ahead plan']
++80 Delivery Time-of-Day best: Day-ahead + live prices tied: ['Day-ahead plan']
+
+Plug in 23:00, leave 08:00
+  +15 kWh Standard delivery     Day-ahead plan           saves $52/yr  $1.51 -> $1.37/day (9% cheaper)  ready 100%  days 556
+  +15 kWh Standard delivery     Day-ahead + live prices  saves $48/yr  $1.51 -> $1.38/day (9% cheaper)  ready 100%  days 556
+  +15 kWh Standard delivery     Perfect hindsight        saves $88/yr  $1.51 -> $1.27/day (16% cheaper)  ready 100%  days 556
+  +15 kWh Delivery Time-of-Day  Day-ahead plan           saves $51/yr  $0.97 -> $0.83/day (14% cheaper)  ready 100%  days 556
+  +15 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $46/yr  $0.97 -> $0.84/day (13% cheaper)  ready 100%  days 556
+  +15 kWh Delivery Time-of-Day  Perfect hindsight        saves $85/yr  $0.97 -> $0.73/day (24% cheaper)  ready 100%  days 556
+  +30 kWh Standard delivery     Day-ahead plan           saves $67/yr  $2.93 -> $2.74/day (6% cheaper)  ready 100%  days 556
+  +30 kWh Standard delivery     Day-ahead + live prices  saves $69/yr  $2.93 -> $2.74/day (6% cheaper)  ready 100%  days 556
+  +30 kWh Standard delivery     Perfect hindsight        saves $119/yr  $2.93 -> $2.60/day (11% cheaper)  ready 100%  days 556
+  +30 kWh Delivery Time-of-Day  Day-ahead plan           saves $66/yr  $1.85 -> $1.67/day (10% cheaper)  ready 100%  days 556
+  +30 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $67/yr  $1.85 -> $1.66/day (10% cheaper)  ready 100%  days 556
+  +30 kWh Delivery Time-of-Day  Perfect hindsight        saves $113/yr  $1.85 -> $1.54/day (17% cheaper)  ready 100%  days 556
+  +80 kWh Standard delivery     Day-ahead plan           saves $33/yr  $7.88 -> $7.79/day (1% cheaper)  ready 100%  days 556
+  +80 kWh Standard delivery     Day-ahead + live prices  saves $35/yr  $7.88 -> $7.78/day (1% cheaper)  ready 100%  days 556
+  +80 kWh Standard delivery     Perfect hindsight        saves $97/yr  $7.88 -> $7.61/day (3% cheaper)  ready 100%  days 556
+  +80 kWh Delivery Time-of-Day  Day-ahead plan           saves $27/yr  $5.08 -> $5.00/day (1% cheaper)  ready 100%  days 556
+  +80 kWh Delivery Time-of-Day  Day-ahead + live prices  saves $30/yr  $5.08 -> $4.99/day (2% cheaper)  ready 100%  days 556
+  +80 kWh Delivery Time-of-Day  Perfect hindsight        saves $77/yr  $5.08 -> $4.87/day (4% cheaper)  ready 100%  days 556
++15 Standard delivery best: Day-ahead plan tied: ['Day-ahead + live prices']
++15 Delivery Time-of-Day best: Day-ahead plan tied: ['Day-ahead + live prices']
++30 Standard delivery best: Day-ahead + live prices tied: ['Day-ahead plan']
++30 Delivery Time-of-Day best: Day-ahead + live prices tied: ['Day-ahead plan']
++80 Standard delivery best: Day-ahead + live prices tied: ['Day-ahead plan']
++80 Delivery Time-of-Day best: Day-ahead + live prices tied: ['Day-ahead plan']
+

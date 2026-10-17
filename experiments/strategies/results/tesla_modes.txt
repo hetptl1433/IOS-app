@@ -1,0 +1,27 @@
+Average plan $355.5
+   scheduled charging, start 21:00: $247.1  -> plan saves $108.4 more
+   scheduled charging, start 22:00: $283.2  -> plan saves $72.3 more
+   scheduled charging, start 23:00: $304.7  -> plan saves $50.8 more
+   scheduled charging, start 00:00: $331.5  -> plan saves $24.0 more
+   scheduled charging, start 01:00: $346.3  -> plan saves $9.2 more
+   off-peak charging, finish by 05:00: $345.4  -> plan saves $10.1 more
+   off-peak charging, finish by 06:00: $303.2  -> plan saves $52.3 more
+   off-peak charging, finish by 07:00: $191.2  -> plan saves $164.3 more
+Moderate plan $643.0
+   scheduled charging, start 21:00: $472.2  -> plan saves $170.7 more
+   scheduled charging, start 22:00: $533.8  -> plan saves $109.2 more
+   scheduled charging, start 23:00: $578.5  -> plan saves $64.5 more
+   scheduled charging, start 00:00: $616.1  -> plan saves $26.9 more
+   scheduled charging, start 01:00: $638.2  -> plan saves $4.7 more
+   off-peak charging, finish by 05:00: $634.8  -> plan saves $8.2 more
+   off-peak charging, finish by 06:00: $589.6  -> plan saves $53.4 more
+   off-peak charging, finish by 07:00: $443.2  -> plan saves $199.8 more
+Heavy plan $1,223.9
+   scheduled charging, start 21:00: $1,164.9  -> plan saves $59.1 more
+   scheduled charging, start 22:00: $1,210.2  -> plan saves $13.7 more
+   scheduled charging, start 23:00: $1,166.5  -> plan saves $57.4 more
+   scheduled charging, start 00:00: $1,166.5  -> plan saves $57.4 more
+   scheduled charging, start 01:00: $1,166.5  -> plan saves $57.4 more
+   off-peak charging, finish by 05:00: $1,182.7  -> plan saves $41.2 more
+   off-peak charging, finish by 06:00: $1,211.3  -> plan saves $12.6 more
+   off-peak charging, finish by 07:00: $1,116.6  -> plan saves $107.3 more

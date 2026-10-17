@@ -1,0 +1,10 @@
+Nights 2025-04-02 to 2026-10-14; prices include delivery
+Average  nightly plan                     starts/night 1.18  avg 4.97¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Average  fill-up                          starts/night 1.07  avg 4.49¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Average  fill-up + live q20 + skip q80    starts/night 2.78  avg 4.08¢  top-ups 3414 kWh at 2.75¢  skipped 360 kWh worth 6.45¢
+Moderate nightly plan                     starts/night 1.30  avg 5.01¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Moderate fill-up                          starts/night 1.20  avg 4.82¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Moderate fill-up + live q20 + skip q80    starts/night 2.81  avg 4.57¢  top-ups 3021 kWh at 2.80¢  skipped 638 kWh worth 6.85¢
+Heavy    nightly plan                     starts/night 1.15  avg 5.46¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Heavy    fill-up                          starts/night 1.14  avg 5.45¢  top-ups 0 kWh at 0.00¢  skipped 0 kWh worth 0.00¢
+Heavy    fill-up + live q20 + skip q80    starts/night 1.62  avg 5.43¢  top-ups 570 kWh at 3.19¢  skipped 328 kWh worth 7.28¢

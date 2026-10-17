@@ -1,0 +1,28 @@
+rule                                      Average train/test c/kWh       Moderate train/test c/kWh          Heavy train/test c/kWh
+nightly                                              5.106 / 4.842                   5.106 / 4.915                   5.526 / 5.397
+percentile 0.2/0.8, max 80%                          4.866 / 4.452                   5.005 / 4.695                   5.531 / 5.397
+percentile 0.3/0.7, max 80%                          4.875 / 4.432                   4.992 / 4.700                   5.531 / 5.397
+percentile 0.4/0.6, max 80%                          4.830 / 4.454                   4.999 / 4.729                   5.531 / 5.397
+percentile 0.5/0.5, max 80%                          4.870 / 4.394                   5.032 / 4.724                   5.531 / 5.397
+weekend 0/0, max 80%                                 5.102 / 4.842                   5.106 / 4.915                   5.528 / 5.397
+every 2 2/0, max 80%                                 5.193 / 4.673                   5.339 / 4.942                   5.528 / 5.397
+every 3 3/0, max 80%                                 5.214 / 5.100                   5.426 / 5.339                   5.528 / 5.397
+percentile 0.2/0.8, max 90%                          4.839 / 4.511                   4.975 / 4.626                   5.518 / 5.392
+percentile 0.3/0.7, max 90%                          4.838 / 4.499                   4.964 / 4.638                   5.518 / 5.375
+percentile 0.4/0.6, max 90%                          4.798 / 4.530                   4.991 / 4.669                   5.518 / 5.377
+percentile 0.5/0.5, max 90%                          4.847 / 4.467                   5.053 / 4.691                   5.522 / 5.387
+weekend 0/0, max 90%                                 5.102 / 4.842                   5.106 / 4.915                   5.528 / 5.397
+every 2 2/0, max 90%                                 5.196 / 4.673                   5.352 / 4.941                   5.534 / 5.399
+every 3 3/0, max 90%                                 5.217 / 5.100                   5.602 / 5.552                   5.531 / 5.387
+percentile 0.2/0.8, max 100%                         4.844 / 4.578                   4.969 / 4.608                   5.506 / 5.384
+percentile 0.3/0.7, max 100%                         4.839 / 4.564                   4.963 / 4.618                   5.507 / 5.351
+percentile 0.4/0.6, max 100%                         4.802 / 4.612                   5.021 / 4.668                   5.504 / 5.371
+percentile 0.5/0.5, max 100%                         4.860 / 4.552                   5.104 / 4.709                   5.526 / 5.394
+weekend 0/0, max 100%                                5.101 / 4.842                   5.105 / 4.915                   5.526 / 5.397
+every 2 2/0, max 100%                                5.209 / 4.673                   5.361 / 4.941                   5.617 / 5.483
+every 3 3/0, max 100%                                5.230 / 5.100                   5.674 / 5.640                   5.586 / 5.463
+
+Best rule on the tuning nights for each driver, and how it did on the test nights:
+  Average: ('percentile', 0.4, 0.6, 0.9): tuning +0.308 c/kWh ($+19/yr), test +0.313 c/kWh ($+19/yr), short nights 0
+  Moderate: ('percentile', 0.3, 0.7, 1.0): tuning +0.142 c/kWh ($+17/yr), test +0.297 c/kWh ($+36/yr), short nights 0
+  Heavy: ('percentile', 0.4, 0.6, 1.0): tuning +0.023 c/kWh ($+7/yr), test +0.026 c/kWh ($+9/yr), short nights 0

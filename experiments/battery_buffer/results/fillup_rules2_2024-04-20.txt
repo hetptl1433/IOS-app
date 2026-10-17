@@ -1,0 +1,46 @@
+# Run 2 of fillup_rules2.py, made in a second environment with prices from 2024-01-01,
+# with this script as it was before it moved into the repository (the same code; only its paths changed):
+#   python experiments/battery_buffer/fillup_rules2.py 2024-04-20 2026-10-14 2026-01-01
+# Output copied verbatim.
+mean cheap-hours price by plug-in night (c/kWh, incl. delivery), tuning nights: {'Sat': 4.4, 'Sun': 4.55, 'Mon': 4.95, 'Tue': 4.78, 'Wed': 4.87, 'Thu': 4.81, 'Fri': 4.78}
+rule                                    Average train/test c/kWh     Moderate train/test c/kWh        Heavy train/test c/kWh
+('nightly', 0, 0, 0.9)                     4.759 / 4.842            4.773 / 4.915            5.120 / 5.397   
+('proportional', 0.5, 14, 0.8)             4.533 / 4.544            4.620 / 4.751            5.120 / 5.397   
+('proportional', 0.5, 30, 0.8)             4.548 / 4.561            4.622 / 4.692            5.120 / 5.397   
+('proportional', 0.5, 60, 0.8)             4.540 / 4.595            4.621 / 4.707            5.120 / 5.397   
+('proportional', 1, 14, 0.8)               4.437 / 4.400            4.592 / 4.722            5.120 / 5.397   
+('proportional', 1, 30, 0.8)               4.442 / 4.401            4.596 / 4.707            5.120 / 5.397   
+('proportional', 1, 60, 0.8)               4.438 / 4.436            4.595 / 4.694            5.120 / 5.397   
+('proportional', 2, 14, 0.8)               4.341 / 4.310            4.585 / 4.727            5.120 / 5.397   
+('proportional', 2, 30, 0.8)               4.352 / 4.319            4.588 / 4.710            5.120 / 5.397   
+('proportional', 2, 60, 0.8)               4.364 / 4.344            4.590 / 4.704            5.120 / 5.397   
+('proportional', 3, 14, 0.8)               4.338 / 4.333            4.599 / 4.750            5.120 / 5.397   
+('proportional', 3, 30, 0.8)               4.340 / 4.278            4.595 / 4.723            5.120 / 5.397   
+('proportional', 3, 60, 0.8)               4.354 / 4.291            4.596 / 4.712            5.120 / 5.397   
+('percentile', 0.3, 14, 0.8)               4.447 / 4.411            4.607 / 4.695            5.120 / 5.397   
+('percentile', 0.3, 60, 0.8)               4.532 / 4.563            4.652 / 4.664            5.120 / 5.397   
+('percentile', 0.4, 14, 0.8)               4.396 / 4.421            4.606 / 4.766            5.120 / 5.397   
+('percentile', 0.4, 60, 0.8)               4.434 / 4.454            4.604 / 4.767            5.120 / 5.397   
+('weekend-min', 0, 0, 0.8)                 4.895 / 5.558            4.883 / 5.249            5.120 / 5.397   
+('proportional', 0.5, 14, 0.9)             4.531 / 4.536            4.605 / 4.695            5.111 / 5.383   
+('proportional', 0.5, 30, 0.9)             4.546 / 4.585            4.603 / 4.661            5.110 / 5.383   
+('proportional', 0.5, 60, 0.9)             4.539 / 4.632            4.599 / 4.681            5.110 / 5.384   
+('proportional', 1, 14, 0.9)               4.427 / 4.410            4.559 / 4.708            5.109 / 5.382   
+('proportional', 1, 30, 0.9)               4.435 / 4.441            4.560 / 4.650            5.108 / 5.382   
+('proportional', 1, 60, 0.9)               4.422 / 4.490            4.561 / 4.641            5.108 / 5.382   
+('proportional', 2, 14, 0.9)               4.330 / 4.292            4.543 / 4.718            5.108 / 5.383   
+('proportional', 2, 30, 0.9)               4.339 / 4.333            4.546 / 4.686            5.108 / 5.383   
+('proportional', 2, 60, 0.9)               4.343 / 4.379            4.553 / 4.673            5.109 / 5.382   
+('proportional', 3, 14, 0.9)               4.305 / 4.286            4.558 / 4.729            5.109 / 5.384   
+('proportional', 3, 30, 0.9)               4.312 / 4.271            4.559 / 4.715            5.110 / 5.384   
+('proportional', 3, 60, 0.9)               4.328 / 4.293            4.563 / 4.687            5.110 / 5.383   
+('percentile', 0.3, 14, 0.9)               4.436 / 4.473            4.586 / 4.644            5.104 / 5.385   
+('percentile', 0.3, 60, 0.9)               4.524 / 4.626            4.637 / 4.635            5.104 / 5.374   
+('percentile', 0.4, 14, 0.9)               4.397 / 4.435            4.598 / 4.764            5.106 / 5.387   
+('percentile', 0.4, 60, 0.9)               4.411 / 4.530            4.581 / 4.722            5.102 / 5.385   
+('weekend-min', 0, 0, 0.9)                 4.978 / 5.794            4.913 / 5.409            5.119 / 5.415   
+
+Best on the tuning nights for each driver, scored on the test nights (gain over nightly):
+  Average: ('proportional', 3, 14, 0.9): tuning $+28/yr, test $+34/yr
+  Moderate: ('proportional', 2, 14, 0.9): tuning $+28/yr, test $+24/yr
+  Heavy: ('percentile', 0.4, 60, 0.9): tuning $+6/yr, test $+4/yr

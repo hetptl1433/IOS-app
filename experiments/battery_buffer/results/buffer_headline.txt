@@ -1,0 +1,8 @@
+Nights 2025-04-02 to 2026-10-14; $ a year saved against the default setup (% cheaper, ¢/kWh)
+                                                 Average                Moderate                   Heavy
+backtest: Day-ahead plan                            $355                    $643                   $1224
+backtest: Perfect hindsight                         $393                    $697                   $1297
+nightly plan                      $355.5 (54.0%, 4.971¢)  $643.0 (51.3%, 5.008¢)$1,223.5 (40.8%, 5.461¢)
+fill-up                           $384.9 (58.5%, 4.488¢)  $665.4 (53.1%, 4.823¢)$1,227.1 (41.0%, 5.450¢)
+fill-up + live q20                $405.7 (61.7%, 4.145¢)  $690.3 (55.1%, 4.619¢)$1,231.0 (41.1%, 5.438¢)
+fill-up + live q20 + skip q80     $409.7 (62.3%, 4.080¢)  $696.7 (55.6%, 4.566¢)$1,233.4 (41.2%, 5.430¢)

@@ -1,0 +1,42 @@
+99,381 hourly forecasts; gap = settled real-time price minus the day-ahead price used
+gap: mean -0.23, sd 5.98, median -0.10 cents
+
+correlation with the gap (and with |gap|, i.e. spikiness):
+  day_ahead        -0.348   |gap| +0.670
+  day_ahead_known  +0.004   |gap| -0.005
+  hours_ahead      -0.007   |gap| -0.012
+  hour_sin         -0.016   |gap| -0.056
+  hour_cos         -0.009   |gap| -0.126
+  weekend          +0.004   |gap| -0.055
+  season_sin       -0.026   |gap| +0.035
+  season_cos       -0.098   |gap| +0.104
+  gap_latest       +0.246   |gap| -0.109
+  gap_1h           +0.322   |gap| -0.216
+  gap_3h           +0.380   |gap| -0.301
+  gap_24h          +0.513   |gap| -0.443
+  holiday          +0.003   |gap| -0.026
+  heating_fc       -0.150   |gap| +0.151
+  cooling_fc       +0.055   |gap| +0.078
+  dew_point_fc     +0.146   |gap| -0.141
+  wind_fc          -0.015   |gap| +0.060
+  cloud_fc         +0.007   |gap| +0.008
+  temp_surprise    -0.025   |gap| +0.035
+
+by weather surprise in the last 3 hours (observed minus day-ahead forecast):
+  much colder than forecast (< -2 C)         n= 7,673  mean gap  +0.02  mean |gap|  1.51  share |gap|>5c   4.7%
+  about as forecast (-2..2 C)                n=83,233  mean gap  -0.22  mean |gap|  1.85  share |gap|>5c   5.7%
+  much warmer than forecast (> 2 C)          n= 8,475  mean gap  -0.58  mean |gap|  2.16  share |gap|>5c   6.6%
+
+by forecast temperature:
+  very cold (heating > 25, below -7 C)       n= 8,925  mean gap  -3.69  mean |gap|  5.34  share |gap|>5c  20.5%
+  cold (heating 10-25)                       n=33,234  mean gap  -0.03  mean |gap|  1.57  share |gap|>5c   3.9%
+  mild                                       n=52,006  mean gap  +0.16  mean |gap|  1.24  share |gap|>5c   3.3%
+  hot (cooling > 6, above 24 C)              n= 5,216  mean gap  +0.48  mean |gap|  3.68  share |gap|>5c  15.6%
+
+by wind forecast:
+  calm (< 10 km/h)                           n=35,187  mean gap  +0.00  mean |gap|  1.29  share |gap|>5c   4.1%
+  windy (> 25 km/h)                          n= 5,498  mean gap  +0.36  mean |gap|  2.27  share |gap|>5c   5.4%
+
+holidays:
+  holiday                                    n= 1,488  mean gap  -0.09  mean |gap|  0.64  share |gap|>5c   1.1%
+  not a holiday                              n=97,893  mean gap  -0.23  mean |gap|  1.87  share |gap|>5c   5.8%

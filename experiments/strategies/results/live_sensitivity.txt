@@ -1,0 +1,5 @@
+live, as backtested (lag 10 min, stickiness 0.5)               Commuter: -0.8 c/night vs day-ahead, pauses 1.01; Big day: +0.3 c/night vs day-ahead, pauses 1.16
+no hysteresis                                                  Commuter: +0.1 c/night vs day-ahead, pauses 3.23; Big day: +0.7 c/night vs day-ahead, pauses 3.01
+strong hysteresis (2 cents)                                    Commuter: -8.4 c/night vs day-ahead, pauses 0.87; Big day: -5.4 c/night vs day-ahead, pauses 0.90
+no persistence beyond observed readings                        Commuter: -1.0 c/night vs day-ahead, pauses 0.89; Big day: +0.4 c/night vs day-ahead, pauses 1.13
+optimistic lag: see each price the moment its interval ends    Commuter: -0.6 c/night vs day-ahead, pauses 1.02; Big day: +0.5 c/night vs day-ahead, pauses 1.12

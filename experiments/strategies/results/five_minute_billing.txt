@@ -1,0 +1,15 @@
+Average (554 nights)
+  hourly billing: default $1.802/night; plan saves $355/yr
+  5-minute billing: default $1.837/night; plan saves $366/yr
+  ceiling, real hourly billing:        $393/yr
+  ceiling, hypothetical 5-minute bill: $446/yr
+Moderate (554 nights)
+  hourly billing: default $3.431/night; plan saves $643/yr
+  5-minute billing: default $3.436/night; plan saves $643/yr
+  ceiling, real hourly billing:        $697/yr
+  ceiling, hypothetical 5-minute bill: $750/yr
+Heavy (554 nights)
+  hourly billing: default $8.206/night; plan saves $1,224/yr
+  5-minute billing: default $8.210/night; plan saves $1,228/yr
+  ceiling, real hourly billing:        $1,291/yr
+  ceiling, hypothetical 5-minute bill: $1,361/yr

@@ -1,0 +1,30 @@
+strategies: ['charge-now', 'timer-2100', 'timer-2200', 'timer-2300', 'timer-0000', 'timer-0100', 'cap-2', 'cap-3', 'cap-5', 'day-ahead', 'live', 'walk:ridge', 'walk:ridge+weather', 'walk:lightgbm', 'walk:lightgbm+weather']
+run 20261017-001509-6141 nights {'Average': 554, 'Moderate': 554, 'Heavy': 554} skipped {'Average': 7, 'Moderate': 7, 'Heavy': 7}
+strategy                                                   Average              Moderate                 Heavy
+Charge on plug-in                             $   165  25%  $ 1.35  $   363  29%  $ 2.44  $ 1,020  34%  $ 5.41
+Timer 21:00                                   $   247  38%  $ 1.13  $   472  38%  $ 2.14  $ 1,165  39%  $ 5.01
+Timer 22:00                                   $   283  43%  $ 1.03  $   534  43%  $ 1.97  $ 1,210  40%  $ 4.89
+Timer 23:00                                   $   305  46%  $ 0.97  $   579  46%  $ 1.85  $ 1,167  39%  $ 5.01
+Timer 00:00                                   $   331  50%  $ 0.89  $   616  49%  $ 1.74  $ 1,167  39%  $ 5.01
+Timer 01:00                                   $   346  53%  $ 0.85  $   638  51%  $ 1.68  $ 1,167  39%  $ 5.01
+Below 2¢                                      $   290  44%  $ 1.01  $   552  44%  $ 1.92  $ 1,166  39%  $ 5.01
+Below 3¢                                      $   290  44%  $ 1.01  $   553  44%  $ 1.92  $ 1,173  39%  $ 4.99
+Below 5¢                                      $   228  35%  $ 1.18  $   465  37%  $ 2.16  $ 1,147  38%  $ 5.06
+Day-ahead plan                                $   355  54%  $ 0.83  $   643  51%  $ 1.67  $ 1,224  41%  $ 4.85
+Day-ahead + live prices                       $   348  53%  $ 0.85  $   641  51%  $ 1.67  $ 1,228  41%  $ 4.84
+Forecast: Ridge, refit monthly                $   343  52%  $ 0.86  $   635  51%  $ 1.69  $ 1,222  41%  $ 4.86
+Forecast: Ridge + weather, refit monthly      $   343  52%  $ 0.86  $   635  51%  $ 1.69  $ 1,223  41%  $ 4.86
+Forecast: LightGBM, refit monthly             $   345  52%  $ 0.86  $   636  51%  $ 1.69  $ 1,225  41%  $ 4.85
+Forecast: LightGBM + weather, refit monthly   $   345  52%  $ 0.86  $   636  51%  $ 1.69  $ 1,226  41%  $ 4.85
+Perfect hindsight                             $   393  60%  $ 0.73  $   697  56%  $ 1.52  $ 1,297  43%  $ 4.65
+default setup $/night: {'Average': 1.8024, 'Moderate': 3.4308, 'Heavy': 8.206}
+Average | Standard delivery | best: Day-ahead plan | tied: 
+Average | Delivery Time-of-Day | best: Day-ahead plan | tied: 
+Moderate | Standard delivery | best: Day-ahead plan | tied: Timer 01:00, Day-ahead + live prices
+Moderate | Delivery Time-of-Day | best: Day-ahead plan | tied: Timer 01:00, Day-ahead + live prices
+Heavy | Standard delivery | best: Day-ahead + live prices | tied: Day-ahead plan, Forecast: Ridge, refit monthly, Forecast: Ridge + weather, refit monthly, Forecast: LightGBM, refit monthly, Forecast: LightGBM + weather, refit monthly
+Heavy | Delivery Time-of-Day | best: Day-ahead + live prices | tied: Day-ahead plan, Forecast: Ridge, refit monthly, Forecast: Ridge + weather, refit monthly, Forecast: LightGBM, refit monthly, Forecast: LightGBM + weather, refit monthly
+Forecast: Ridge, refit monthly MAE 1.872 RMSE 5.632 (DA 1.872 / 6.320)
+Forecast: Ridge + weather, refit monthly MAE 1.880 RMSE 5.595 (DA 1.872 / 6.320)
+Forecast: LightGBM, refit monthly MAE 1.825 RMSE 5.976 (DA 1.872 / 6.320)
+Forecast: LightGBM + weather, refit monthly MAE 1.842 RMSE 6.011 (DA 1.872 / 6.320)

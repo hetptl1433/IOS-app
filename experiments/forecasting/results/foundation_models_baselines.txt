@@ -1,0 +1,69 @@
+9,528 decisions, 85,550 hourly forecasts scored
+day-ahead                  mean error 1.872 (day-ahead 1.872, +0.0%)  RMS 6.323 (day-ahead 6.323, +0.0%)  0 s
+seasonal-naive             mean error 2.495 (day-ahead 1.872, +33.3%)  RMS 7.358 (day-ahead 6.323, +16.4%)  0 s
+
+Commuter · Standard delivery · 554 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              2.40           0      0%    22.36    1.00    0.00          878   100%
+  Day-ahead plan                 1.37         374     91%     6.45    1.82    0.82            0   100%
+  Forecast: seasonal-naive       1.44         351     86%     3.73    1.99    0.99            0   100%
+  Perfect hindsight              1.27         410    100%     3.02    2.31    1.31            0   100%
+
+Big day · Standard delivery · 554 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              5.18           0      0%    28.60    1.00    0.00          878   100%
+  Day-ahead plan                 3.76         517     90%    12.64    1.96    0.96            0   100%
+  Forecast: seasonal-naive       3.87         475     83%     9.93    2.14    1.14            0   100%
+  Perfect hindsight              3.60         574    100%     9.45    2.51    1.51            0   100%
+
+Late arrival · Standard delivery · 555 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              4.91           0      0%    12.69    1.00    0.00            0   100%
+  Day-ahead plan                 4.66          92     61%    16.57    1.99    0.99            0   100%
+  Forecast: seasonal-naive       4.72          68     45%    12.08    2.05    1.05            0   100%
+  Perfect hindsight              4.49         152    100%    11.69    2.21    1.21            0   100%
+
+Afternoon plug-in · Standard delivery · 540 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              4.11           0      0%    33.67    1.00    0.00         3695   100%
+  Day-ahead plan                 2.77         490     88%     9.98    2.14    1.14            0   100%
+  Forecast: seasonal-naive       2.92         433     78%    10.39    2.16    1.16            0   100%
+  Perfect hindsight              2.59         557    100%     5.29    2.62    1.62            0   100%
+
+Commuter · Delivery Time-of-Day · 554 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              2.52           0      0%    22.49    1.00    0.00          878   100%
+  Day-ahead plan                 0.83         616     95%     5.91    1.79    0.79            0   100%
+  Forecast: seasonal-naive       0.89         596     92%     3.18    1.95    0.95            0   100%
+  Perfect hindsight              0.74         649    100%     2.48    2.23    1.23            0   100%
+
+Big day · Delivery Time-of-Day · 554 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              4.45           0      0%    27.87    1.00    0.00          878   100%
+  Day-ahead plan                 2.32         775     94%    11.20    1.90    0.90            0   100%
+  Forecast: seasonal-naive       2.42         741     90%     8.48    2.04    1.04            0   100%
+  Perfect hindsight              2.19         824    100%     8.09    2.36    1.36            0   100%
+
+Late arrival · Delivery Time-of-Day · 555 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              3.11           0      0%    10.89    1.00    0.00            0   100%
+  Day-ahead plan                 2.86          92     61%    14.77    1.99    0.99            0   100%
+  Forecast: seasonal-naive       2.92          68     45%    10.27    2.05    1.05            0   100%
+  Perfect hindsight              2.69         152    100%     9.89    2.21    1.21            0   100%
+
+Afternoon plug-in · Delivery Time-of-Day · 540 nights
+  strategy                    $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in              5.61           0      0%    35.17    1.00    0.00         3695   100%
+  Day-ahead plan                 1.70        1427     97%     8.90    1.88    0.88            0   100%
+  Forecast: seasonal-naive       1.80        1391     95%     6.34    1.96    0.96            0   100%
+  Perfect hindsight              1.58        1469    100%     5.41    2.29    1.29            0   100%
+
+Forecast: seasonal-naive, cost per night minus the day-ahead plan's (cents, ± one standard error):
+  Commuter           Standard delivery       +6.27 ± 1.17   saved $351/yr (day-ahead plan $374)
+  Commuter           Delivery Time-of-Day    +5.40 ± 1.11   saved $596/yr (day-ahead plan $616)
+  Big day            Standard delivery      +11.64 ± 1.65   saved $475/yr (day-ahead plan $517)
+  Big day            Delivery Time-of-Day    +9.34 ± 1.46   saved $741/yr (day-ahead plan $775)
+  Late arrival       Standard delivery       +6.56 ± 1.36   saved $68/yr (day-ahead plan $92)
+  Late arrival       Delivery Time-of-Day    +6.56 ± 1.36   saved $68/yr (day-ahead plan $92)
+  Afternoon plug-in  Standard delivery      +15.43 ± 2.48   saved $433/yr (day-ahead plan $490)
+  Afternoon plug-in  Delivery Time-of-Day    +9.82 ± 1.49   saved $1391/yr (day-ahead plan $1427)

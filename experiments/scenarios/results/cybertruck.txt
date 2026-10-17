@@ -1,0 +1,20 @@
+ 18:00 +20 kWh Standard delivery     plug-in $3.27  plan $1.83 saves $525/yr (44% cheaper, 91% of max $576)  live $520  ready 100%  best: Day-ahead plan
+ 18:00 +20 kWh Delivery Time-of-Day  plug-in $3.52  plan $1.11 saves $880/yr (69% cheaper, 95% of max $927)  live $875  ready 100%  best: Day-ahead plan
+ 18:00 +40 kWh Standard delivery     plug-in $5.66  plan $3.68 saves $722/yr (35% cheaper, 91% of max $789)  live $719  ready 100%  best: Day-ahead plan
+ 18:00 +40 kWh Delivery Time-of-Day  plug-in $5.28  plan $2.24 saves $1110/yr (58% cheaper, 95% of max $1170)  live $1105  ready 100%  best: Day-ahead plan
+ 18:00 +60 kWh Standard delivery     plug-in $7.76  plan $5.64 saves $773/yr (27% cheaper, 90% of max $857)  live $775  ready 100%  best: Day-ahead + live prices
+ 18:00 +60 kWh Delivery Time-of-Day  plug-in $6.66  plan $3.49 saves $1158/yr (48% cheaper, 94% of max $1231)  live $1159  ready 100%  best: Day-ahead + live prices
+ 18:00 +80 kWh Standard delivery     plug-in $9.68  plan $7.72 saves $716/yr (20% cheaper, 88% of max $814)  live $716  ready 100%  best: Day-ahead + live prices
+ 18:00 +80 kWh Delivery Time-of-Day  plug-in $7.86  plan $4.85 saves $1096/yr (38% cheaper, 93% of max $1173)  live $1095  ready 100%  best: Day-ahead plan
+18:00 +100 kWh Standard delivery     plug-in $11.51  plan $9.98 saves $559/yr (13% cheaper, 83% of max $671)  live $557  ready 100%  best: Day-ahead plan
+18:00 +100 kWh Delivery Time-of-Day  plug-in $8.97  plan $6.46 saves $918/yr (28% cheaper, 92% of max $998)  live $911  ready 100%  best: Day-ahead plan
+18:00 +120 kWh Standard delivery     plug-in $13.45  plan $12.71 saves $269/yr (5% cheaper, 69% of max $392)  live $269  ready 100%  best: Day-ahead + live prices
+18:00 +120 kWh Delivery Time-of-Day  plug-in $10.19  plan $8.75 saves $524/yr (14% cheaper, 82% of max $638)  live $522  ready 100%  best: Day-ahead plan
+ 22:00 +20 kWh Standard delivery     plug-in $2.08  plan $1.83 saves $92/yr (12% cheaper, 67% of max $137)  live $90  ready 100%  best: Day-ahead plan
+ 22:00 +20 kWh Delivery Time-of-Day  plug-in $1.36  plan $1.11 saves $91/yr (18% cheaper, 68% of max $135)  live $90  ready 100%  best: Day-ahead plan
+ 22:00 +40 kWh Standard delivery     plug-in $3.99  plan $3.68 saves $111/yr (8% cheaper, 66% of max $169)  live $114  ready 100%  best: Day-ahead + live prices
+ 22:00 +40 kWh Delivery Time-of-Day  plug-in $2.54  plan $2.24 saves $111/yr (12% cheaper, 67% of max $165)  live $114  ready 100%  best: Day-ahead + live prices
+ 22:00 +60 kWh Standard delivery     plug-in $5.82  plan $5.64 saves $67/yr (3% cheaper, 50% of max $133)  live $73  ready 100%  best: Day-ahead + live prices
+ 22:00 +60 kWh Delivery Time-of-Day  plug-in $3.66  plan $3.48 saves $63/yr (5% cheaper, 51% of max $125)  live $71  ready 100%  best: Day-ahead + live prices
+ 22:00 +80 kWh Standard delivery     plug-in $7.77  plan $7.73 saves $15/yr (1% cheaper, 21% of max $69)  live $18  ready 100%  best: Day-ahead + live prices
+ 22:00 +80 kWh Delivery Time-of-Day  plug-in $4.89  plan $4.87 saves $8/yr (0% cheaper, 16% of max $48)  live $10  ready 100%  best: Day-ahead + live prices

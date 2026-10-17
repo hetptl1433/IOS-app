@@ -1,0 +1,37 @@
+Data /home/user/sparc/runtime/sparc.db, nights 2025-04-02 to 2026-10-14
+
+Average (15 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                                     -        +0 ±  0        +0 ±  0        +0 ±  0     50%
+  fill-up                                          -       +24 ±  7       +35 ± 13       +36 ± 14     20%
+  fill-up + live q20                               -       +30 ±  8       +69 ± 29       +49 ± 14     20%
+  fill-up + live q20 + skip q80                    -       +33 ±  8       +75 ± 29       +55 ± 14     20%
+  billed ref: + live q20                           -       +27 ±  7       +62 ± 28       +46 ± 14     20%
+  billed ref: + live q20 + skip q80                -       +32 ±  8       +70 ± 28       +53 ± 15     20%
+  billed ref: + live q30 + skip q80                -       +34 ±  9       +74 ± 27       +56 ± 14     20%
+  billed ref: + live q10 + skip q80                -       +32 ±  9       +60 ± 23       +48 ± 15     20%
+  nights: 2024 0, 2025 270, 2026 284; nightly plan ¢/kWh: 2025 5.11, 2026 4.84
+
+Moderate (30 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                                     -        +0 ±  0        +0 ±  0        +0 ±  0     50%
+  fill-up                                          -       +20 ±  7       +24 ± 11       +25 ± 11     20%
+  fill-up + live q20                               -       +28 ±  8       +65 ± 25       +49 ± 13     20%
+  fill-up + live q20 + skip q80                    -       +32 ±  9       +74 ± 25       +58 ± 14     20%
+  billed ref: + live q20                           -       +28 ±  7       +53 ± 21       +40 ± 13     20%
+  billed ref: + live q20 + skip q80                -       +34 ±  9       +65 ± 22       +51 ± 13     20%
+  billed ref: + live q30 + skip q80                -       +35 ± 10       +70 ± 25       +55 ± 14     20%
+  billed ref: + live q10 + skip q80                -       +31 ±  9       +52 ± 16       +45 ± 13     20%
+  nights: 2024 0, 2025 270, 2026 284; nightly plan ¢/kWh: 2025 5.11, 2026 4.91
+
+Heavy (80 kWh a day): $ a year saved against the nightly plan, ± 1 SE (months resampled)
+                                                2024            2025            2026   2026 no storm  lowest
+  nightly plan                                     -        +0 ±  0        +0 ±  0        +0 ±  0     25%
+  fill-up                                          -        +3 ±  1        +4 ±  1        +4 ±  1     20%
+  fill-up + live q20                               -        +5 ±  1       +10 ±  3        +9 ±  2     20%
+  fill-up + live q20 + skip q80                    -        +7 ±  2       +12 ±  3       +12 ±  2     20%
+  billed ref: + live q20                           -        +5 ±  1        +8 ±  3        +8 ±  2     20%
+  billed ref: + live q20 + skip q80                -        +7 ±  2       +10 ±  3       +10 ±  3     20%
+  billed ref: + live q30 + skip q80                -        +8 ±  2       +11 ±  3       +11 ±  3     20%
+  billed ref: + live q10 + skip q80                -        +7 ±  3       +10 ±  2        +9 ±  2     20%
+  nights: 2024 0, 2025 270, 2026 284; nightly plan ¢/kWh: 2025 5.53, 2026 5.40

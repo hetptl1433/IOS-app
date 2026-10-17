@@ -1,0 +1,196 @@
+Share of a 5-minute price's gap from day-ahead still present after 5 min: 0.62, 15 min: 0.44, 30 min: 0.40, 60 min: 0.35, 120 min: 0.31
+10pm-7am 15kWh: plug in 22:00, leave 07:00, +15 kWh at 7.7 kW
+10pm-7am 30kWh: plug in 22:00, leave 07:00, +30 kWh at 7.7 kW
+10pm-8am 15kWh: plug in 22:00, leave 08:00, +15 kWh at 7.7 kW
+10pm-8am 30kWh: plug in 22:00, leave 08:00, +30 kWh at 7.7 kW
+Savings are against charging on plug-in, as if every night of the year looked like these. "of max" is the share of perfect hindsight's savings. "risk kWh/yr" is energy charged on summer weekday afternoons, when the capacity charge is set.
+
+10pm-7am 15kWh · Standard delivery · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 21:00                                       1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 22:00                                       1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 23:00                                       1.49          24     24%     3.57    1.00    0.00            0   100%
+  Timer 00:00                                       1.42          47     48%     3.21    1.00    0.00            0   100%
+  Timer 01:00                                       1.39          59     61%     3.71    1.00    0.00            0   100%
+  Below 2¢                                          1.49          24     24%     7.48    5.09    4.09            0   100%
+  Below 3¢                                          1.46          34     35%     7.48    4.12    3.12            0   100%
+  Below 5¢                                          1.51          15     15%     7.48    2.09    1.09            0   100%
+  Day-ahead plan                                    1.37          65     67%     6.45    1.81    0.81            0   100%
+  Day-ahead + live prices                           1.37          65     67%     5.26    1.85    0.85            0   100%
+  Forecast: Ridge, refit monthly                    1.39          59     60%     5.78    1.92    0.92            0   100%
+  Forecast: Ridge + weather, refit monthly          1.39          59     60%     5.78    1.91    0.91            0   100%
+  Forecast: LightGBM, refit monthly                 1.39          59     61%     6.29    1.89    0.89            0   100%
+  Forecast: LightGBM + weather, refit monthly       1.39          59     61%     6.54    1.87    0.87            0   100%
+  Perfect hindsight                                 1.28          97    100%     3.02    2.28    1.28            0   100%
+
+10pm-7am 30kWh · Standard delivery · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 21:00                                       2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 22:00                                       2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 23:00                                       2.87          35     31%     7.32    1.00    0.00            0   100%
+  Timer 00:00                                       2.80          61     55%     7.97    1.00    0.00            0   100%
+  Timer 01:00                                       2.81          59     53%    10.14    1.00    0.00            0   100%
+  Below 2¢                                          2.90          26     23%    12.24    5.66    4.66            0   100%
+  Below 3¢                                          2.87          37     34%    12.24    4.93    3.93            0   100%
+  Below 5¢                                          2.90          24     21%    12.24    2.35    1.35            0   100%
+  Day-ahead plan                                    2.77          71     64%     9.98    1.90    0.90            0   100%
+  Day-ahead + live prices                           2.76          74     67%    10.58    1.85    0.85            0   100%
+  Forecast: Ridge, refit monthly                    2.79          66     60%     9.98    1.75    0.75            0   100%
+  Forecast: Ridge + weather, refit monthly          2.79          66     59%     9.98    1.76    0.76            0   100%
+  Forecast: LightGBM, refit monthly                 2.78          67     60%     9.98    1.77    0.77            0   100%
+  Forecast: LightGBM + weather, refit monthly       2.79          66     60%    10.64    1.75    0.75            0   100%
+  Perfect hindsight                                 2.66         111    100%     6.80    2.28    1.28            0   100%
+
+10pm-8am 15kWh · Standard delivery · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 21:00                                       1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 22:00                                       1.55           0      0%     4.07    1.00    0.00            0   100%
+  Timer 23:00                                       1.49          24     24%     3.57    1.00    0.00            0   100%
+  Timer 00:00                                       1.42          47     47%     3.21    1.00    0.00            0   100%
+  Timer 01:00                                       1.39          59     59%     3.71    1.00    0.00            0   100%
+  Below 2¢                                          1.51          16     16%     8.49    5.31    4.31            0   100%
+  Below 3¢                                          1.46          34     34%     7.29    4.15    3.15            0   100%
+  Below 5¢                                          1.51          14     15%     7.29    2.09    1.09            0   100%
+  Day-ahead plan                                    1.37          65     66%     6.45    1.85    0.85            0   100%
+  Day-ahead + live prices                           1.37          66     66%     5.40    1.90    0.90            0   100%
+  Forecast: Ridge, refit monthly                    1.39          58     59%     5.78    1.92    0.92            0   100%
+  Forecast: Ridge + weather, refit monthly          1.39          58     59%     5.78    1.92    0.92            0   100%
+  Forecast: LightGBM, refit monthly                 1.39          59     59%     6.29    1.92    0.92            0   100%
+  Forecast: LightGBM + weather, refit monthly       1.39          59     60%     6.54    1.90    0.90            0   100%
+  Perfect hindsight                                 1.28          99    100%     3.02    2.35    1.35            0   100%
+
+10pm-8am 30kWh · Standard delivery · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 21:00                                       2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 22:00                                       2.97           0      0%     7.38    1.00    0.00            0   100%
+  Timer 23:00                                       2.87          35     30%     7.32    1.00    0.00            0   100%
+  Timer 00:00                                       2.80          61     53%     7.97    1.00    0.00            0   100%
+  Timer 01:00                                       2.81          59     51%    10.14    1.00    0.00            0   100%
+  Below 2¢                                          2.96           1      1%    13.72    6.29    5.29            0   100%
+  Below 3¢                                          2.89          28     24%    13.72    5.20    4.20            0   100%
+  Below 5¢                                          2.91          22     19%    13.72    2.36    1.36            0   100%
+  Day-ahead plan                                    2.77          72     62%     9.98    1.95    0.95            0   100%
+  Day-ahead + live prices                           2.76          76     65%    10.63    1.94    0.94            0   100%
+  Forecast: Ridge, refit monthly                    2.79          66     57%     9.98    1.76    0.76            0   100%
+  Forecast: Ridge + weather, refit monthly          2.79          66     57%     9.98    1.78    0.78            0   100%
+  Forecast: LightGBM, refit monthly                 2.79          66     57%     9.98    1.81    0.81            0   100%
+  Forecast: LightGBM + weather, refit monthly       2.78          67     58%    10.64    1.80    0.80            0   100%
+  Perfect hindsight                                 2.65         116    100%     6.80    2.43    1.43            0   100%
+
+10pm-7am 15kWh · Delivery Time-of-Day · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 21:00                                       1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 22:00                                       1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 23:00                                       0.94          24     25%     3.03    1.00    0.00            0   100%
+  Timer 00:00                                       0.88          47     49%     2.67    1.00    0.00            0   100%
+  Timer 01:00                                       0.85          59     62%     3.17    1.00    0.00            0   100%
+  Below 2¢                                          0.96          17     18%     6.98    5.09    4.09            0   100%
+  Below 3¢                                          0.92          33     34%     6.98    4.12    3.12            0   100%
+  Below 5¢                                          0.97          14     15%     6.98    2.09    1.09            0   100%
+  Day-ahead plan                                    0.83          65     68%     5.91    1.79    0.79            0   100%
+  Day-ahead + live prices                           0.83          65     68%     4.72    1.85    0.85            0   100%
+  Forecast: Ridge, refit monthly                    0.85          59     62%     5.24    1.93    0.93            0   100%
+  Forecast: Ridge + weather, refit monthly          0.85          59     62%     5.24    1.91    0.91            0   100%
+  Forecast: LightGBM, refit monthly                 0.85          59     62%     5.75    1.89    0.89            0   100%
+  Forecast: LightGBM + weather, refit monthly       0.85          59     62%     6.00    1.89    0.89            0   100%
+  Perfect hindsight                                 0.75          96    100%     2.48    2.21    1.21            0   100%
+
+10pm-7am 30kWh · Delivery Time-of-Day · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 21:00                                       1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 22:00                                       1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 23:00                                       1.79          35     32%     6.24    1.00    0.00            0   100%
+  Timer 00:00                                       1.72          61     57%     6.88    1.00    0.00            0   100%
+  Timer 01:00                                       1.72          59     55%     9.06    1.00    0.00            0   100%
+  Below 2¢                                          1.84          16     15%    11.20    5.66    4.66            0   100%
+  Below 3¢                                          1.79          34     32%    11.20    4.93    3.93            0   100%
+  Below 5¢                                          1.82          24     22%    11.20    2.35    1.35            0   100%
+  Day-ahead plan                                    1.69          70     65%     8.90    1.86    0.86            0   100%
+  Day-ahead + live prices                           1.69          73     68%     9.56    1.84    0.84            0   100%
+  Forecast: Ridge, refit monthly                    1.71          66     61%     8.90    1.79    0.79            0   100%
+  Forecast: Ridge + weather, refit monthly          1.71          66     61%     8.90    1.80    0.80            0   100%
+  Forecast: LightGBM, refit monthly                 1.71          66     61%     8.90    1.79    0.79            0   100%
+  Forecast: LightGBM + weather, refit monthly       1.70          66     61%     9.55    1.79    0.79            0   100%
+  Perfect hindsight                                 1.59         107    100%     5.72    2.20    1.20            0   100%
+
+10pm-8am 15kWh · Delivery Time-of-Day · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 21:00                                       1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 22:00                                       1.01           0      0%     3.53    1.00    0.00            0   100%
+  Timer 23:00                                       0.94          24     25%     3.03    1.00    0.00            0   100%
+  Timer 00:00                                       0.88          47     49%     2.67    1.00    0.00            0   100%
+  Timer 01:00                                       0.85          59     61%     3.17    1.00    0.00            0   100%
+  Below 2¢                                          1.01          -2     -2%     8.06    5.31    4.31            0   100%
+  Below 3¢                                          0.92          31     33%     6.86    4.15    3.15            0   100%
+  Below 5¢                                          0.97          14     15%     6.86    2.09    1.09            0   100%
+  Day-ahead plan                                    0.83          65     68%     5.91    1.79    0.79            0   100%
+  Day-ahead + live prices                           0.83          65     68%     4.88    1.87    0.87            0   100%
+  Forecast: Ridge, refit monthly                    0.85          59     61%     5.24    1.92    0.92            0   100%
+  Forecast: Ridge + weather, refit monthly          0.85          59     61%     5.24    1.91    0.91            0   100%
+  Forecast: LightGBM, refit monthly                 0.85          59     62%     5.75    1.89    0.89            0   100%
+  Forecast: LightGBM + weather, refit monthly       0.85          59     62%     6.00    1.89    0.89            0   100%
+  Perfect hindsight                                 0.75          96    100%     2.48    2.25    1.25            0   100%
+
+10pm-8am 30kWh · Delivery Time-of-Day · 555 nights
+  strategy                                       $/night  saved $/yr  of max  worst $  starts  pauses  risk kWh/yr  ready
+  Charge on plug-in                                 1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 21:00                                       1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 22:00                                       1.89           0      0%     6.30    1.00    0.00            0   100%
+  Timer 23:00                                       1.79          35     32%     6.24    1.00    0.00            0   100%
+  Timer 00:00                                       1.72          61     56%     6.88    1.00    0.00            0   100%
+  Timer 01:00                                       1.72          59     54%     9.06    1.00    0.00            0   100%
+  Below 2¢                                          1.95         -25    -23%    12.76    6.29    5.29            0   100%
+  Below 3¢                                          1.83          22     20%    12.76    5.20    4.20            0   100%
+  Below 5¢                                          1.83          21     20%    12.76    2.36    1.36            0   100%
+  Day-ahead plan                                    1.69          70     64%     8.90    1.86    0.86            0   100%
+  Day-ahead + live prices                           1.68          74     68%     9.59    1.87    0.87            0   100%
+  Forecast: Ridge, refit monthly                    1.70          66     61%     8.90    1.78    0.78            0   100%
+  Forecast: Ridge + weather, refit monthly          1.71          66     60%     8.90    1.79    0.79            0   100%
+  Forecast: LightGBM, refit monthly                 1.71          66     61%     8.90    1.79    0.79            0   100%
+  Forecast: LightGBM + weather, refit monthly       1.70          66     61%     9.55    1.80    0.80            0   100%
+  Perfect hindsight                                 1.59         109    100%     5.72    2.30    1.30            0   100%
+
+Saved a year against the default setup (standard delivery, charging on plug-in), with each strategy on Time-of-Day delivery:
+  strategy                                       10pm-7am 15kWh  10pm-7am 30kWh  10pm-8am 15kWh  10pm-8am 30kWh
+  Charge on plug-in                                   $197  35%       $395  36%       $197  35%       $395  36%
+  Timer 21:00                                         $197  35%       $395  36%       $197  35%       $395  36%
+  Timer 22:00                                         $197  35%       $395  36%       $197  35%       $395  36%
+  Timer 23:00                                         $221  39%       $430  40%       $221  39%       $430  40%
+  Timer 00:00                                         $244  43%       $456  42%       $244  43%       $456  42%
+  Timer 01:00                                         $256  45%       $453  42%       $256  45%       $453  42%
+  Below 2¢                                            $214  38%       $411  38%       $195  35%       $370  34%
+  Below 3¢                                            $230  41%       $429  40%       $229  40%       $416  38%
+  Below 5¢                                            $212  37%       $418  39%       $212  37%       $416  38%
+  Day-ahead plan                                      $262  46%       $464  43%       $262  46%       $465  43%
+  Day-ahead + live prices                             $262  46%       $468  43%       $262  46%       $468  43%
+  Forecast: Ridge, refit monthly                      $256  45%       $461  43%       $256  45%       $461  43%
+  Forecast: Ridge + weather, refit monthly            $256  45%       $460  42%       $256  45%       $460  43%
+  Forecast: LightGBM, refit monthly                   $257  45%       $461  43%       $256  45%       $461  43%
+  Forecast: LightGBM + weather, refit monthly         $257  45%       $461  43%       $256  45%       $461  43%
+  Perfect hindsight                                   $293  52%       $502  46%       $293  52%       $503  46%
+
+Cheapest strategy ("tied": within two standard errors, comparing night by night):
+  10pm-7am 15kWh · Standard delivery: Day-ahead plan, $1.37/night; tied: Day-ahead + live prices
+  10pm-7am 15kWh · Delivery Time-of-Day: Day-ahead + live prices, $0.83/night; tied: Day-ahead plan
+  10pm-7am 30kWh · Standard delivery: Day-ahead + live prices, $2.76/night; tied: Day-ahead plan
+  10pm-7am 30kWh · Delivery Time-of-Day: Day-ahead + live prices, $1.69/night; tied: Day-ahead plan
+  10pm-8am 15kWh · Standard delivery: Day-ahead + live prices, $1.37/night; tied: Day-ahead plan
+  10pm-8am 15kWh · Delivery Time-of-Day: Day-ahead + live prices, $0.83/night; tied: Day-ahead plan
+  10pm-8am 30kWh · Standard delivery: Day-ahead + live prices, $2.76/night; tied: Day-ahead plan
+  10pm-8am 30kWh · Delivery Time-of-Day: Day-ahead + live prices, $1.68/night; tied: Day-ahead plan
+
+Forecast error on nights each model never saw (cents/kWh; day-ahead in brackets):
+  Forecast: Ridge, refit monthly: MAE 1.87 (1.87), RMSE 5.63 (6.32)
+  Forecast: Ridge + weather, refit monthly: MAE 1.88 (1.87), RMSE 5.60 (6.32)
+  Forecast: LightGBM, refit monthly: MAE 1.83 (1.87), RMSE 5.98 (6.32)
+  Forecast: LightGBM + weather, refit monthly: MAE 1.84 (1.87), RMSE 6.01 (6.32)
+
+Nights skipped for missing prices: 10pm-7am 15kWh 6, 10pm-7am 30kWh 6, 10pm-8am 15kWh 6, 10pm-8am 30kWh 6
+run id 20261017-001725-b040

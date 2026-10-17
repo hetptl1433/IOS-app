@@ -1,0 +1,8 @@
+all nights (2025-04-02 to 2026-10-14): $ a year saved against the nightly plan
+  fill-up                          Average $+29  Moderate $+22  Heavy $+4
+  fill-up + live q20               Average $+50  Moderate $+47  Heavy $+7
+  fill-up + live q20 + skip q80    Average $+54  Moderate $+54  Heavy $+10
+without Jan 25-29, 2026 (2025-04-02 to 2026-10-14): $ a year saved against the nightly plan
+  fill-up                          Average $+30  Moderate $+23  Heavy $+4
+  fill-up + live q20               Average $+40  Moderate $+39  Heavy $+7
+  fill-up + live q20 + skip q80    Average $+44  Moderate $+45  Heavy $+9

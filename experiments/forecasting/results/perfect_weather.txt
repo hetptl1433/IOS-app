@@ -1,0 +1,6 @@
+PERFECT WEATHER Forecast: Ridge + weather, refit monthly mean err 1.882 (day-ahead 1.872, +0.5%)  RMS 5.634 (-10.9%)
+PERFECT WEATHER Forecast: LightGBM + weather, refit monthly mean err 1.828 (day-ahead 1.872, -2.4%)  RMS 5.989 (-5.2%)
+  Standard delivery      Forecast: Ridge + weather, refit monthly         1.59    0.77    0.96    1.68  cents/night vs the plan
+  Standard delivery      Forecast: LightGBM + weather, refit monthly      1.49    1.26    0.84    0.78  cents/night vs the plan
+  Delivery Time-of-Day   Forecast: Ridge + weather, refit monthly         1.50    0.50    0.96    1.01  cents/night vs the plan
+  Delivery Time-of-Day   Forecast: LightGBM + weather, refit monthly      1.51    0.98    0.83    1.12  cents/night vs the plan

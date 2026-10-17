@@ -1,0 +1,8 @@
+1. Knowing when the driver leaves (the car really leaves at 7 a.m.):
+   plan aims to finish by 05:00 minus 30 min: Average $356, Moderate $641, Heavy $1,132
+   plan aims to finish by 06:00 minus 30 min: Average $355, Moderate $643, Heavy $1,206
+   plan aims to finish by 07:00 minus 30 min: Average $355, Moderate $643, Heavy $1,224
+2. Ceiling for refilling only on the cheapest nights (perfect price knowledge):
+   Average: every 1 night: $393, every 2 nights: $421, every 3 nights: $436, every 7 nights: $456
+   Moderate: every 1 night: $697, every 2 nights: $737, every 3 nights: $757, every 7 nights: $776
+   Heavy: every 1 night: $1,291, every 2 nights: $1,319, every 3 nights: $1,341, every 7 nights: $1,356

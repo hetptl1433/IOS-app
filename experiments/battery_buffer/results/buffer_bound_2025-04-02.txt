@@ -1,0 +1,16 @@
+¢/kWh billed (and $ a year against the nightly day-ahead plan, as in buffer.py), nights 2025-04-02-2026-10-14
+
+Average: nightly day-ahead plan 2025 5.105, 2026 4.842
+  nightly hindsight             2025 4.614 ($+30)   2026 4.109 ($+45)
+  buffer hindsight              2025 3.832 ($+77)   2026 2.708 ($+130)
+  buffer, day-ahead foresight   2025 4.481 ($+38)   2026 4.396 ($+27)
+
+Moderate: nightly day-ahead plan 2025 5.106, 2026 4.915
+  nightly hindsight             2025 4.781 ($+40)   2026 4.359 ($+68)
+  buffer hindsight              2025 4.394 ($+87)   2026 3.642 ($+155)
+  buffer, day-ahead foresight   2025 4.808 ($+36)   2026 4.691 ($+27)
+
+Heavy: nightly day-ahead plan 2025 5.528, 2026 5.397
+  nightly hindsight             2025 5.355 ($+56)   2026 5.122 ($+89)
+  buffer hindsight              2025 5.319 ($+68)   2026 5.066 ($+107)
+  buffer, day-ahead foresight   2025 5.503 ($+8)   2026 5.362 ($+11)
