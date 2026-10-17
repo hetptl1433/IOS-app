@@ -77,4 +77,8 @@ imported with:
 - `import_tables.py`: day-ahead and settled hourly tables, parsed by the same code as `sparc fetch`.
 
 Both are kept for the record. With direct access, `python -m sparc fetch` does the same thing.
-`export_weather.py` writes `chicago_weather.csv` from the database.
+`export_weather.py` writes `chicago_weather.csv` from the database. `export_comed.py` writes every
+stored ComEd price to `comed-data/` at the repository root, one CSV per year. That folder is
+git-ignored, because ComEd's terms restrict redistributing its prices. ComEd's archive has hourly prices
+from 2007-01-01 and 5-minute prices from 2012-10-29: `python -m sparc fetch 2007-01-01 <today>` gets
+them all (weather only exists from 2024).

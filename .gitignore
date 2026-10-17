@@ -9,6 +9,7 @@ dist/
 # Price databases and backtest output stay local: ComEd's API terms restrict
 # redistributing its data.
 runtime/
+comed-data/
 
 .env
 .env.*

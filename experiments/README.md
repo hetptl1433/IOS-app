@@ -1,7 +1,8 @@
 # SPARC experiments
 
 Every study behind SPARC's results: the question, the script, the output and what it showed. Start
-here. Each folder has its own README with the details.
+here. Each folder has its own README with the details. [`../results/index.html`](../results/README.md)
+shows the headline results as charts on one page.
 
 SPARC plans EV charging on ComEd's Hourly Pricing in Chicago, where every kWh pays that hour's
 wholesale real-time price plus a delivery charge. The studies replay real prices night by night

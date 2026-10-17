@@ -219,6 +219,9 @@ output and what it showed:
 - a battery buffer across nights, which adds about $54 a year for the average and moderate drivers.
   The buffer is not in the app yet.
 
+[`results/index.html`](results/README.md) shows the headline results on one page, with charts: open it
+in a browser.
+
 ComEd's prices are not in this repository; `python -m sparc fetch` downloads them.
 
 ## Command line
