@@ -1,40 +1,42 @@
-# Data: where the prices come from, and why they are not in this repository
+# Data: where the prices come from, and where they are kept
 
 ## What the studies use
 
 | Data | Source | In this repository? |
 |---|---|---|
-| ComEd 5-minute real-time prices | ComEd's documented API, `hourlypricing.comed.com/api?type=5minutefeed` | No; rebuild it as below |
-| ComEd day-ahead and settled hourly prices | the table behind ComEd's pricing-table page | No; rebuild it as below |
-| Chicago weather: what happened, and the forecast made 24 hours before | Open-Meteo Previous Runs API (`gfs_seamless`, downtown Chicago) | Yes: `chicago_weather.csv` |
+| ComEd 5-minute real-time prices | ComEd's documented API, `hourlypricing.comed.com/api?type=5minutefeed` | Yes: `comed-data/five_minute/`, one CSV per year from 2012 |
+| ComEd day-ahead and settled hourly prices | the table behind ComEd's pricing-table page | Yes: `comed-data/hourly/`, one CSV per year from 2007 |
+| Chicago weather: what happened, and the forecast made 24 hours before | Open-Meteo Previous Runs API (`gfs_seamless`, downtown Chicago) | Yes: `chicago_weather.csv` and `comed-data/weather/` |
 | NERC holidays | coded in `sparc/holidays.py` | Yes |
 | ComEd delivery rates | ComEd's Rate BES-H and Delivery Time-of-Day tariffs, coded in `sparc/tariff.py` | Yes |
 
-## Why the ComEd prices are left out
+## ComEd's terms
 
-The repository is public, and ComEd's API terms forbid republishing what the API returns. Section 5,
-"Prohibitions on content", of the
-[ComEd Hourly Pricing APIs Terms of Service](https://hourlypricing.comed.com/comed-hourly-pricing-apis-terms-of-service)
+The prices are kept in `comed-data/` so the studies can be rerun without downloading anything. ComEd's
+API terms restrict copying and redistributing what the API returns. Section 5, "Prohibitions on content",
+of the [ComEd Hourly Pricing APIs Terms of Service](https://hourlypricing.comed.com/comed-hourly-pricing-apis-terms-of-service)
 says users will not, unless the content owner or applicable law permits it:
 
 > Scrape, build databases, or otherwise create permanent copies of such content, or keep cached copies
 > longer than permitted by the cache header; Copy, translate, modify, create a derivative work of, sell,
 > lease, lend, convey, distribute, publicly display, or sublicense to any third party
 
-So the price database (`runtime/sparc.db`) is git-ignored, and so are the per-night CSV files the
-backtests write. A night's cost under a fixed charging schedule is close to a copy of that night's prices.
-What is committed is analysis: yearly and monthly averages, savings, error statistics, and a few
-individual hours quoted as evidence where a finding depends on them (the January 2026 negative prices in
-`../battery_buffer/results/negative_prices.txt`, and the revised spikes below).
+This public repository includes the prices anyway, by its owner's choice. Anyone reusing `comed-data/`
+should read those terms first.
 
-The weather is licensed CC BY 4.0, which allows sharing with attribution. It is included.
+The working database (`runtime/sparc.db`) is not kept in git: it changes every time the app runs, and
+`python -m sparc load` rebuilds it from `comed-data/` in seconds (`start.command` does this on first start).
+
+The weather is licensed CC BY 4.0, which allows sharing with attribution.
 *Weather data by [Open-Meteo.com](https://open-meteo.com/), CC BY 4.0.*
 
-## Rebuilding the price database
+## Loading or rebuilding the price database
 
-Anyone can download the same prices from ComEd's free public API. From the repository root:
+From the repository root, load the copy in `comed-data/` (seconds), or download the same prices again from
+ComEd's free public API:
 
 ```sh
+python -m sparc load                            # comed-data/ into runtime/sparc.db
 python -m sparc fetch 2024-01-01 2026-10-16     # prices and weather into runtime/sparc.db; resumable
 python -m sparc check 2024-01-01 2026-10-16     # coverage, and agreement with ComEd's hourly prices
 ```
@@ -81,5 +83,4 @@ Both are kept for the record. With direct access, `python -m sparc fetch` does t
 stored price and hour of weather to `comed-data/` at the repository root, one CSV per year, and
 `python -m sparc load` reads them back in seconds. ComEd's archive has hourly prices from 2007-01-01 and
 5-minute prices from 2012-10-29: `python -m sparc fetch 2007-01-01 <today>` gets them all (weather only
-exists from 2024). ComEd's terms restrict redistributing its prices, so share `comed-data/` only in a
-private repository.
+exists from 2024). **Update prices** on SPARC's home page fetches the newest days and rewrites the current year's files.

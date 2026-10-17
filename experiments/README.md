@@ -73,7 +73,7 @@ soon as the car is plugged in.
 | [`strategies/`](strategies/README.md) | Can any single-night strategy beat the day-ahead plan? |
 | [`forecasting/`](forecasting/README.md) and `foundation_models.py` | Can forecasting the real-time price beat the day-ahead price? |
 | [`battery_buffer/`](battery_buffer/README.md) | What does using the battery across nights add? |
-| [`data/`](data/README.md) | Where the data comes from, its coverage, and why the prices are not in this repository |
+| [`data/`](data/README.md) | Where the data comes from, its coverage, and where the prices are kept |
 | [`webapp/`](webapp/README.md) | Browser checks and screenshots of the web app |
 | [`dev/`](dev/README.md) | Profiling and an equivalence check used during development |
 
@@ -83,11 +83,11 @@ prices, and say so at the top.
 
 ## Running them
 
-The ComEd prices are not in this repository: ComEd's API terms forbid republishing them
-(`data/README.md`). Download them once from ComEd's public API (about 20 minutes):
+The ComEd prices are in `comed-data/`, one CSV per year (`data/README.md`, which also quotes ComEd's terms).
+Load them into the working database once, in seconds (`start.command` does this on first start):
 
 ```sh
-python -m sparc fetch 2024-01-01 2026-10-16      # into runtime/sparc.db
+python -m sparc load                             # comed-data/ into runtime/sparc.db
 python experiments/battery_buffer/buffer_skip.py 2025-04-02 2026-10-14
 ```
 

@@ -288,11 +288,12 @@ python -m unittest discover -s tests              # tests
   after Thanksgiving.
 - Historical feeds cannot say when each price was actually published. `collect`
   records that from now on.
-- `runtime/` holds the working database and is git-ignored. `python -m sparc export` writes the same
-  prices and weather to `comed-data/`, one CSV per year (5-minute prices from 2012-10-29, hourly ones from
-  2007-01-01), and `python -m sparc load` reads them back in seconds. **Update prices** on the Test models
-  page does both: it fetches the newest days and rewrites the current year's files. ComEd's API terms
-  restrict redistributing its data, so share `comed-data/` only in a private repository.
+- The prices and weather are kept in git as `comed-data/`, one CSV per year (5-minute prices from
+  2012-10-29, hourly ones from 2007-01-01, weather from 2024). `python -m sparc load` reads them into the
+  working database, `runtime/sparc.db`, in seconds; that file is not kept in git, because it changes every
+  time the app runs. **Update prices** on the Test models page fetches the newest days and rewrites the
+  current year's files (`python -m sparc export` writes them all). ComEd's API terms restrict
+  redistributing its data: see `experiments/data/README.md`.
 
 ## Layout
 

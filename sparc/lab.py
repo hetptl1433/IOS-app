@@ -1,8 +1,8 @@
 """Backtest runs and model training, shared by the command line and the web app.
 
 Everything lives in one data folder (runtime/ by default): the price database,
-saved backtest runs and trained models. None of it belongs in git, because
-ComEd's terms do not allow redistributing its prices.
+saved backtest runs and trained models. The prices themselves are also kept as
+CSV files in comed-data/ (sparc.dataset), which is the copy in git.
 """
 from __future__ import annotations
 

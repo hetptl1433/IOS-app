@@ -464,7 +464,7 @@ function renderData(panel) {
         { class: "note small" },
         "Stored in ",
         el("code", {}, `${state.server.folder}/sparc.db`),
-        " on this computer. ComEd's terms do not allow redistributing its prices, so keep the folder out of git. ",
+        " on this computer. Update prices on the home page also keeps a copy as CSV files in comed-data/. ",
         "Weather data by Open-Meteo.com (CC BY 4.0).",
       ),
     ),
