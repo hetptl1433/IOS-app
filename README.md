@@ -6,6 +6,8 @@ prices, backtests charging strategies on real price history (from a local web ap
 or the command line), trains price forecasts, and records live prices. Tesla
 control comes next, once a strategy has proven itself on real prices.
 
+New here? [`SPARC_EXPLAINED.md`](SPARC_EXPLAINED.md) explains the whole project and its results in plain words.
+
 ## Start here (on a Mac)
 
 ```sh
