@@ -15,3 +15,18 @@ runtime/ai-forecasts/
 .env
 .env.*
 .DS_Store
+
+# Native iOS build products and local signing preferences
+DerivedData/
+artifacts/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.dSYM/
+*.xcarchive/
+*.p12
+*.mobileprovision
+
+# Per-device controller credentials and Wi-Fi secrets
+controller-state/
+controller/.venv/
