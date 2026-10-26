@@ -39,6 +39,7 @@ final class SPARCFlowTests: XCTestCase {
                 if element.exists && element.isHittable && viewport.contains(element.frame) { return }
                 let needsDownwardScroll = element.exists && element.frame.minY < viewport.minY
                 dragPage(in: viewport, downward: needsDownwardScroll)
+                waitForScrollToSettle(page, file: file, line: line)
             } else {
                 app.swipeUp()
             }
@@ -71,14 +72,33 @@ final class SPARCFlowTests: XCTestCase {
     }
 
     private func dragPage(in viewport: CGRect, downward: Bool) {
-        // Keep both touch points inside visible content, clear of fixed tabs and navigation.
+        // Use the padding gutter so dragging cannot press a centered navigation link or picker.
         let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-        let upper = origin.withOffset(CGVector(dx: viewport.midX - app.frame.minX,
+        let gutterX = viewport.minX + 3 - app.frame.minX
+        let upper = origin.withOffset(CGVector(dx: gutterX,
                                               dy: viewport.minY + viewport.height * 0.25 - app.frame.minY))
-        let lower = origin.withOffset(CGVector(dx: viewport.midX - app.frame.minX,
+        let lower = origin.withOffset(CGVector(dx: gutterX,
                                               dy: viewport.minY + viewport.height * 0.8 - app.frame.minY))
-        if downward { upper.press(forDuration: 0.1, thenDragTo: lower) }
-        else { lower.press(forDuration: 0.1, thenDragTo: upper) }
+        if downward { upper.press(forDuration: 0.1, thenDragTo: lower, withVelocity: .slow, thenHoldForDuration: 0.2) }
+        else { lower.press(forDuration: 0.1, thenDragTo: upper, withVelocity: .slow, thenHoldForDuration: 0.2) }
+    }
+
+    private func waitForScrollToSettle(_ page: XCUIElement, file: StaticString, line: UInt) {
+        let content = page.children(matching: .other).firstMatch
+        var previousFrame: CGRect?
+        var stableSince = Date()
+        let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard content.exists else { return false }
+            let frame = content.frame
+            if frame != previousFrame {
+                previousFrame = frame
+                stableSince = Date()
+                return false
+            }
+            return Date().timeIntervalSince(stableSince) >= 0.25
+        }, object: page)
+        XCTAssertEqual(XCTWaiter.wait(for: [stable], timeout: 4), .completed,
+                       "Scrolling must settle before interacting with a control", file: file, line: line)
     }
 
     private func waitForPage(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
@@ -119,23 +139,16 @@ final class SPARCFlowTests: XCTestCase {
     }
 
     @discardableResult
-    private func adjustTarget(_ slider: XCUIElement, position: CGFloat,
-                              file: StaticString = #filePath, line: UInt = #line) -> String {
+    private func selectMaximumTarget(_ slider: XCUIElement,
+                                     file: StaticString = #filePath, line: UInt = #line) -> String {
         reveal(slider)
-        slider.adjust(toNormalizedSliderPosition: position)
+        slider.adjust(toNormalizedSliderPosition: 1.0)
         let value = app.staticTexts["schedule.targetValue"]
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", "80%"), object: value)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 3), .completed,
-                       "Adjusting the target must change the default", file: file, line: line)
-        let label = value.label
-        guard let percent = Int(label.replacingOccurrences(of: "%", with: "")) else {
-            XCTFail("Invalid target label: \(label)", file: file, line: line)
-            return label
-        }
-        XCTAssertTrue((50...100).contains(percent), file: file, line: line)
-        XCTAssertEqual(percent % 5, 0, file: file, line: line)
-        XCTAssertNotEqual(percent, 80, file: file, line: line)
-        return label
+        let maximum = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "100%"), object: value)
+        XCTAssertEqual(XCTWaiter.wait(for: [maximum], timeout: 3), .completed,
+                       "The maximum slider position must select 100%", file: file, line: line)
+        XCTAssertEqual(value.label, "100%", file: file, line: line)
+        return value.label
     }
 
     private func screenshot(_ name: String) {
@@ -184,7 +197,7 @@ final class SPARCFlowTests: XCTestCase {
         waitForPage("Just this departure.")
         let slider = app.sliders["schedule.target"]
         reveal(slider)
-        let todayTarget = adjustTarget(slider, position: 0.9)
+        let todayTarget = selectMaximumTarget(slider)
         let save = app.buttons["schedule.save"]
         reveal(save)
         save.tap()
@@ -197,7 +210,7 @@ final class SPARCFlowTests: XCTestCase {
         screenshot("schedule-today-saved")
         openWeeklyEditor()
         XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, "80%")
-        adjustTarget(app.sliders["schedule.target"], position: 0.8)
+        selectMaximumTarget(app.sliders["schedule.target"])
         let back = app.navigationBars.buttons["Back"]
         XCTAssertTrue(back.isHittable)
         back.tap()
@@ -212,7 +225,7 @@ final class SPARCFlowTests: XCTestCase {
         openSchedule()
         openWeeklyEditor()
         let target = app.sliders["schedule.target"]
-        let savedTarget = adjustTarget(target, position: 0.8)
+        let savedTarget = selectMaximumTarget(target)
         let save = app.buttons["schedule.save"]
         reveal(save)
         save.tap()

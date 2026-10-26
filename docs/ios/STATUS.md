@@ -42,13 +42,12 @@ without relying on the earlier interrupted chat.
 - **55 native tests passed in one clean run: 48 unit tests and 7 UI tests**, on
   iPhone 17 Pro / iOS 26.5 with Xcode 27. Result bundle:
   `artifacts/ios/QA-regular-complete.xcresult`.
-- **All 7 UI scenarios have passing small-iPhone evidence** across the full run
-  and the corrected tab regression. `artifacts/ios/QA-small-complete.xcresult`
-  contains six passing scenarios and the earlier tab failure;
-  `artifacts/ios/QA-small-tabs.xcresult` confirms that scenario passes after its
-  hit-area correction. A fresh combined small-device run is being saved separately
-  as `artifacts/ios/QA-small-final.xcresult`; verify its summary before treating it
-  as a clean full-suite pass.
+- **All 7 UI tests passed in a clean small-iPhone CI run** for published revision
+  `8a761326`, in the completed GitHub run linked below. Earlier local bundles
+  remain available for regression history: `artifacts/ios/QA-small-complete.xcresult`
+  contains six passing scenarios and the earlier tab failure, while
+  `artifacts/ios/QA-small-tabs.xcresult` confirms that scenario passed after its
+  hit-area correction.
 - **Release build for the iPhone device SDK succeeded**. This is an unsigned
   build check, not a signed archive or a physical-device acceptance run.
 - **94 research tests passed, with 1 skipped** (95 tests total). Local test log:
@@ -59,11 +58,15 @@ without relying on the earlier interrupted chat.
 - Result paths above are relative to `~/Documents/project/sparc APP`. The
   `.xcresult` bundles under `artifacts/ios/` include logs and screenshot
   attachments. Temporary logs alone are not the durable test evidence.
-- Remote checks are configured, with exact results available in the branch's
-  [iOS workflow](https://github.com/hetptl1433/sparc/actions/workflows/ios.yml?query=branch%3Afeat%2Fnative-ios-controller)
-  and [Python workflow](https://github.com/hetptl1433/sparc/actions/workflows/test.yml?query=branch%3Afeat%2Fnative-ios-controller).
-  These local results do not establish a remote CI pass. See
-  [QA commands and acceptance matrix](QA.md).
+- **Published revision `8a761326` passed GitHub CI**. The completed
+  [iOS workflow run 40384161469](https://github.com/hetptl1433/sparc/actions/runs/40384161469)
+  passed 48 unit tests plus all 7 UI tests on a regular iPhone, and all 7 UI tests
+  on a small iPhone. The [Python workflow](https://github.com/hetptl1433/sparc/actions/workflows/test.yml?query=branch%3Afeat%2Fnative-ios-controller)
+  also passed its Python 3.11, 3.12 and 3.13 matrix, including the research suite,
+  native project validation, and all 21 Raspberry Pi companion tests. This is
+  completed evidence for that revision; later revisions have their own workflow
+  results. See [QA commands and acceptance matrix](QA.md) for the physical checks
+  that CI does not establish.
 
 ## Remaining integration and release work
 
