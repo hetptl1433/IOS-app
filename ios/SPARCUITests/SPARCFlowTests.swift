@@ -264,6 +264,15 @@ final class SPARCFlowTests: XCTestCase {
         reveal(connect)
         connect.tap()
         waitForPage("Meet your home controller.")
+        let host = app.textFields["setup.host"]
+        reveal(host)
+        XCTAssertTrue(host.exists)
+        let key = app.secureTextFields["setup.lanKey"]
+        reveal(key)
+        XCTAssertTrue(key.exists)
+        let pair = app.buttons["setup.pairLAN"]
+        reveal(pair)
+        XCTAssertFalse(pair.isEnabled, "A private setup key is required before first-time LAN pairing")
         screenshot("controller-setup-entry")
         XCTAssertFalse(app.staticTexts["Controller connected"].exists)
     }

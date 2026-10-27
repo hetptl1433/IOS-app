@@ -1,8 +1,10 @@
 import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
+import io
 import json
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 import struct
 import sys
 import tempfile
@@ -17,6 +19,7 @@ from sparc_controller.protocol import DeviceInfo, FrameBuffer, MAX_FRAME, Protoc
 from sparc_controller.network import NetworkManagerWiFi, WiFiError, validate_wifi
 from sparc_controller.service import ControllerService, initialize, validate_weekly
 from sparc_controller.http import HTTPTransport, local_peer
+from sparc_controller.__main__ import main, parse_args, run
 
 FIXTURE = json.loads((Path(__file__).resolve().parents[1] / "fixtures/wire-v1.json").read_text())
 
@@ -177,16 +180,61 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         reply = await self.service.handle(self.channel.seal(request, "c2d"), transport)
         return self.channel.open(reply, "d2c")
 
-    async def test_pair_and_wifi_require_ble_and_open_window(self):
-        self.assertFalse((await self.exchange("pair"))["ok"])
+    async def test_pair_accepts_lan_and_ble_but_wifi_requires_ble(self):
+        lan = await self.exchange("pair")
+        self.assertTrue(lan["ok"])
+        self.assertEqual(lan["body"]["deviceId"], self.identity["deviceId"])
         self.assertTrue((await self.exchange("pair", transport="ble"))["ok"])
+        self.assertFalse((await self.exchange("pair", transport="unknown"))["ok"])
         body = {"ssid":"home", "password":"test-only-password"}
         self.assertFalse((await self.exchange("wifi.provision", body))["ok"])
         self.assertEqual(self.wifi.calls, [])
         self.assertTrue((await self.exchange("wifi.provision", body, "ble"))["ok"])
         self.service.setup_deadline = time.monotonic()-1
+        self.assertFalse((await self.exchange("pair", transport="lan"))["ok"])
+        self.assertFalse((await self.exchange("pair", transport="ble"))["ok"])
         self.assertFalse((await self.exchange("wifi.provision", body, "ble"))["ok"])
+        # Saved credentials still reconnect and persist schedules after setup closes.
+        self.assertTrue((await self.exchange("ping"))["ok"])
+        self.assertTrue((await self.exchange("set_weekly", self.service.settings["weekly"]))["ok"])
         self.assertEqual(len(self.wifi.calls), 1)
+
+    async def test_lan_only_disables_network_provisioning_even_over_ble(self):
+        with patch("sparc_controller.service.NetworkManagerWiFi", side_effect=AssertionError("must not create a Wi-Fi adapter")):
+            self.service = ControllerService(self.path, allow_wifi_provision=False)
+        self.channel = SecureChannel(setup_key(self.identity["setupKey"]), self.service.info)
+        self.assertNotIn("wifi.provision", self.service.info.public()["capabilities"])
+        self.assertIsNone(self.service.wifi)
+        self.assertTrue((await self.exchange("pair"))["ok"])
+        self.assertTrue((await self.exchange("ping"))["ok"])
+        self.assertFalse((await self.exchange("wifi.provision", {"ssid": "home", "password": "test-only-password"}, "ble"))["ok"])
+        self.assertEqual(self.wifi.calls, [])
+
+    async def test_lan_pair_requires_authentication_and_cannot_replay_or_cross_boot(self):
+        request = {"id": str(uuid.uuid4()), "timestamp": time.time(), "operation": "pair", "body": {}}
+        wrong = SecureChannel(b"x" * 32, self.service.info)
+        with self.assertRaises(ProtocolError):
+            await self.service.handle(wrong.seal(request, "c2d"), "lan")
+        packet = self.channel.seal(request, "c2d")
+        response = await self.service.handle(packet, "lan")
+        self.assertEqual(self.channel.open(response, "d2c")["body"]["deviceId"], self.identity["deviceId"])
+        with self.assertRaises(ProtocolError):
+            wrong.open(response, "d2c")
+        with self.assertRaises(ProtocolError):
+            await self.service.handle(packet, "lan")
+        restarted = ControllerService(self.path, allow_wifi_provision=False)
+        self.assertEqual(restarted.info.device_id, self.service.info.device_id)
+        self.assertNotEqual(restarted.info.boot_id, self.service.info.boot_id)
+        with self.assertRaises(ProtocolError):
+            await restarted.handle(packet, "lan")
+
+    async def test_one_time_schedule_survives_restart_and_preserves_weekly(self):
+        weekly = dict(self.service.settings["weekly"])
+        today = {"targetPercent": 85, "departure": (datetime.now(timezone.utc) + timedelta(hours=8)).isoformat()}
+        self.assertTrue((await self.exchange("set_today", {"today": today}))["ok"])
+        restarted = ControllerService(self.path, allow_wifi_provision=False)
+        self.assertEqual(restarted.settings["today"], today)
+        self.assertEqual(restarted.settings["weekly"], weekly)
 
     async def test_no_fake_vehicle_success(self):
         for operation in ("get_snapshot", "charge_now", "pause", "resume", "end"):
@@ -237,7 +285,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads((destination / "identity.json").read_text()), winners[0])
         self.assertEqual(list(destination.glob("*.tmp")), [])
 
-    async def test_http_loopback_encrypted_settings_and_replay_rejection(self):
+    async def test_http_loopback_encrypted_pair_settings_and_replay_rejection(self):
         server = await asyncio.start_server(HTTPTransport(self.service).handle, "127.0.0.1", 0, limit=8192)
         port = server.sockets[0].getsockname()[1]
         async def request(packet):
@@ -249,15 +297,109 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         try:
             status, body = await request(b"GET /v1/info HTTP/1.1\r\nHost: localhost\r\n\r\n")
             self.assertIn(b"200", status); self.assertEqual(json.loads(body)["deviceId"], self.identity["deviceId"])
-            payload = self.channel.seal({"id":str(uuid.uuid4()),"timestamp":time.time(),"operation":"get_settings","body":{}}, "c2d")
+            payload = self.channel.seal({"id":str(uuid.uuid4()),"timestamp":time.time(),"operation":"pair","body":{}}, "c2d")
             packet = b"POST /v1/exchange HTTP/1.1\r\nHost: localhost\r\nContent-Length: "+str(len(payload)).encode()+b"\r\n\r\n"+payload
             status, body = await request(packet)
-            self.assertIn(b"200", status); self.assertTrue(self.channel.open(body,"d2c")["ok"])
+            self.assertIn(b"200", status)
+            reply = self.channel.open(body, "d2c")
+            self.assertTrue(reply["ok"])
+            self.assertEqual(reply["body"]["deviceId"], self.identity["deviceId"])
             status, _ = await request(packet); self.assertIn(b"401", status)
+            settings_packet = self.channel.seal({"id":str(uuid.uuid4()), "timestamp":time.time(), "operation":"get_settings", "body":{}}, "c2d")
+            settings_request = b"POST /v1/exchange HTTP/1.1\r\nHost: localhost\r\nContent-Length: "+str(len(settings_packet)).encode()+b"\r\n\r\n"+settings_packet
+            status, body = await request(settings_request)
+            self.assertIn(b"200", status)
+            self.assertEqual(self.channel.open(body, "d2c")["body"], self.service.settings)
             status, _ = await request(b"POST /v1/exchange HTTP/1.1\r\nContent-Length: 99999999\r\n\r\n")
             self.assertIn(b"413", status)
         finally:
             server.close(); await server.wait_closed()
+
+
+class ControllerRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    def test_lan_only_cli_and_legacy_alias(self):
+        for flag in ("--lan-only", "--no-ble"):
+            args = parse_args([flag, "--no-bonjour"])
+            self.assertTrue(args.lan_only)
+            self.assertTrue(args.no_bonjour)
+        args = parse_args(["--adapter", "/org/bluez/hci2", "--wifi-interface", "wlx1234"])
+        self.assertFalse(args.lan_only)
+        self.assertEqual(args.adapter, "/org/bluez/hci2")
+        self.assertEqual(args.wifi_interface, "wlx1234")
+
+    def test_initialization_never_logs_private_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with patch("sys.stdout", output):
+                main(["--state-dir", directory, "--init"])
+            identity = json.loads((Path(directory) / "identity.json").read_text())
+            self.assertNotIn(identity["setupKey"], output.getvalue())
+            self.assertEqual((Path(directory) / "identity.json").stat().st_mode & 0o777, 0o600)
+
+    async def test_lan_only_survives_optional_bonjour_failure_without_ble_or_wifi(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize(Path(directory))
+            args = parse_args(["--state-dir", directory, "--lan-only"])
+            listening = asyncio.Event()
+            stopped = asyncio.Event()
+            async def fake_http(service, host, port):
+                self.assertIsNone(service.wifi)
+                listening.set()
+                try:
+                    await asyncio.Future()
+                finally:
+                    stopped.set()
+            with patch("sparc_controller.__main__.run_http", fake_http), \
+                 patch("sparc_controller.__main__.NetworkManagerWiFi", side_effect=AssertionError("must not create Wi-Fi")), \
+                 patch("sparc_controller.__main__.advertise_lan", side_effect=RuntimeError("test private payload")), \
+                 patch("sys.stderr", io.StringIO()) as output:
+                task = asyncio.create_task(run(args))
+                await asyncio.wait_for(listening.wait(), 1)
+                await asyncio.sleep(0)
+                self.assertFalse(task.done())
+                self.assertIn("Bonjour unavailable", output.getvalue())
+                self.assertNotIn("test private payload", output.getvalue())
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await task
+                self.assertTrue(stopped.is_set())
+
+    async def test_ble_failure_is_visible_and_uses_inspected_interface_and_adapter(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            initialize(Path(directory))
+            args = parse_args(["--state-dir", directory, "--no-bonjour", "--adapter", "/org/bluez/hci2", "--wifi-interface", "wlx1234"])
+            stopped = asyncio.Event()
+            async def http(*args):
+                try:
+                    await asyncio.Future()
+                finally:
+                    stopped.set()
+            async def ble(service, adapter):
+                self.assertEqual(adapter, "/org/bluez/hci2")
+                self.assertEqual(service.wifi.interface, "wlx1234")
+                raise RuntimeError("adapter unavailable")
+            with patch("sparc_controller.__main__.run_http", http), \
+                 patch.dict(sys.modules, {"sparc_controller.bluez": SimpleNamespace(run_ble=ble)}):
+                with self.assertRaisesRegex(RuntimeError, "adapter unavailable"):
+                    await run(args)
+            self.assertTrue(stopped.is_set())
+
+    async def test_http_failure_is_fatal_and_cleans_up_optional_task(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize(Path(directory))
+            args = parse_args(["--state-dir", directory, "--lan-only"])
+            stopped = asyncio.Event()
+            async def optional(*args):
+                try:
+                    await asyncio.Future()
+                finally:
+                    stopped.set()
+            with patch("sparc_controller.__main__.run_http", side_effect=OSError("port occupied")), \
+                 patch("sparc_controller.__main__.optional_bonjour", optional):
+                with self.assertRaisesRegex(OSError, "port occupied"):
+                    await run(args)
+            self.assertTrue(stopped.is_set())
 
 
 if __name__ == "__main__": unittest.main()

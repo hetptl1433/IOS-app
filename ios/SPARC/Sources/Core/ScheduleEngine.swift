@@ -68,6 +68,27 @@ enum ScheduleEngine {
         return DateInterval(start: start, duration: duration)
     }
 
+    /// The virtual example plan respects the chosen fixed start and the ready
+    /// deadline even when there is not enough time to reach the battery target.
+    static func virtualWindow(for goal: ScheduleGoal, weekly: WeeklySchedule,
+                              remainingMinutes: Int, now: Date) -> DateInterval {
+        let calendar = chicagoCalendar
+        let minutes = weekly.mode == .fixed ? weekly.fixedStartMinutes : 60
+        var preferred = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60,
+                                      second: 0, of: goal.readyBy, matchingPolicy: .nextTime,
+                                      repeatedTimePolicy: .first, direction: .forward) ?? goal.readyBy
+        if weekly.mode == .fixed, preferred > goal.readyBy,
+           let previousDay = calendar.date(byAdding: .day, value: -1, to: goal.readyBy) {
+            preferred = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60,
+                                      second: 0, of: previousDay, matchingPolicy: .nextTime,
+                                      repeatedTimePolicy: .first, direction: .forward) ?? goal.readyBy
+        } else if weekly.mode == .smart {
+            preferred = min(preferred, goal.readyBy.addingTimeInterval(-Double(max(0, remainingMinutes)) * 60))
+        }
+        let start = max(now, preferred)
+        return DateInterval(start: start, end: max(start, goal.readyBy))
+    }
+
     /// Used by the quick 'today' editor. It means the next occurrence of the selected local time.
     static func nextOccurrence(minutes: Int, after now: Date,
                                calendar: Calendar = chicagoCalendar) -> Date? {

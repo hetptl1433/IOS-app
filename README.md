@@ -25,8 +25,8 @@ checks and the real-device acceptance checklist.
 ## Start here (on a Mac)
 
 ```sh
-git clone https://github.com/hetptl1433/sparc.git
-cd sparc
+git clone https://github.com/hetptl1433/IOS-app.git
+cd IOS-app
 ./start.command        # or double-click start.command in Finder
 ```
 

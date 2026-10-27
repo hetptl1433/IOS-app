@@ -202,18 +202,33 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Image(systemName: "sparkles").foregroundStyle(SPARCTheme.green)
-                        Text(store.isDemo ? "You're exploring the demo" : "Your home controller").sparcFont(16, weight: .semibold)
+                        Text(store.isDemo ? "You're exploring the demo" : store.isControllerTest ? "Your controller · app test mode" : "Your home controller").sparcFont(16, weight: .semibold)
                     }
-                    Text(store.isDemo ? "Try the design with sample data, or pair your Raspberry Pi to start setting up your home controller." : (store.controllerName ?? "No home controller paired"))
+                    Text(store.isDemo ? "Explore charging here, or pair your Raspberry Pi to control it over Bluetooth." : (store.controllerName ?? "No home controller paired"))
                         .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                     Toggle("Demo mode", isOn: Binding(get: { store.isDemo }, set: { store.setDemoMode($0) }))
                         .sparcFont(14).tint(.gray)
                         .accessibilityIdentifier("settings.demoMode")
                         .disabled(store.busy)
+                    Divider().overlay(SPARCTheme.line)
+                    Toggle(isOn: Binding(get: { store.virtualCarEnabled }, set: { enabled in
+                        Task { await store.setVirtualCarEnabled(enabled) }
+                    })) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Virtual car").sparcFont(14)
+                            Text("Starts plugged in at 40%. Try charging, pause, and schedules.")
+                                .sparcFont(11).foregroundStyle(SPARCTheme.muted)
+                        }
+                    }
+                    .tint(SPARCTheme.green)
+                    .accessibilityIdentifier("settings.virtualCar")
+                    .disabled(store.busy)
+                    Text(store.isDemo ? "The virtual car runs in this app. Turn Demo mode off to use your paired Pi." : "The virtual car runs on your Pi. Battery, energy, and prices are virtual readings.")
+                        .sparcFont(11).foregroundStyle(SPARCTheme.muted)
                 }
             }
             NavigationLink(destination: ControllerSetupView()) {
-                SPARCNavigationButton(title: provisioning.savedController == nil ? "Connect home controller" : "Manage home controller", subtitle: "Bluetooth pairing · Wi-Fi setup", symbol: "network")
+                SPARCNavigationButton(title: provisioning.savedController == nil ? "Connect home controller" : "Manage home controller", subtitle: "Bluetooth controls · home network", symbol: "network")
             }
             .buttonStyle(SPARCPressStyle())
             .accessibilityIdentifier("settings.connectController")
@@ -222,8 +237,8 @@ struct SettingsView: View {
             }.buttonStyle(SPARCPressStyle())
             SPARCCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Tesla connection", systemImage: "car.side").sparcFont(15, weight: .semibold)
-                    Text("Vehicle control comes next. Pairing your Raspberry Pi configures the controller; it doesn't authorize Tesla or start a real vehicle charge.")
+                    Label("Vehicle connection", systemImage: "car.side").sparcFont(15, weight: .semibold)
+                    Text("Use the virtual car while the vehicle hardware is being connected. Its controls change the virtual charge; they do not operate a real vehicle.")
                         .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                 }
             }

@@ -29,10 +29,20 @@ struct SPARCRootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if store.isDemo {
-                    Text("DEMO · SAMPLE DATA")
+                    Text(store.isVirtualCarActive ? "DEMO · VIRTUAL CAR" : "DEMO MODE")
                         .sparcFont(8, weight: .medium).tracking(1.2)
                         .foregroundStyle(SPARCTheme.muted).padding(.top, 5)
-                        .accessibilityLabel("Demo mode. All charging data is sample data.")
+                        .accessibilityLabel(store.isVirtualCarActive ? "Demo mode. Virtual car and example prices." : "Demo mode. Virtual car is off.")
+                } else if store.isVirtualCarActive {
+                    Text("PI CONNECTED · VIRTUAL CAR")
+                        .sparcFont(8, weight: .medium).tracking(1.2)
+                        .foregroundStyle(SPARCTheme.muted).padding(.top, 5)
+                        .accessibilityIdentifier("controller.virtualCar")
+                } else if store.isControllerTest {
+                    Text("APP TEST · NO VEHICLE CONNECTED")
+                        .sparcFont(8, weight: .medium).tracking(1.2)
+                        .foregroundStyle(SPARCTheme.muted).padding(.top, 5)
+                        .accessibilityIdentifier("controller.testMode")
                 }
                 tabBar
             }.background(.black)
@@ -59,7 +69,7 @@ struct SPARCRootView: View {
             Button("Charge now") { Task { await store.chargeNow() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(store.isDemo ? "This previews an immediate charge with sample data. Your weekly routine stays saved." : "The controller will request an immediate charge. Your weekly routine stays saved.")
+            Text(store.isVirtualCarActive ? "Start charging your virtual car. Your weekly routine stays saved." : store.isDemo ? "Enable Virtual car in Settings to try charging." : store.isControllerTest ? "Start the charging test on your controller. No vehicle is connected, and your weekly routine stays saved." : "The controller will request an immediate charge. Your weekly routine stays saved.")
         }
         .alert("Couldn't complete that", isPresented: Binding(get: { store.errorMessage != nil && sheet == nil && (selectedTab == .home || selectedTab == .charge) }, set: { if !$0 { store.errorMessage = nil } })) {
             Button("OK") { store.errorMessage = nil }
@@ -162,11 +172,15 @@ private struct HomeView: View {
             if store.isDemo {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles").foregroundStyle(SPARCTheme.green)
-                    Text("Demo mode · sample data").foregroundStyle(SPARCTheme.muted).accessibilityIdentifier("demo.banner")
+                    Text(store.isVirtualCarActive ? "Demo mode · virtual car" : "Demo mode · virtual car off").foregroundStyle(SPARCTheme.muted).accessibilityIdentifier("demo.banner")
                     Spacer()
                     Button("Connect Pi", action: onSettings).foregroundStyle(.white)
                 }
                 .sparcFont(11)
+            } else if store.isVirtualCarActive {
+                SPARCNotice(title: "Virtual car · plugged in. Controls and schedules run on your Pi over Bluetooth.", symbol: "car.side")
+            } else if store.isControllerTest {
+                SPARCNotice(title: "App test mode · no vehicle connected.", symbol: "bolt.badge.clock")
             }
 
             if store.snapshot.state == .offline && !store.isDemo {
@@ -220,8 +234,8 @@ private struct HomeView: View {
             }
 
             HStack(alignment: .top, spacing: 12) {
-                summaryCard(label: "Saved this month", value: store.showsTelemetry ? SPARCFormat.money(store.snapshot.monthlySavings) : "—", detail: "View savings", symbol: "leaf", action: onSavings)
-                summaryCard(label: "Current total rate", value: store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.currentRateCents, digits: 0))¢" : "—", detail: "See prices", symbol: nil, action: onPrices)
+                summaryCard(label: store.isVirtualCarActive ? "Virtual savings" : "Saved this month", value: store.showsTelemetry ? SPARCFormat.money(store.isVirtualCarActive ? store.snapshot.sessionSavings : store.snapshot.monthlySavings) : "—", detail: "View savings", symbol: "leaf", action: onSavings)
+                summaryCard(label: store.isVirtualCarActive ? "Example rate" : "Current total rate", value: store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.currentRateCents, digits: 0))¢" : "—", detail: "See prices", symbol: nil, action: onPrices)
             }
             HStack {
                 Text("Your overnight plan").sparcFont(16, weight: .semibold)
@@ -241,7 +255,7 @@ private struct HomeView: View {
                     SPARCDetail(title: "Estimated charging cost", value: store.showsTelemetry ? SPARCFormat.money(store.snapshot.estimatedCost) : "—")
                 }
             }
-            Text(store.isDemo ? "Sample estimates for the design demo. No vehicle is connected." : "Times shown in Chicago time. Charging preferences save on your Raspberry Pi.")
+            Text(store.isVirtualCarActive ? "Virtual battery and energy · example prices. Charging increases the battery over time; pause stops it. Times shown in Chicago time." : store.isDemo ? "Turn on Virtual car in Settings to explore charging." : store.isControllerTest ? "Virtual car is off. Turn it on in Settings to try a plugged-in car at 40%." : "Times shown in Chicago time. Charging preferences save on your Raspberry Pi.")
                 .sparcFont(11).foregroundStyle(SPARCTheme.muted)
         }
         .refreshable { await store.refresh() }
@@ -268,7 +282,7 @@ private struct HomeView: View {
             .accessibilityLabel("Current schedule")
             .accessibilityIdentifier("home.schedule")
             .disabled(store.busy)
-            SPARCPill(title: "Home", symbol: "cable.connector")
+            SPARCPill(title: store.isVirtualCarActive ? "Plugged in" : "Home", symbol: "cable.connector")
         }
     }
     @ViewBuilder private var battery: some View {
@@ -287,13 +301,23 @@ private struct HomeView: View {
         return "Good evening."
     }
     private var statusSubtitle: String {
+        if store.isControllerTest && !store.isVirtualCarActive {
+            switch store.snapshot.state {
+            case .charging: return "Your Pi confirmed the charging test"
+            case .paused: return "Test paused · your weekly routine stays saved"
+            case .complete: return "The scheduled test window has finished"
+            case .waiting: return store.weekly.mode == .fixed ? "Test window · \(store.displayedWindow)" : "Charge now to test, or choose a fixed start time"
+            case .unplugged: return "No vehicle is connected"
+            case .offline: return "Reconnect your controller"
+            }
+        }
         switch store.snapshot.state {
         case .charging: return "\(SPARCFormat.decimal(store.snapshot.powerKW)) kW · \(SPARCFormat.duration(store.snapshot.remainingMinutes)) remaining"
         case .paused: return "Your weekly routine stays saved"
         case .complete: return "Ready for your next departure"
         case .unplugged: return "Plug in at home to start charging"
-        case .offline: return store.hasLiveTelemetry ? "Last update · \(SPARCFormat.time(store.snapshot.updatedAt))" : "Waiting for a live vehicle connection"
-        case .waiting: return store.isDemo && store.effectiveGoal == nil ? "Your routine is paused. Charge now whenever you're ready." : "Next window · \(store.displayedWindow)"
+        case .offline: return store.hasLiveTelemetry ? "Last update · \(SPARCFormat.time(store.snapshot.updatedAt))" : "Reconnect your controller"
+        case .waiting: return store.effectiveGoal == nil ? "Your routine is paused. Charge now whenever you're ready." : "Next window · \(store.displayedWindow)"
         }
     }
     private func homeMetric(_ title: String, _ value: String) -> some View {

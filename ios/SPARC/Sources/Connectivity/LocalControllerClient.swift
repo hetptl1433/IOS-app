@@ -6,6 +6,13 @@ protocol ControllerClient: Sendable {
     func saveWeekly(_ value: WeeklySchedule) async throws
     func saveToday(_ value: TodayOverride?) async throws
     func command(_ command: String) async throws
+    func setVirtualCarEnabled(_ enabled: Bool) async throws
+}
+
+extension ControllerClient {
+    func setVirtualCarEnabled(_ enabled: Bool) async throws {
+        throw ControllerConnectionError.unavailable("This controller does not support Virtual car. Update the app and controller together.")
+    }
 }
 
 enum ControllerAddress {
@@ -32,9 +39,9 @@ enum ControllerAddress {
 actor LocalControllerClient: ControllerClient {
     private let vault: any ControllerCredentialStore
     private let session: URLSession
-    init(vault: any ControllerCredentialStore = ControllerVault.shared) {
+    init(vault: any ControllerCredentialStore = ControllerVault.shared, configuration: URLSessionConfiguration? = nil) {
         self.vault = vault
-        let configuration = URLSessionConfiguration.ephemeral
+        let configuration = configuration ?? URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 12
         configuration.timeoutIntervalForResource = 18
         configuration.waitsForConnectivity = false
@@ -53,8 +60,29 @@ actor LocalControllerClient: ControllerClient {
         guard ["charge_now", "pause", "resume", "end"].contains(command) else { throw ControllerConnectionError.invalidMessage }
         _ = try await exchange(operation: command)
     }
+    func setVirtualCarEnabled(_ enabled: Bool) async throws {
+        _ = try await exchange(operation: "set_virtual_car", body: ["enabled": .bool(enabled)])
+    }
+    /// A public challenge supplies the candidate identity, never proof of trust.
+    /// Keep the entered address; a discovery response cannot redirect the key elsewhere.
+    func pair(host: String, setupKey: String, port: Int = 8766) async throws -> PairedController {
+        let address = try ControllerAddress.url(host: host, port: port, path: "/v1/info")
+        let info = try await challenge(at: address)
+        let key = setupKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let candidate = PairedController(deviceID: info.deviceId, deviceName: info.name,
+                                        host: address.host ?? host, port: port, setupKey: key)
+        let body = try await exchange(operation: "pair", controller: candidate, info: info)
+        guard body["deviceId"]?.string == candidate.deviceID else { throw ControllerConnectionError.invalidMessage }
+        try Task.checkCancellation()
+        try await ping(candidate)
+        try Task.checkCancellation()
+        return candidate
+    }
     func ping(_ controller: PairedController) async throws {
-        _ = try await exchange(operation: "ping", paired: controller)
+        let body = try await exchange(operation: "ping", paired: controller)
+        guard body["deviceId"]?.string == controller.deviceID, body["connected"] == .bool(true) else {
+            throw ControllerConnectionError.invalidMessage
+        }
     }
     private func decode<T: Decodable>(_ result: [String: WireValue]) throws -> T {
         return try ControllerJSON.decoder.decode(T.self, from: ControllerJSON.encoder.encode(result))
@@ -74,10 +102,22 @@ actor LocalControllerClient: ControllerClient {
     }
     private func exchange(operation: String, body: [String: WireValue] = [:], paired: PairedController? = nil) async throws -> [String: WireValue] {
         guard let controller = try paired ?? vault.load() else { throw ControllerConnectionError.notPaired }
-        // Public boot challenge is authenticated indirectly: a forged challenge cannot produce a valid sealed response.
-        let infoData = try await fetch(URLRequest(url: ControllerAddress.url(host: controller.host, port: controller.port, path: "/v1/info")))
-        let info = try JSONDecoder().decode(ControllerInfo.self, from: infoData)
+        guard controller.bluetoothPeripheralID == nil else {
+            throw ControllerConnectionError.unavailable("This controller uses Bluetooth. Reconnect it nearby before continuing.")
+        }
+        let info = try await challenge(at: ControllerAddress.url(host: controller.host, port: controller.port, path: "/v1/info"))
+        return try await exchange(operation: operation, body: body, controller: controller, info: info)
+    }
+    private func challenge(at address: URL) async throws -> ControllerInfo {
+        try Task.checkCancellation()
+        let data = try await fetch(URLRequest(url: address))
+        let info = try JSONDecoder().decode(ControllerInfo.self, from: data)
         try info.validate()
+        return info
+    }
+    private func exchange(operation: String, body: [String: WireValue] = [:], controller: PairedController,
+                          info: ControllerInfo) async throws -> [String: WireValue] {
+        try Task.checkCancellation()
         guard info.deviceId == controller.deviceID else { throw ControllerConnectionError.invalidMessage }
         let codec = try ControllerWireCodec(setupKey: controller.setupKey, info: info)
         let id = UUID().uuidString.lowercased()
@@ -94,4 +134,75 @@ actor LocalControllerClient: ControllerClient {
 private final class ControllerRedirectBlocker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+}
+
+
+/// The same authenticated operations can travel over LAN or the owner's saved BLE peripheral.
+protocol BluetoothControllerTransport: Sendable {
+    func exchangeBLE(controller: PairedController, operation: String,
+                     body: [String: WireValue]) async throws -> [String: WireValue]
+}
+
+actor ControllerClientRouter: ControllerClient {
+    private let vault: any ControllerCredentialStore
+    private let bluetooth: any BluetoothControllerTransport
+    private let lan: any ControllerClient
+
+    init(vault: any ControllerCredentialStore = ControllerVault.shared,
+         bluetooth: any BluetoothControllerTransport,
+         lan: (any ControllerClient)? = nil) {
+        self.vault = vault
+        self.bluetooth = bluetooth
+        self.lan = lan ?? LocalControllerClient(vault: vault)
+    }
+
+    func fetchSnapshot() async throws -> ChargeSnapshot {
+        if let controller = try bluetoothController() {
+            let body = try await bluetooth.exchangeBLE(controller: controller, operation: "get_snapshot", body: [:])
+            return try decode(body)
+        }
+        return try await lan.fetchSnapshot()
+    }
+    func fetchSettings() async throws -> ControllerSettings {
+        if let controller = try bluetoothController() {
+            let body = try await bluetooth.exchangeBLE(controller: controller, operation: "get_settings", body: [:])
+            return try decode(body)
+        }
+        return try await lan.fetchSettings()
+    }
+    func saveWeekly(_ value: WeeklySchedule) async throws {
+        if let controller = try bluetoothController() {
+            _ = try await bluetooth.exchangeBLE(controller: controller, operation: "set_weekly", body: WireValue.dictionary(value))
+        } else { try await lan.saveWeekly(value) }
+    }
+    func saveToday(_ value: TodayOverride?) async throws {
+        if let controller = try bluetoothController() {
+            let body: [String: WireValue] = try value.map { ["today": .object(try WireValue.dictionary($0))] } ?? ["today": .null]
+            _ = try await bluetooth.exchangeBLE(controller: controller, operation: "set_today", body: body)
+        } else { try await lan.saveToday(value) }
+    }
+    func command(_ command: String) async throws {
+        guard ["charge_now", "pause", "resume", "end"].contains(command) else { throw ControllerConnectionError.invalidMessage }
+        if let controller = try bluetoothController() {
+            _ = try await bluetooth.exchangeBLE(controller: controller, operation: command, body: [:])
+        } else { try await lan.command(command) }
+    }
+
+    func setVirtualCarEnabled(_ enabled: Bool) async throws {
+        if let controller = try bluetoothController() {
+            _ = try await bluetooth.exchangeBLE(controller: controller, operation: "set_virtual_car", body: ["enabled": .bool(enabled)])
+        } else { try await lan.setVirtualCarEnabled(enabled) }
+    }
+
+    private func bluetoothController() throws -> PairedController? {
+        guard let controller = try vault.load() else { throw ControllerConnectionError.notPaired }
+        guard let identifier = controller.bluetoothPeripheralID else { return nil }
+        guard UUID(uuidString: identifier) != nil, UUID(uuidString: controller.deviceID) != nil else {
+            throw ControllerConnectionError.invalidMessage
+        }
+        return controller
+    }
+    private func decode<T: Decodable>(_ body: [String: WireValue]) throws -> T {
+        try ControllerJSON.decoder.decode(T.self, from: ControllerJSON.encoder.encode(body))
+    }
 }

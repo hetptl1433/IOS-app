@@ -1,0 +1,28 @@
+[Unit]
+Description=SPARC Bluetooth app test controller (no vehicle)
+After=network.target bluetooth.service
+Wants=bluetooth.service
+Conflicts=sparc-controller.service sparc-controller-ble.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sparc-controller/controller
+# Supply the inspected BlueZ adapter; this mode never provisions Wi-Fi.
+EnvironmentFile=/etc/sparc-controller/ble.conf
+ExecStartPre=/usr/sbin/rfkill unblock bluetooth
+ExecStart=/opt/sparc-controller/.venv-controller/bin/python -m sparc_controller --no-wifi-provision --app-test --adapter ${SPARC_BLUEZ_ADAPTER}
+Restart=on-failure
+RestartSec=5
+User=root
+StateDirectory=sparc-controller
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_BLUETOOTH
+ReadWritePaths=/var/lib/sparc-controller
+
+[Install]
+WantedBy=multi-user.target

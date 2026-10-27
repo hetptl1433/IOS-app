@@ -10,9 +10,11 @@ private actor MockControllerClient: ControllerClient {
     var failedOperations: Set<String>
     func setFailedOperations(_ operations: Set<String>) { failedOperations = operations }
 
-    init(snapshot: ChargeSnapshot = .demo(), settings: ControllerSettings = ControllerSettings(weekly: .default, today: nil),
+    init(snapshot: ChargeSnapshot? = nil, settings: ControllerSettings = ControllerSettings(weekly: .default, today: nil),
          failedOperations: Set<String> = []) {
-        self.snapshot = snapshot
+        var legacy = ChargeSnapshot.demo()
+        legacy.virtualCar = nil; legacy.controlOnly = nil
+        self.snapshot = snapshot ?? legacy
         self.settings = settings
         self.failedOperations = failedOperations
     }
@@ -32,10 +34,15 @@ private actor MockControllerClient: ControllerClient {
         if failedOperations.contains("save") { throw MockFailure.unavailable }
         settings.today = value
     }
+    func setVirtualCarEnabled(_ enabled: Bool) async throws {
+        if failedOperations.contains("virtual") { throw MockFailure.unavailable }
+        settings.virtualCarEnabled = enabled
+        snapshot = enabled ? .demo() : .noVehicle()
+    }
     func command(_ command: String) async throws {
         if failedOperations.contains("command") { throw MockFailure.unavailable }
-        snapshot.state = .charging
-        snapshot.powerKW = 11.5
+        snapshot.state = command == "pause" ? .paused : command == "end" ? .waiting : .charging
+        snapshot.powerKW = snapshot.controlOnly == true || snapshot.state != .charging ? 0 : 11.5
     }
 }
 
@@ -43,6 +50,200 @@ final class AppStoreTests: XCTestCase {
     private func isolatedDefaults() -> (UserDefaults, String) {
         let name = "SPARC.Tests.\(UUID().uuidString)"
         return (UserDefaults(suiteName: name)!, name)
+    }
+
+    private func appTestSnapshot() -> ChargeSnapshot {
+        var snapshot = ChargeSnapshot.disconnected()
+        snapshot.state = .waiting
+        snapshot.vehicleName = "No vehicle connected"
+        snapshot.controlOnly = true
+        return snapshot
+    }
+
+    @MainActor
+    func testControllerTestCommandsUseConfirmedStatesWithoutInventingTelemetry() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: "sparc.demoMode")
+        let store = AppStore(defaults: defaults, client: MockControllerClient(snapshot: appTestSnapshot()), arguments: [])
+        await store.refresh()
+        XCTAssertTrue(store.isControllerTest)
+        XCTAssertFalse(store.isDemo)
+        XCTAssertFalse(store.hasLiveTelemetry)
+        XCTAssertFalse(store.showsTelemetry)
+        XCTAssertTrue(store.canControlCharging)
+        await store.chargeNow()
+        XCTAssertEqual(store.snapshot.state, .charging)
+        XCTAssertEqual(store.snapshot.powerKW, 0)
+        await store.pauseCharging()
+        XCTAssertEqual(store.snapshot.state, .paused)
+        await store.resumeCharging()
+        XCTAssertEqual(store.snapshot.state, .charging)
+        await store.endCharging()
+        XCTAssertEqual(store.snapshot.state, .waiting)
+        XCTAssertTrue(store.records.isEmpty)
+    }
+
+    @MainActor
+    func testControllerTestDisconnectClearsActiveStateAndRecoversWithoutDemoData() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: "sparc.demoMode")
+        let client = MockControllerClient(snapshot: appTestSnapshot())
+        let store = AppStore(defaults: defaults, client: client, arguments: [])
+        await store.refresh()
+        await store.chargeNow()
+        await client.setFailedOperations(["snapshot"])
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.state, .offline)
+        XCTAssertFalse(store.isControllerTest)
+        XCTAssertFalse(store.canControlCharging)
+        XCTAssertFalse(store.showsTelemetry)
+        XCTAssertTrue(store.records.isEmpty)
+        await client.setFailedOperations([])
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.state, .charging)
+        XCTAssertTrue(store.isControllerTest)
+        XCTAssertFalse(store.showsTelemetry)
+    }
+
+    @MainActor
+    func testControllerTestScheduleSaveUsesControllerAndUpdatesItsGoal() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: "sparc.demoMode")
+        let client = MockControllerClient(snapshot: appTestSnapshot())
+        let store = AppStore(defaults: defaults, client: client, arguments: [])
+        await store.refresh()
+        var weekly = WeeklySchedule.default
+        weekly.mode = .fixed
+        weekly.targetPercent = 90
+        await store.saveWeekly(weekly)
+        let saved = try? await client.fetchSettings()
+        XCTAssertEqual(saved?.weekly, weekly)
+        XCTAssertEqual(store.weekly, weekly)
+        XCTAssertTrue(store.isControllerTest)
+        XCTAssertFalse(store.showsTelemetry)
+        store.setDemoMode(true)
+        XCTAssertTrue(store.isControllerTest)
+        XCTAssertTrue(store.isVirtualCarActive)
+        XCTAssertEqual(store.snapshot.state, .waiting)
+    }
+
+    @MainActor
+    func testVirtualCarDefaultsOnAtFortyAndOptOutSurvivesRelaunch() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = AppStore(defaults: defaults, arguments: [])
+        XCTAssertTrue(store.virtualCarEnabled)
+        XCTAssertTrue(store.isVirtualCarActive)
+        XCTAssertFalse(store.hasLiveTelemetry)
+        XCTAssertEqual(store.snapshot.batteryPercent, 40)
+        XCTAssertEqual(store.snapshot.state, .waiting)
+        await store.setVirtualCarEnabled(false)
+        XCTAssertFalse(store.isVirtualCarActive)
+        XCTAssertFalse(store.canControlCharging)
+        XCTAssertEqual(store.snapshot.state, .unplugged)
+        let relaunched = AppStore(defaults: defaults, arguments: [])
+        XCTAssertFalse(relaunched.virtualCarEnabled)
+        XCTAssertFalse(relaunched.showsTelemetry)
+        await relaunched.setVirtualCarEnabled(true)
+        XCTAssertEqual(relaunched.snapshot.batteryPercent, 40)
+        XCTAssertEqual(relaunched.snapshot.energyKWh, 0)
+    }
+
+    @MainActor
+    func testVirtualChargeAccruesElapsedEnergyAndPauseResumeEnd() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        var clock = ISO8601DateFormatter().date(from: "2026-10-26T23:00:00Z")!
+        let store = AppStore(defaults: defaults, now: { clock }, arguments: [])
+        var weekly = WeeklySchedule.default
+        weekly.enabled = false
+        await store.saveWeekly(weekly)
+        await store.chargeNow()
+        clock.addTimeInterval(3600)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.batteryPercent, 50)
+        XCTAssertEqual(store.snapshot.energyKWh, 11.5, accuracy: 0.000001)
+        XCTAssertEqual(store.snapshot.estimatedCost, 2.415, accuracy: 0.000001)
+        await store.pauseCharging()
+        clock.addTimeInterval(3600)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.energyKWh, 11.5, accuracy: 0.000001)
+        XCTAssertEqual(store.snapshot.state, .paused)
+        await store.resumeCharging()
+        clock.addTimeInterval(3600)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.batteryPercent, 60)
+        await store.endCharging()
+        clock.addTimeInterval(3600)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.state, .waiting)
+        XCTAssertEqual(store.snapshot.energyKWh, 23, accuracy: 0.000001)
+        await store.resumeCharging()
+        clock.addTimeInterval(24 * 3600)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.batteryPercent, 80)
+        XCTAssertEqual(store.snapshot.state, .complete)
+        XCTAssertEqual(store.snapshot.energyKWh, 40 / 0.9, accuracy: 0.000001)
+        let energy = store.snapshot.energyKWh
+        await store.setVirtualCarEnabled(true)
+        XCTAssertEqual(store.snapshot.energyKWh, energy, "An unchanged toggle must not reset the car")
+    }
+
+    @MainActor
+    func testFixedVirtualWindowStartsAtChosenTimeAndStopsAtReadyDeadline() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        var clock = ISO8601DateFormatter().date(from: "2026-10-27T10:59:00Z")! // 05:59 Chicago.
+        let store = AppStore(defaults: defaults, now: { clock }, arguments: [])
+        var weekly = WeeklySchedule.default
+        weekly.mode = .fixed; weekly.fixedStartMinutes = 360
+        await store.saveWeekly(weekly)
+        XCTAssertEqual(store.snapshot.windowStart, ISO8601DateFormatter().date(from: "2026-10-27T11:00:00Z"))
+        XCTAssertEqual(store.snapshot.windowEnd, ISO8601DateFormatter().date(from: "2026-10-27T11:30:00Z"))
+        clock.addTimeInterval(31 * 60)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.batteryPercent, 45)
+        XCTAssertEqual(store.snapshot.energyKWh, 5.75, accuracy: 0.000001)
+        XCTAssertEqual(store.snapshot.state, .waiting)
+        clock.addTimeInterval(20 * 60)
+        await store.chargeNow() // Manual charging remains possible in the final buffer.
+        clock.addTimeInterval(20 * 60)
+        await store.refresh()
+        XCTAssertEqual(store.snapshot.energyKWh, 5.75 + 11.5 / 6, accuracy: 0.000001)
+        XCTAssertEqual(store.snapshot.state, .waiting)
+    }
+
+    @MainActor
+    func testControllerVirtualSourceAndFailedToggleNeverClaimRealTelemetry() async {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: "sparc.demoMode")
+        let client = MockControllerClient(snapshot: .demo(),
+            settings: ControllerSettings(weekly: .default, today: nil, virtualCarEnabled: true))
+        let store = AppStore(defaults: defaults, client: client, arguments: [])
+        await store.refresh()
+        XCTAssertTrue(store.isVirtualCarActive)
+        XCTAssertTrue(store.isControllerTest)
+        XCTAssertFalse(store.hasLiveTelemetry)
+        await client.setFailedOperations(["virtual"])
+        await store.setVirtualCarEnabled(false)
+        XCTAssertTrue(store.virtualCarEnabled)
+        XCTAssertTrue(store.isVirtualCarActive)
+        XCTAssertNotNil(store.errorMessage)
+        await client.setFailedOperations(["snapshot"])
+        await store.setVirtualCarEnabled(false)
+        XCTAssertTrue(store.virtualCarEnabled, "An unconfirmed acknowledgement must not change the switch")
+        XCTAssertFalse(store.isVirtualCarActive)
+        XCTAssertEqual(store.snapshot.state, .offline)
+        await client.setFailedOperations([])
+        await store.refresh()
+        XCTAssertFalse(store.virtualCarEnabled)
+        XCTAssertFalse(store.showsTelemetry)
+        store.setDemoMode(true)
+        XCTAssertTrue(store.virtualCarEnabled, "Controller settings must not change the separate local-demo preference")
     }
 
     @MainActor

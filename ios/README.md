@@ -10,13 +10,21 @@ The sibling `sparc` directory is a different project; do not replace or merge it
 See [current status and continuation notes](../docs/ios/STATUS.md) for verified
 results and remaining hardware/release work.
 
-Local verification passed 48 unit tests and all 7 UI tests in a clean regular
-iPhone Simulator run. All seven UI scenarios also have passing small-iPhone
-evidence across the suite and targeted regressions, and the unsigned iPhone
-Release build passes. Result bundles are kept in `artifacts/ios/`; the status
+The October 27 adaptation passed 56 unit tests and all 7 UI tests in one clean
+regular-iPhone Simulator run, plus three targeted small-iPhone UI checks. Earlier
+builds also have full small-iPhone and unsigned iPhone Release evidence. Result
+bundles are kept in `artifacts/ios/`; the status
 document identifies the exact runs. Check the branch's
-[GitHub iOS workflow](https://github.com/hetptl1433/sparc/actions/workflows/ios.yml?query=branch%3Afeat%2Fnative-ios-controller)
+[GitHub iOS workflow](https://github.com/hetptl1433/IOS-app/actions/workflows/ios.yml?query=branch%3Afeat%2Fnative-ios-controller)
 for remote CI results.
+
+## Physical iPhone, Bluetooth and virtual car
+
+Settings now places **Virtual car** directly below **Demo mode**, enabled by
+default with a plugged-in car at **40%**. Controls, battery progress and example
+prices work locally in Demo mode or on the paired Pi over Bluetooth. See the
+[physical-iPhone setup and acceptance steps](../docs/ios/BLUETOOTH_APP_TEST.md).
+No Tesla integration is required or enabled.
 
 ## Run on a Mac
 
@@ -56,18 +64,26 @@ All schedule times use **America/Chicago**, including daylight-saving transition
 The ready buffer is 30 minutes before departure. The iPhone edits and displays the
 configuration; the Raspberry Pi remains the place for charging decisions.
 
-## Connect a Raspberry Pi 4
+## Connect a home controller
 
-Install and start the [companion service](../controller/README.md) on Raspberry Pi
-OS with Bluetooth and NetworkManager. On the iPhone, open **Settings → Connect
-home controller**, scan nearby devices, connect to your Pi, enter its setup key,
-and send its Wi-Fi details. Keep both devices nearby during setup. The app saves
-the pairing only after the Pi answers an authenticated request on the local network.
+Install and start the [companion service](../controller/README.md). For the
+Banana Pi Pro with Armbian Minimal / Debian 13, use its LAN-only installation and
+leave the existing Netplan/systemd-networkd connection intact. Connect the phone
+and controller to the same home LAN. On the iPhone, open **Settings → Connect
+home controller**, enter the controller's private IPv4 address or `.local`
+hostname and its private 64-character setup key, then choose **Pair over home
+network**. Keep the controller's setup window open for first pairing. The app
+authenticates encrypted pairing and ping responses before saving to Keychain.
+Later connections use the saved identity and key without opening a setup window.
 
-Bluetooth permission is requested when starting setup. Local network access is
-requested when connecting to the Pi. If access is denied, the setup flow explains
-how to open iOS Settings. A simulator cannot verify real Bluetooth hardware; use
-an iPhone for that part.
+Bluetooth supports ongoing controls and schedules when the controller has a working BlueZ
+adapter. A Bluetooth pairing authenticates pair and ping over Bluetooth before
+saving; it does not need a LAN connection. Wi-Fi configuration remains optional. Choose **Search for controllers**, enter its setup key, and optionally
+send Wi-Fi details when NetworkManager manages the selected wireless interface.
+Bluetooth permission is requested only when scanning; LAN setup does not need
+Bluetooth permission. Local Network permission is needed for the LAN connection.
+If access is denied, use the setup screen's iPhone Settings shortcut. A simulator
+cannot establish successful physical Bluetooth or router behavior.
 
 The setup key is kept in this iPhone's Keychain. Wi-Fi credentials are sent in an
 authenticated encrypted message and are not stored in UserDefaults or printed to
@@ -80,8 +96,10 @@ trust boundary and key rotation.
 The app and companion implement pairing, Wi-Fi provisioning, authenticated local
 connectivity, and durable schedule settings. The existing SPARC research planner
 and Tesla vehicle authorization/control are not yet wired to the companion.
-Until a real vehicle adapter supplies telemetry and acknowledges commands, live
-mode shows unavailable data and reports the missing adapter. Demo mode starts in
+The explicit app-test service supplies a labeled virtual car for charging controls,
+battery progress and schedules. Virtual readings are never treated as real vehicle
+telemetry. Other deployments still require a real vehicle adapter for live data.
+Demo mode starts in
 **Waiting for a better charging time** on every fresh launch, as requested for the
 design, and never sends hardware commands.
 

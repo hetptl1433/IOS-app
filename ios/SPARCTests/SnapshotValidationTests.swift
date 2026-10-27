@@ -7,7 +7,7 @@ final class SnapshotValidationTests: XCTestCase {
         try snapshot.validate()
         XCTAssertEqual(snapshot.state, .waiting)
         XCTAssertEqual(snapshot.powerKW, 0)
-        XCTAssertEqual(snapshot.batteryPercent, 62)
+        XCTAssertEqual(snapshot.batteryPercent, 40)
         XCTAssertEqual(snapshot.targetPercent, 80)
     }
 
@@ -43,4 +43,43 @@ final class SnapshotValidationTests: XCTestCase {
         let changed = try JSONSerialization.data(withJSONObject: object)
         XCTAssertThrowsError(try JSONDecoder().decode(ChargeSnapshot.self, from: changed))
     }
+
+    func testControlOnlySnapshotCannotSmuggleSampleTelemetry() throws {
+        var snapshot = ChargeSnapshot.disconnected()
+        snapshot.controlOnly = true
+        snapshot.state = .charging
+        try snapshot.validate()
+        snapshot.powerKW = 11.5
+        XCTAssertThrowsError(try snapshot.validate())
+        snapshot.powerKW = 0
+        snapshot.batteryPercent = 62
+        XCTAssertThrowsError(try snapshot.validate())
+    }
+
+    func testSnapshotsWithoutControlOnlyFlagRemainCompatible() throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(ChargeSnapshot.demo())) as? [String: Any])
+        object.removeValue(forKey: "controlOnly")
+        let decoded = try JSONDecoder().decode(ChargeSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(decoded.controlOnly)
+        try decoded.validate()
+    }
+    func testLegacySnapshotAndSettingsDecodeWithoutVirtualMarkers() throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(ChargeSnapshot.demo())) as? [String: Any])
+        object.removeValue(forKey: "controlOnly")
+        object.removeValue(forKey: "virtualCar")
+        let snapshot = try JSONDecoder().decode(ChargeSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(snapshot.virtualCar)
+        XCTAssertNil(snapshot.controlOnly)
+        let settings = try JSONDecoder().decode(ControllerSettings.self,
+            from: JSONEncoder().encode(ControllerSettings(weekly: .default, today: nil)))
+        XCTAssertNil(settings.virtualCarEnabled)
+        try snapshot.validate()
+    }
+
+    func testVirtualAndControlOnlyMarkersCannotBothBeTrue() {
+        var snapshot = ChargeSnapshot.noVehicle()
+        snapshot.virtualCar = true
+        XCTAssertThrowsError(try snapshot.validate())
+    }
+
 }

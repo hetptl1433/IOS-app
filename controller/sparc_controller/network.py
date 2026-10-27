@@ -26,7 +26,7 @@ def local_hostname() -> str:
     # Avahi supplies the machine's .local host record; use an IP address in-app if mDNS is blocked.
     name = socket.gethostname().split(".")[0].lower()
     if not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in name):
-        return "raspberrypi.local"
+        return "sparc.local"
     return name + ".local"
 
 

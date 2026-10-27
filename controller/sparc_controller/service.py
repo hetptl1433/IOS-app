@@ -11,8 +11,9 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .app_test import AppTestControl
 from .network import NetworkManagerWiFi, WiFiError, local_hostname
-from .protocol import DeviceInfo, ProtocolError, SecureChannel, compact_json, setup_key
+from .protocol import DeviceInfo, ProtocolError, SecureChannel, compact_json, pairing_code_key, setup_key
 
 
 def atomic_save(path: Path, value: dict, *, overwrite: bool = True) -> None:
@@ -62,14 +63,14 @@ def validate_weekly(body: dict) -> dict:
             "days": sorted(days), "mode": body["mode"], "enabled": body["enabled"]}
 
 
-def validate_today(value: object) -> dict | None:
+def validate_today(value: object, *, now: datetime | None = None) -> dict | None:
     if value is None:
         return None
     if not isinstance(value, dict) or type(value.get("targetPercent")) is not int or not 50 <= value["targetPercent"] <= 100:
         raise ValueError("Choose a valid one-time charge target.")
     try:
         departure = datetime.fromisoformat(value["departure"].replace("Z", "+00:00"))
-        remaining = (departure - datetime.now(timezone.utc)).total_seconds()
+        remaining = (departure - (now if now is not None else datetime.now(timezone.utc))).total_seconds()
         if not 0 < remaining <= 48 * 3600:
             raise ValueError()
     except (ValueError, TypeError, KeyError, AttributeError):
@@ -78,21 +79,69 @@ def validate_today(value: object) -> dict | None:
 
 
 class ControllerService:
-    def __init__(self, state_dir: Path, setup_seconds: int = 600, wifi=None):
+    def __init__(self, state_dir: Path, setup_seconds: int = 600, wifi=None, *, allow_wifi_provision: bool = True,
+                 app_test: bool = False, clock=None, pairing_code: str | None = None):
         identity = json.loads((state_dir / "identity.json").read_text())
+        if pairing_code is not None and not app_test:
+            raise ValueError("A pairing code is available in app-test mode only.")
         # A new boot ID invalidates all captured packets across process restarts.
-        self.info = DeviceInfo(str(uuid.UUID(identity["deviceId"])), str(uuid.uuid4()), "SPARC Raspberry Pi 4")
-        self.channel = SecureChannel(setup_key(identity["setupKey"]), self.info)
+        self.info = DeviceInfo(str(uuid.UUID(identity["deviceId"])), str(uuid.uuid4()),
+                               "SPARC app test controller" if app_test else "SPARC home controller",
+                               wifi_provision=allow_wifi_provision, app_test=app_test,
+                               pairing_code=pairing_code is not None)
+        # The code replaces the identity key for this process only; identity.json is never rewritten.
+        key = pairing_code_key(pairing_code) if pairing_code is not None else identity["setupKey"]
+        self.channel = SecureChannel(setup_key(key), self.info)
         self.state_dir = state_dir
         self.setup_deadline = time.monotonic() + max(0, setup_seconds)
-        self.wifi = wifi or NetworkManagerWiFi()
+        self.allow_wifi_provision = allow_wifi_provision
+        self.clock = clock if clock is not None else lambda: datetime.now(timezone.utc)
+        self.app_test = AppTestControl(self.clock) if app_test else None
+        # LAN-only never creates a network provisioning adapter or needs its D-Bus package.
+        self.wifi = (wifi if wifi is not None else NetworkManagerWiFi()) if allow_wifi_provision else None
         self.busy_wifi = False
         self._lock = asyncio.Lock()
         default = {"weekly": {"targetPercent": 80, "departureMinutes": 420, "days": [1,2,3,4,5],
                               "enabled": True, "mode": "smart", "fixedStartMinutes": 60}, "today": None}
         self.settings = json.loads((state_dir / "settings.json").read_text()) if (state_dir / "settings.json").exists() else default
         self.settings["weekly"] = validate_weekly(self.settings["weekly"])
+        if self.app_test:
+            self.app_test.control_state(self.settings)
+            updated = dict(self.settings)
+            if "virtualCarEnabled" not in updated:
+                updated["virtualCarEnabled"] = True
+                updated["appTestControl"] = {"manualState": None, "manualUntil": None}
+                updated["virtualCarState"] = self.app_test.initial_virtual_state()
+            elif "virtualCarState" not in updated:
+                updated["virtualCarState"] = self.app_test.initial_virtual_state()
+            self.app_test.virtual_enabled(updated)
+            self.app_test.virtual_state(updated)
+            if updated != self.settings:
+                atomic_save(self.state_dir / "settings.json", updated)
+                self.settings = updated
+        # An in-memory anchor intentionally excludes time while the process is
+        # stopped. Persist SOC/counters, never extrapolate electricity downtime.
+        self._virtual_anchor = self.clock().astimezone(timezone.utc)
         self.expire_today()
+
+    @property
+    def virtual_car_enabled(self) -> bool:
+        return self.app_test is not None and self.app_test.virtual_enabled(self.settings)
+
+    def mode_info(self) -> dict:
+        return {"vehicleAdapterAvailable": False, "virtualCar": self.virtual_car_enabled,
+                "controlOnly": self.app_test is not None and not self.virtual_car_enabled}
+
+    def advance_virtual(self) -> None:
+        """Call under _lock before replacing the schedule/manual control state."""
+        now = self.clock().astimezone(timezone.utc)
+        if self.virtual_car_enabled and now > self._virtual_anchor:
+            model = self.app_test.advance_virtual(self.settings, self._virtual_anchor, now)
+            if model != self.settings["virtualCarState"]:
+                updated = dict(self.settings, virtualCarState=model)
+                atomic_save(self.state_dir / "settings.json", updated)
+                self.settings = updated
+        self._virtual_anchor = now
 
     @property
     def setup_open(self) -> bool:
@@ -101,7 +150,7 @@ class ControllerService:
     def expire_today(self) -> None:
         if self.settings.get("today") is not None:
             try:
-                self.settings["today"] = validate_today(self.settings["today"])
+                self.settings["today"] = validate_today(self.settings["today"], now=self.clock())
             except ValueError:
                 self.settings["today"] = None
 
@@ -119,12 +168,19 @@ class ControllerService:
 
     async def dispatch(self, operation: str, body: dict, transport: str) -> dict:
         if operation == "ping":
-            return {"connected": True, "deviceId": self.info.device_id, "vehicleAdapterAvailable": False}
-        if operation in ("pair", "wifi.provision"):
+            return {"connected": True, "deviceId": self.info.device_id, **self.mode_info()}
+        if operation == "pair":
+            # handle() has already authenticated this request and consumed its replay ID.
+            # Discovery alone is untrusted; the phone must authenticate this sealed reply.
+            # Anyone who knows a shared pairing code can already send commands, so a window adds nothing.
+            if transport not in ("ble", "lan") or not (self.setup_open or self.info.pairing_code):
+                raise ValueError("Open the controller’s local setup window, then pair again.")
+            return {"deviceId": self.info.device_id, "host": local_hostname(), **self.mode_info()}
+        if operation == "wifi.provision":
+            if not self.allow_wifi_provision:
+                raise ValueError("Wi-Fi provisioning is disabled in LAN-only mode. Use the controller’s existing network connection.")
             if transport != "ble" or not self.setup_open:
                 raise ValueError("Open the controller’s local setup window and reconnect over Bluetooth.")
-            if operation == "pair":
-                return {"deviceId": self.info.device_id, "host": local_hostname(), "vehicleAdapterAvailable": False}
             if self.busy_wifi:
                 raise ValueError("Wi-Fi setup is already running. Wait for it to finish.")
             self.busy_wifi = True
@@ -133,18 +189,56 @@ class ControllerService:
             finally:
                 self.busy_wifi = False
         if operation == "get_settings":
-            self.expire_today()
-            return self.settings
+            async with self._lock:
+                self.advance_virtual()
+                self.expire_today()
+                result = {"weekly": self.settings["weekly"], "today": self.settings.get("today")}
+                if self.app_test:
+                    result["virtualCarEnabled"] = self.virtual_car_enabled
+                return result
+        if operation == "set_virtual_car":
+            if self.app_test is None:
+                raise ValueError("Virtual car is available in app-test mode only.")
+            enabled = body.get("enabled")
+            if type(enabled) is not bool:
+                raise ValueError("Choose whether Virtual car is enabled.")
+            async with self._lock:
+                self.advance_virtual()
+                if enabled != self.virtual_car_enabled:
+                    updated = dict(self.settings, virtualCarEnabled=enabled)
+                    updated["appTestControl"] = {"manualState": None, "manualUntil": None}
+                    if enabled:
+                        updated["virtualCarState"] = self.app_test.initial_virtual_state()
+                    atomic_save(self.state_dir / "settings.json", updated)
+                    self.settings = updated
+                return {"virtualCarEnabled": self.virtual_car_enabled, **self.mode_info()}
         if operation in ("set_weekly", "set_today"):
             async with self._lock:
+                self.advance_virtual()
                 updated = dict(self.settings)
                 if operation == "set_weekly":
                     updated["weekly"] = validate_weekly(body)
                 else:
-                    updated["today"] = validate_today(body.get("today"))
+                    updated["today"] = validate_today(body.get("today"), now=self.clock())
+                if self.app_test:
+                    # Schedule and manual-override changes commit together, so a
+                    # failed disk write never acknowledges a partial update.
+                    updated["appTestControl"] = {"manualState": None, "manualUntil": None}
                 atomic_save(self.state_dir / "settings.json", updated)
                 self.settings = updated
-                return {"storedOnly": True, "vehicleAdapterAvailable": False}
+                return {"storedOnly": True, **self.mode_info()}
         if operation in ("get_snapshot", "charge_now", "pause", "resume", "end"):
-            raise ValueError("Your Pi is connected. Install the vehicle adapter before live charging data and controls become available.")
+            if self.app_test is None:
+                raise ValueError("Your Pi is connected. Install the vehicle adapter before live charging data and controls become available.")
+            async with self._lock:
+                self.advance_virtual()
+                self.expire_today()
+                if operation != "get_snapshot":
+                    if not self.virtual_car_enabled:
+                        raise ValueError("Virtual car is off. Turn it on before using test charging controls.")
+                    updated = dict(self.settings)
+                    updated["appTestControl"] = self.app_test.command_value(operation, updated)
+                    atomic_save(self.state_dir / "settings.json", updated)
+                    self.settings = updated
+                return self.app_test.snapshot(self.settings)
         raise ValueError("This controller does not support that operation. Update the app and controller together.")

@@ -60,6 +60,8 @@ struct TodayOverride: Codable, Equatable, Sendable {
 struct ControllerSettings: Codable, Equatable, Sendable {
     var weekly: WeeklySchedule
     var today: TodayOverride?
+    /// Missing on older controllers; new virtual-car controllers default to enabled.
+    var virtualCarEnabled: Bool? = nil
 }
 
 struct ScheduleGoal: Equatable, Sendable {
@@ -85,19 +87,26 @@ struct ChargeSnapshot: Codable, Equatable, Sendable {
     var sessionSavings: Double
     var updatedAt: Date
     var vehicleName: String
+    /// Acknowledged controller state for app testing, without vehicle telemetry.
+    var controlOnly: Bool? = nil
+    /// Explicitly virtual values must never be treated as physical vehicle telemetry.
+    var virtualCar: Bool? = nil
 
     /// Values shown only in the explicitly labeled design demo.
     static func demo(now: Date = Date()) -> ChargeSnapshot {
-        let goal = ScheduleEngine.effectiveGoal(weekly: .default, today: nil, now: now)!
-        let window = ScheduleEngine.demoWindow(for: goal, weekly: .default,
-                                               remainingMinutes: 129, now: now)
-        return ChargeSnapshot(state: .waiting, batteryPercent: 62, targetPercent: 80,
-                              readyBy: goal.readyBy, windowStart: window.start,
-                              windowEnd: window.end,
-                              powerKW: 0, energyKWh: 0, remainingMinutes: 129,
-                              monthlySavings: 34.60, currentRateCents: 21,
-                              estimatedCost: 2.07, sessionSavings: 3.10,
-                              updatedAt: now, vehicleName: "Cybertruck")
+        var car = VirtualCarState(now: now)
+        car.update(weekly: .default, today: nil, now: now)
+        return car.snapshot(now: now)
+    }
+
+    static func noVehicle(now: Date = Date(), target: Int = 80) -> ChargeSnapshot {
+        var result = disconnected(now: now)
+        result.state = .unplugged
+        result.targetPercent = target
+        result.vehicleName = "No vehicle connected"
+        result.controlOnly = true
+        result.virtualCar = false
+        return result
     }
 
     static func disconnected(now: Date = Date()) -> ChargeSnapshot {
@@ -117,6 +126,12 @@ struct ChargeSnapshot: Codable, Equatable, Sendable {
               currentRateCents.isFinite, estimatedCost.isFinite, sessionSavings.isFinite,
               powerKW >= 0, energyKWh >= 0, remainingMinutes >= 0,
               remainingMinutes <= 10080 else { throw SnapshotError.invalid }
+        if virtualCar == true, controlOnly == true { throw SnapshotError.invalid }
+        if controlOnly == true {
+            guard batteryPercent == 0, powerKW == 0, energyKWh == 0,
+                  remainingMinutes == 0, monthlySavings == 0, currentRateCents == 0,
+                  estimatedCost == 0, sessionSavings == 0 else { throw SnapshotError.invalid }
+        }
     }
 }
 
@@ -138,5 +153,135 @@ struct ChargingRecord: Identifiable, Codable, Equatable, Sendable {
                            energyKWh: 24.6 + Double(offset), cost: 2.07 + Double(offset) * 0.11,
                            savings: 3.1 - Double(offset) * 0.12)
         }
+    }
+}
+
+
+/// A local virtual vehicle for the design demo. No device or Tesla API is called.
+/// The Pi uses the same battery, AC power, efficiency and example price model.
+struct VirtualCarState {
+    static let capacityKWh = 100.0
+    static let powerKW = 11.5
+    static let efficiency = 0.9
+    private var battery = 40.0
+    private var energy = 0.0
+    private var cost = 0.0
+    private var lastUpdate: Date
+    private var state: ChargeState = .waiting
+    private var manualState: ChargeState?
+    private var manualUntil: Date?
+    private var target = 80
+    private var weekly: WeeklySchedule?
+    private var today: TodayOverride?
+    private var goal: ScheduleGoal?
+    private var window: DateInterval?
+
+    init(now: Date) { lastUpdate = now }
+
+    mutating func update(weekly: WeeklySchedule, today: TodayOverride?, now: Date) {
+        advance(to: now)
+        let changed = self.weekly != weekly || self.today != today
+        self.weekly = weekly; self.today = today
+        if changed { manualState = nil; manualUntil = nil }
+        updatePlan(at: now)
+        // A fresh demo launch is visibly waiting; elapsed time or an explicit
+        // command activates the model instead of restoring a previous session.
+        if changed { state = battery >= Double(target) ? .complete : .waiting }
+    }
+
+    mutating func command(_ command: String, now: Date) throws {
+        advance(to: now)
+        updatePlan(at: now)
+        switch command {
+        case "charge_now", "resume": manualState = .charging
+        case "pause": manualState = .paused
+        case "end": manualState = .waiting
+        default: throw ControllerConnectionError.invalidMessage
+        }
+        if let goal {
+            manualUntil = command == "end" || goal.readyBy <= now ? goal.departure : goal.readyBy
+        } else { manualUntil = nil }
+        state = battery >= Double(target) ? .complete : manualState ?? .waiting
+    }
+
+    private func remainingMinutes(target: Int) -> Int {
+        Int(ceil(max(0, Double(target) - battery) / 100 * Self.capacityKWh
+                 / (Self.powerKW * Self.efficiency) * 60))
+    }
+
+    private mutating func updatePlan(at now: Date) {
+        guard let weekly else { return }
+        goal = ScheduleEngine.effectiveGoal(weekly: weekly, today: today, now: now)
+        target = goal?.targetPercent ?? weekly.targetPercent
+        window = goal.map { ScheduleEngine.virtualWindow(for: $0, weekly: weekly,
+            remainingMinutes: remainingMinutes(target: target), now: now) }
+    }
+
+    private func state(at instant: Date, goal: ScheduleGoal?, window: DateInterval?, target: Int) -> ChargeState {
+        if battery >= Double(target) - 0.0000001 { return .complete }
+        if let manualState, manualUntil == nil || instant < manualUntil! { return manualState }
+        if let goal, let window, instant >= window.start, instant < goal.readyBy { return .charging }
+        return .waiting
+    }
+
+    private mutating func advance(to now: Date) {
+        guard now > lastUpdate, let weekly else { return }
+        var cursor = lastUpdate
+        lastUpdate = now
+        // Integrate each active interval across rate, schedule, manual-expiry
+        // and departure boundaries, including time spent in the background.
+        while cursor < now {
+            let currentGoal = ScheduleEngine.effectiveGoal(weekly: weekly, today: today, now: cursor)
+            let currentTarget = currentGoal?.targetPercent ?? weekly.targetPercent
+            let currentWindow = currentGoal.map { ScheduleEngine.virtualWindow(for: $0, weekly: weekly,
+                remainingMinutes: remainingMinutes(target: currentTarget), now: cursor) }
+            let active = state(at: cursor, goal: currentGoal, window: currentWindow, target: currentTarget)
+            let calendar = ScheduleEngine.chicagoCalendar
+            var boundary = min(now, calendar.dateInterval(of: .hour, for: cursor)?.end ?? now)
+            if let manualUntil, manualUntil > cursor { boundary = min(boundary, manualUntil) }
+            if let currentGoal {
+                for instant in [currentWindow?.start, currentGoal.readyBy, currentGoal.departure].compactMap({ $0 }) where instant > cursor {
+                    boundary = min(boundary, instant)
+                }
+            }
+            guard boundary > cursor else { break }
+            if active == .charging {
+                let needed = max(0, Double(currentTarget) - battery) / 100 * Self.capacityKWh / Self.efficiency
+                let supplied = min(needed, Self.powerKW * boundary.timeIntervalSince(cursor) / 3600)
+                energy += supplied
+                cost += supplied * Self.exampleRate(at: cursor) / 100
+                battery = min(100, battery + supplied * Self.efficiency / Self.capacityKWh * 100)
+            }
+            cursor = boundary
+            let maximumTarget = max(weekly.targetPercent,
+                today.flatMap { $0.departure > cursor ? $0.targetPercent : nil } ?? weekly.targetPercent)
+            if battery >= Double(maximumTarget) - 0.0000001 { break }
+        }
+        if let manualUntil, now >= manualUntil { manualState = nil; self.manualUntil = nil }
+        updatePlan(at: now)
+        state = state(at: now, goal: goal, window: window, target: target)
+    }
+
+    static func exampleRate(at date: Date) -> Double {
+        let hour = ScheduleEngine.chicagoCalendar.component(.hour, from: date)
+        return (1..<5).contains(hour) ? 7 : 21
+    }
+
+    func snapshot(now: Date) -> ChargeSnapshot {
+        let minutes = remainingMinutes(target: target)
+        let start = window?.start ?? now
+        let end: Date
+        if manualState == .charging, state == .charging {
+            let forecast = now.addingTimeInterval(Double(minutes) * 60)
+            end = manualUntil.map { min($0, forecast) } ?? forecast
+        } else { end = window?.end ?? now }
+        return ChargeSnapshot(state: state, batteryPercent: Int(floor(battery + 0.0000001)),
+                              targetPercent: target, readyBy: goal?.readyBy ?? now,
+                              windowStart: start, windowEnd: max(start, end),
+                              powerKW: state == .charging ? Self.powerKW : 0,
+                              energyKWh: energy, remainingMinutes: minutes,
+                              monthlySavings: 0, currentRateCents: Self.exampleRate(at: now),
+                              estimatedCost: cost, sessionSavings: max(0, energy * 0.21 - cost),
+                              updatedAt: now, vehicleName: "Virtual car", controlOnly: false, virtualCar: true)
     }
 }

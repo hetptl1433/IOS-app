@@ -2,8 +2,14 @@ import SwiftUI
 
 @main
 struct SPARCApp: App {
-    @StateObject private var store = AppStore()
-    @StateObject private var provisioning = ProvisioningManager()
+    @StateObject private var store: AppStore
+    @StateObject private var provisioning: ProvisioningManager
+
+    init() {
+        let provisioning = ProvisioningManager()
+        _provisioning = StateObject(wrappedValue: provisioning)
+        _store = StateObject(wrappedValue: AppStore(client: ControllerClientRouter(bluetooth: provisioning)))
+    }
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {

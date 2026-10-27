@@ -211,7 +211,7 @@ struct UnavailableBatteryRing: View {
 }
 
 extension AppStore {
-    var showsTelemetry: Bool { isDemo || hasLiveTelemetry }
+    var showsTelemetry: Bool { hasLiveTelemetry || isVirtualCarActive }
     var displayedTarget: String {
         if showsTelemetry { return "\(snapshot.targetPercent)%" }
         if let goal = effectiveGoal { return "\(goal.targetPercent)%" }
@@ -225,6 +225,10 @@ extension AppStore {
     }
     var displayedWindow: String {
         if isDemo && effectiveGoal == nil { return "No charging window scheduled" }
+        if isControllerTest && !isVirtualCarActive {
+            guard effectiveGoal != nil else { return "No test window scheduled" }
+            return weekly.mode == .fixed ? SPARCFormat.window(snapshot.windowStart, snapshot.windowEnd) : "Use a fixed start time for scheduled tests"
+        }
         return showsTelemetry ? SPARCFormat.window(snapshot.windowStart, snapshot.windowEnd) : "Awaiting vehicle data"
     }
 }

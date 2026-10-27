@@ -187,14 +187,12 @@ async def run_ble(service, adapter="/org/bluez/hci0"):
         advertiser = proxy.get_interface("org.bluez.LEAdvertisingManager1")
         await manager.call_register_application(ROOT, {})
         registered = True
-        if service.setup_open:
-            await advertiser.call_register_advertisement(advertisement_path, {})
-            advertising = True
-        while True:
-            if advertising and not service.setup_open:
-                await advertiser.call_unregister_advertisement(advertisement_path)
-                advertising = False
-            await asyncio.sleep(1)
+        # Advertising must outlive the first-pairing window so saved phones can
+        # reconnect for normal authenticated control. dispatch('pair') continues
+        # to enforce setup_open; discovery grants no new access by itself.
+        await advertiser.call_register_advertisement(advertisement_path, {})
+        advertising = True
+        await asyncio.Future()
     finally:
         for task in rx.tasks: task.cancel()
         if advertising:

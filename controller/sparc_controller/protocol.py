@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
 import secrets
@@ -33,6 +34,13 @@ def setup_key(value: str) -> bytes:
     return bytes.fromhex(value)
 
 
+def pairing_code_key(code: str) -> str:
+    """App-test convenience: a short shared code replaces the private key, so anyone who knows it can pair."""
+    if not 4 <= len(code) <= 8 or any(c not in "0123456789" for c in code):
+        raise ProtocolError("Pairing code must contain 4 to 8 digits.")
+    return hashlib.sha256(b"SPARC pairing code\n" + code.encode()).hexdigest()
+
+
 def derive_key(master: bytes, device_id: str, direction: str) -> bytes:
     if len(master) != 32 or direction not in ("c2d", "d2c"):
         raise ProtocolError("Invalid channel parameters.")
@@ -45,11 +53,16 @@ class DeviceInfo:
     device_id: str
     boot_id: str
     name: str
+    wifi_provision: bool = True
+    app_test: bool = False
+    pairing_code: bool = False
 
     def public(self, now: float | None = None) -> dict:
         return {"version": 1, "deviceId": self.device_id, "bootId": self.boot_id,
                 "name": self.name, "serverTime": time.time() if now is None else now,
-                "capabilities": ["pair", "wifi.provision", "ping"],
+                "capabilities": ["pair", "ping"] + (["wifi.provision"] if self.wifi_provision else [])
+                    + (["app-test", "virtual-car", "set_virtual_car", "get_snapshot", "charge_now", "pause", "resume", "end"] if self.app_test else [])
+                    + (["pairing-code"] if self.pairing_code else []),
                 "vehicleAdapterAvailable": False}
 
 

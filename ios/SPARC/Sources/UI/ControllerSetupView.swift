@@ -8,6 +8,7 @@ struct ControllerSetupView: View {
     @State private var ssid = ""
     @State private var password = ""
     @State private var host = "sparc.local"
+    @State private var pairAnotherController = false
     @FocusState private var focused: Field?
 
     private enum Field { case key, ssid, password, host }
@@ -16,7 +17,7 @@ struct ControllerSetupView: View {
 
     var body: some View {
         SPARCPage {
-            SPARCPageTitle(title: "Meet your home controller.", subtitle: "Bluetooth to set up. Wi-Fi to stay connected.")
+            SPARCPageTitle(title: "Meet your home controller.", subtitle: "Connect nearby with Bluetooth, or use your home network.")
             stepIndicator
             if let error = manager.errorMessage {
                 SPARCNotice(title: error, symbol: "exclamationmark.circle")
@@ -26,11 +27,20 @@ struct ControllerSetupView: View {
                 readyCard
             } else {
                 discoveryCard
-                if manager.stage == .needsKey { pairingCard }
-                if (manager.stage == .paired || manager.stage == .configuringWiFi) && manager.connectedDeviceName != nil { wifiCard }
-                if manager.controllerForSetup != nil && manager.stage != .connecting && manager.stage != .needsKey { localNetworkCard }
+                if manager.stage != .needsKey && manager.connectedDeviceName == nil {
+                    if manager.controllerForSetup == nil || pairAnotherController { lanPairingCard }
+                    else {
+                        localNetworkCard
+                        Button("Pair another controller") { manager.cancel(); setupKey = ""; pairAnotherController = true }
+                            .sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                            .disabled(working).accessibilityIdentifier("setup.pairAnother")
+                    }
+                }
+                if manager.stage == .needsKey && !manager.isWorking { pairingCard }
+                if manager.supportsWiFiProvisioning && (manager.stage == .paired || manager.stage == .configuringWiFi) && manager.connectedDeviceName != nil { wifiCard }
+                if manager.pendingController != nil && manager.connectedDeviceName != nil && manager.stage != .connecting { localNetworkCard }
                 if !paired && manager.stage != .needsKey {
-                    SPARCNotice(title: "Power on your Raspberry Pi 4 with the SPARC controller service running, then keep your iPhone nearby.", symbol: "power")
+                    SPARCNotice(title: "Keep your Raspberry Pi nearby and powered on, then tap it below to connect. Bluetooth carries controls and schedules without joining the same Wi-Fi network.", symbol: "power")
                 }
             }
             if !manager.statusMessage.isEmpty {
@@ -41,7 +51,7 @@ struct ControllerSetupView: View {
                 }.accessibilityIdentifier("setup.status")
             }
             if manager.stage == .scanning || working || manager.stage == .needsKey || manager.pendingController != nil {
-                Button("Cancel connection") { manager.cancel(); setupKey = ""; password = "" }
+                Button("Cancel connection") { manager.cancel(); setupKey = ""; password = ""; pairAnotherController = false }
                     .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                     .frame(maxWidth: .infinity).padding(.vertical, 8)
             }
@@ -66,7 +76,7 @@ struct ControllerSetupView: View {
             Rectangle().fill(SPARCTheme.line).frame(height: 1)
             setupStep("2", "Pair", complete: paired)
             Rectangle().fill(SPARCTheme.line).frame(height: 1)
-            setupStep("3", "Wi-Fi", complete: manager.stage == .ready)
+            setupStep("3", "Connect", complete: manager.stage == .ready)
         }
         .accessibilityElement(children: .combine)
     }
@@ -112,7 +122,7 @@ struct ControllerSetupView: View {
                 }
                 if !paired || manager.devices.isEmpty {
                     SPARCButton(title: manager.stage == .scanning ? "Search again" : "Search for controllers", symbol: "antenna.radiowaves.left.and.right", busy: working) {
-                        focused = nil; manager.startScan()
+                        focused = nil; setupKey = ""; pairAnotherController = false; manager.startScan()
                     }.accessibilityIdentifier("setup.scan")
                 }
             }
@@ -122,9 +132,9 @@ struct ControllerSetupView: View {
         SPARCCard {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Trust your controller", systemImage: "lock.shield").sparcFont(16, weight: .semibold)
-                Text("Paste the private 64-character setup key from your Raspberry Pi's setup screen or label. This verifies your controller and protects your Wi-Fi details.")
+                Text("Enter your controller's pairing code, or the private 64-character setup key from its setup terminal.")
                     .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                SecureField("Private setup key", text: $setupKey)
+                SecureField("Pairing code or setup key", text: $setupKey)
                     .sparcFont(14, design: .monospaced).textInputAutocapitalization(.never).autocorrectionDisabled()
                     .padding(14).background(.black, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(SPARCTheme.line))
                     .focused($focused, equals: .key)
@@ -135,7 +145,8 @@ struct ControllerSetupView: View {
                     setupKey = ""
                     Task { await manager.pair(setupKey: key) }
                 }
-                .disabled(setupKey.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
+                .disabled(setupKey.trimmingCharacters(in: .whitespacesAndNewlines).count != 64
+                          && ControllerPairingCode.setupKey(for: setupKey.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
                 .accessibilityIdentifier("setup.pair")
             }
         }
@@ -143,7 +154,7 @@ struct ControllerSetupView: View {
     private var wifiCard: some View {
         SPARCCard {
             VStack(alignment: .leading, spacing: 16) {
-                Label("Connect your Pi to Wi-Fi", systemImage: "wifi").sparcFont(16, weight: .semibold)
+                Label("Connect your controller to Wi-Fi", systemImage: "wifi").sparcFont(16, weight: .semibold)
                 Text("Use your home network. Your iPhone should join the same network to reach your controller afterward.")
                     .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                 setupField("Network name (SSID)", text: $ssid, field: .ssid)
@@ -165,20 +176,55 @@ struct ControllerSetupView: View {
             }
         }
     }
+    private var lanPairingCard: some View {
+        SPARCCard {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Pair on your home network", systemImage: "network").sparcFont(16, weight: .semibold)
+                Text("Connect your controller by Ethernet or Wi-Fi, then join the same network on your iPhone. Enter its .local hostname or private IPv4 address and its private setup key. Bluetooth is optional.")
+                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                setupField("sparc.local or local IP", text: $host, field: .host)
+                    .keyboardType(.URL).accessibilityIdentifier("setup.host")
+                SecureField("Private setup key", text: $setupKey)
+                    .sparcFont(14, design: .monospaced).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .padding(14).background(.black, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(SPARCTheme.line))
+                    .focused($focused, equals: .key).accessibilityIdentifier("setup.lanKey")
+                Text("Open the setup window on your controller before pairing. Your key is saved securely only after the controller responds with proof that it knows the key.")
+                    .sparcFont(12).foregroundStyle(SPARCTheme.muted)
+                SPARCButton(title: "Pair over home network", symbol: "lock.shield", busy: working) {
+                    focused = nil
+                    let key = setupKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let address = host.trimmingCharacters(in: .whitespacesAndNewlines)
+                    setupKey = ""
+                    Task { await manager.pairOnLAN(host: address, setupKey: key) }
+                }
+                .disabled(setupKey.trimmingCharacters(in: .whitespacesAndNewlines).count != 64 || host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || working)
+                .accessibilityIdentifier("setup.pairLAN")
+            }
+        }
+    }
     private var localNetworkCard: some View {
         SPARCCard {
             VStack(alignment: .leading, spacing: 16) {
-                Label("Already on Wi-Fi?", systemImage: "network").sparcFont(16, weight: .semibold)
-                Text("Connect to your paired Pi using its local hostname or IP address.").sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                setupField("sparc.local or local IP", text: $host, field: .host).keyboardType(.URL).accessibilityIdentifier("setup.host")
-                SPARCButton(title: "Connect over Wi-Fi", symbol: "network", busy: working) {
-                    focused = nil
-                    Task {
-                        await manager.connectOnLAN(host: host.trimmingCharacters(in: .whitespacesAndNewlines))
+                if manager.controllerForSetup?.bluetoothPeripheralID != nil {
+                    Label("Reconnect over Bluetooth", systemImage: "antenna.radiowaves.left.and.right").sparcFont(16, weight: .semibold)
+                    Text("Keep your Pi nearby and Bluetooth enabled on your iPhone. Wi-Fi setup is not required for this connection.").sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                    SPARCButton(title: "Connect over Bluetooth", symbol: "antenna.radiowaves.left.and.right", busy: working) {
+                        focused = nil
+                        Task { await manager.reconnectSavedController() }
+                    }.accessibilityIdentifier("setup.connectBluetooth")
+                } else {
+                    Label("Reconnect your controller", systemImage: "network").sparcFont(16, weight: .semibold)
+                    Text("Connect to your paired controller using its .local hostname or private IPv4 address.").sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                    setupField("sparc.local or local IP", text: $host, field: .host).keyboardType(.URL).accessibilityIdentifier("setup.host")
+                    SPARCButton(title: "Connect over home network", symbol: "network", busy: working) {
+                        focused = nil
+                        Task {
+                            await manager.connectOnLAN(host: host.trimmingCharacters(in: .whitespacesAndNewlines))
+                        }
                     }
+                    .disabled(host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || working)
+                    .accessibilityIdentifier("setup.connectLAN")
                 }
-                .disabled(host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || working)
-                .accessibilityIdentifier("setup.connectLAN")
             }
         }
     }
@@ -187,8 +233,8 @@ struct ControllerSetupView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Image(systemName: "checkmark.circle").sparcFont(42, weight: .light).foregroundStyle(SPARCTheme.green)
                 Text("Your controller is connected.").sparcFont(26, weight: .semibold).tracking(-0.6)
-                Text(manager.savedController?.deviceName ?? "Your Raspberry Pi").sparcFont(14).foregroundStyle(SPARCTheme.muted)
-                Text("Your iPhone can now reach your paired home controller. Tesla authorization and live vehicle control come next.")
+                Text(manager.savedController?.deviceName ?? "Your home controller").sparcFont(14).foregroundStyle(SPARCTheme.muted)
+                Text(manager.savedController?.bluetoothPeripheralID != nil ? "Your iPhone can send controls and schedules over Bluetooth. Leave Virtual car on in Settings to try a plugged-in car starting at 40%." : "Your iPhone can now reach your paired home controller. Virtual car lets you try charging before connecting vehicle hardware.")
                     .sparcFont(14).foregroundStyle(SPARCTheme.muted)
                 SPARCButton(title: "Use home controller", symbol: "house", busy: store.busy) {
                     store.setDemoMode(false)

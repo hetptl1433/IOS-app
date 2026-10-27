@@ -8,7 +8,7 @@ struct ChargingView: View {
 
     var body: some View {
         SPARCPage {
-            SPARCPageTitle(title: "Your charge.", subtitle: store.isDemo ? "Demo controls · no vehicle is connected" : "Your home Raspberry Pi")
+            SPARCPageTitle(title: "Your charge.", subtitle: store.isVirtualCarActive ? (store.isDemo ? "Virtual car · on this iPhone" : "Virtual car · on your Raspberry Pi") : store.isDemo ? "Demo mode · virtual car off" : store.isControllerTest ? "App test mode · virtual car off" : "Your home Raspberry Pi")
             if !store.isDemo && store.snapshot.state == .offline {
                 SPARCNotice(title: store.connectionMessage ?? "Connect your home controller in Settings to view live charging.", symbol: "wifi.slash")
             }
@@ -62,11 +62,11 @@ struct ChargingView: View {
                 }
             }
             if store.snapshot.state == .complete {
-                SPARCNotice(title: "\(store.snapshot.targetPercent)% and ready to go. Every little bit of smarter charging adds up.", symbol: "checkmark.circle")
+                SPARCNotice(title: store.isVirtualCarActive ? "Your virtual car has reached its \(store.snapshot.targetPercent)% target." : store.isControllerTest ? "The scheduled charging test has finished. No vehicle was charged." : "\(store.snapshot.targetPercent)% and ready to go. Every little bit of smarter charging adds up.", symbol: "checkmark.circle")
             } else if store.snapshot.state == .unplugged {
                 SPARCNotice(title: "Connect your charging cable before requesting a charge.", symbol: "cable.connector")
             }
-            Text("In-progress costs are estimates. Your weekly routine stays saved.")
+            Text(store.isVirtualCarActive ? "Virtual readings · 11.5 kW while charging, 0 kW while paused or waiting. Battery and energy increase with elapsed charging time. Costs use example prices." : store.isControllerTest || store.isDemo ? "Virtual car is off. Enable it in Settings to try charging from 40%." : "In-progress costs are estimates. Your weekly routine stays saved.")
                 .sparcFont(11).foregroundStyle(SPARCTheme.muted)
         }
         .refreshable { await store.refresh() }
@@ -208,8 +208,11 @@ struct WeeklyScheduleEditor: View {
                 modeButton("Fixed start", mode: .fixed)
             }
             .padding(5).background(Color(white: 0.055), in: RoundedRectangle(cornerRadius: 16))
-            SPARCNotice(title: store.isDemo
+            SPARCNotice(title: store.isVirtualCarActive
+                        ? (draft.mode == .smart ? "Your virtual car uses an example lower-cost window from 1–5 a.m., adjusting the start to your battery target and departure." : "Your virtual car starts at your selected time and stops at its target or 30 minutes before departure.")
+                        : store.isDemo
                         ? (draft.mode == .smart ? "Your controller chooses lower-cost hours within the available window." : "Charging uses your selected start time.")
+                        : store.isControllerTest ? (draft.mode == .smart ? "Smart optimization is not connected yet. Use Fixed for a scheduled charging test, or Charge now for a manual test." : "Your Pi will start the charging test at this fixed time and finish 30 minutes before departure.")
                         : (draft.mode == .smart ? "Save your target and departure on your controller." : "Save a fixed start time on your controller."),
                         symbol: draft.mode == .smart ? "sparkles" : "clock")
             SPARCCard {
@@ -335,8 +338,8 @@ struct PlanView: View {
                 }
             }
             SPARCButton(title: "Manage my schedule", symbol: "calendar") { showSchedule = true }
-            if store.isDemo { SPARCNotice(title: "This is an example plan. Connect your controller for its actual charging schedule.", symbol: "sparkles") }
-            Text("Plug in at home. Scheduling and optimization run locally on your Raspberry Pi.").sparcFont(12).foregroundStyle(SPARCTheme.muted)
+            if store.isVirtualCarActive { SPARCNotice(title: "A virtual charging plan with example prices. Save a weekly routine or change just the next departure.", symbol: "sparkles") }
+            Text(store.isVirtualCarActive ? (store.isDemo ? "Virtual charging is calculated in this app. A fresh launch starts at 40%." : "The virtual schedule runs on your Pi, including when this app is closed.") : store.isControllerTest ? "Turn on Virtual car in Settings to test charging and schedules with a battery at 40%." : "Plug in at home. Scheduling and optimization run locally on your Raspberry Pi.").sparcFont(12).foregroundStyle(SPARCTheme.muted)
         }
         .sheet(isPresented: $showSchedule) {
             NavigationStack {
@@ -348,26 +351,26 @@ struct PlanView: View {
 
 struct PricesView: View {
     @EnvironmentObject private var store: AppStore
-    private let rates = [8.9, 8.4, 8.1, 8.6, 9.2, 10.8, 12.5, 14.1, 13.8, 12.1, 11.8, 13.2, 15.6, 18.2, 22.4, 25.6, 27.1, 24.7, 21.0, 18.3, 16.4, 13.2, 10.9, 9.7]
+    private let rates = (0..<24).map { (1..<5).contains($0) ? 7.0 : 21.0 }
     var body: some View {
         SPARCPage {
-            SPARCPageTitle(title: "Find your good hours.", subtitle: store.isDemo ? "Example hourly prices · Chicago time" : "Rates reported by your home controller")
+            SPARCPageTitle(title: "Find your good hours.", subtitle: store.isVirtualCarActive ? "Example hourly prices · Chicago time" : "Rates reported by your home controller")
             Text(store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.currentRateCents, digits: 1))¢" : "—")
                 .sparcFont(62, weight: .semibold).tracking(-2).foregroundStyle(SPARCTheme.green)
             Text("Current total rate per kWh · estimated").sparcFont(13).foregroundStyle(SPARCTheme.muted)
-            if store.isDemo {
+            if store.isVirtualCarActive {
                 SPARCCard {
                     Chart(Array(rates.enumerated()), id: \.offset) { item in
                         BarMark(x: .value("Hour", item.offset), y: .value("Cents per kWh", item.element))
-                            .foregroundStyle(item.offset < 6 ? SPARCTheme.green : Color(white: 0.29))
+                            .foregroundStyle((1..<5).contains(item.offset) ? SPARCTheme.green : Color(white: 0.29))
                             .cornerRadius(3)
                     }
                     .frame(height: 200)
                     .chartXAxis { AxisMarks(values: [0, 6, 12, 18, 23]) { value in AxisValueLabel { if let hour = value.as(Int.self) { Text("\(hour):00").sparcFont(10) } } } }
                     .chartYAxis { AxisMarks(position: .leading) }
-                    .accessibilityLabel("Example hourly electricity prices. The cheapest rate is 8.1 cents around 2 AM.")
+                    .accessibilityLabel("Example electricity prices. Seven cents per kilowatt-hour from 1 to 5 AM, and twenty-one cents at other times.")
                 }
-                SPARCNotice(title: "Sample supply and delivery rates. Final billed prices, taxes and fixed charges can differ.", symbol: "chart.bar")
+                SPARCNotice(title: "Virtual-car example prices: 7¢/kWh from 1–5 a.m.; 21¢/kWh at other times. These are not your utility's rates.", symbol: "chart.bar")
             } else {
                 SPARCNotice(title: "The controller reports the current rate. Hourly history will appear when the controller provides it.", symbol: "chart.bar")
             }

@@ -6,10 +6,10 @@ enum ControllerConnectionError: LocalizedError {
     case unavailable(String)
     var errorDescription: String? {
         switch self {
-        case .invalidKey: return "Enter the 64-character setup key shown on your Raspberry Pi."
+        case .invalidKey: return "Enter your controller’s pairing code or its 64-character setup key."
         case .invalidMessage: return "The controller response could not be authenticated. Check the setup key and try again."
         case .invalidAddress: return "Enter the controller’s .local name or a private home-network IP address."
-        case .notPaired: return "Pair your Raspberry Pi in Settings first."
+        case .notPaired: return "Pair your home controller in Settings first."
         case .timeout: return "The controller did not respond. Keep it nearby and try again."
         case .cancelled: return "Connection cancelled."
         case .unavailable(let message): return message
@@ -84,6 +84,17 @@ struct ControllerWireResponse: Codable, Sendable {
     let ok: Bool
     let body: [String: WireValue]?
     let error: Failure?
+}
+
+/// App-test controllers that advertise "pairing-code" accept a short shared code
+/// instead of the private key. Anyone who knows the code can pair.
+enum ControllerPairingCode {
+    static let `default` = "0000"
+    /// Matches the controller's pairing_code_key, giving a key ControllerWireCodec accepts.
+    static func setupKey(for code: String) -> String? {
+        guard (4...8).contains(code.utf8.count), code.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
+        return SHA256.hash(data: Data("SPARC pairing code\n\(code)".utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 struct ControllerWireCodec {

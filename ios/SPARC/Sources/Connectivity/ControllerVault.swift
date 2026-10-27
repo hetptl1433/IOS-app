@@ -7,6 +7,8 @@ struct PairedController: Codable, Equatable, Sendable {
     var host: String
     var port: Int = 8766
     let setupKey: String
+    /// Missing in existing saved pairings: those continue to use the LAN transport.
+    var bluetoothPeripheralID: String? = nil
 }
 
 protocol ControllerCredentialStore: Sendable {
