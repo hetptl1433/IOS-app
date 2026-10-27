@@ -19,6 +19,24 @@ The owner will run the changed app in Xcode. Updated compilation and Pi checks
 are recorded in the Bluetooth guide; historical simulator results below apply
 to the earlier revisions and do not establish acceptance of this update.
 
+## Pi touchscreen (October 27, 2026)
+
+A display on the Pi's HDMI port now shows SPARC full screen: Charge, Schedule and
+Status, one-tap controls, and the app's look (see `controller/README.md`). It was
+installed on `het-pi` with `controller/kiosk/install-display.sh` and the owner's
+sudo entry: 62/62 controller tests passed on the Pi, `cage`, Chromium 156 and
+Inter were installed, the page answered on 127.0.0.1 only, Chromium rendered it
+as the kiosk user, identity was unchanged and Bluetooth kept advertising. With no
+display attached the screen service skips itself. A dry run on a virtual display
+(`controller/kiosk/kiosk-smoke.sh`) then started the real service: the login
+session was active on seat0/VT1, Chromium loaded the page (title SPARC, Connected,
+Waiting, 40.0%), polled every 2 seconds, and left no processes after stopping. That
+run caught and fixed two bugs: the `?kiosk=1` page address returned 404, and the
+Bluetooth status read Off. The screen's demo car is the Pi's virtual car (on by
+default at 40%); seven taps on the logo open a hidden Developer switch for it.
+**Not yet verified with a real display:** HDMI output, touch and the plug-in
+event need the physical panel. Review screenshots are in `artifacts/display/`.
+
 ## Project location
 
 - User's app checkout: `~/Documents/project/sparc APP`.

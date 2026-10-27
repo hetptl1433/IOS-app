@@ -108,6 +108,40 @@ wrong keys/replay/old-boot rejection, command and schedule persistence,
 manual/scheduled state boundaries, DST, and the production guard. They do not
 establish Bluetooth radio reachability or app installation/signing on a phone.
 
+## Raspberry Pi touchscreen: plug in a display and it starts
+
+A screen on the Pi's HDMI port (a 7-inch panel or a wide car-style display) shows
+charging, the weekly routine and the next trip, with one-tap Charge now, Pause,
+Resume and End. It matches the app's look and lays itself out for 800×480,
+1024×600, wide 1280×400–1920×720 and portrait panels. With no display connected
+nothing runs; plugging one in starts the screen within a few seconds, and
+unplugging stops it.
+
+- `sparc_controller/display.py` serves `display/` and a small JSON API on
+  `127.0.0.1:8767` only. It is enabled by `SPARC_DISPLAY_PORT=8767` in
+  `/etc/sparc-controller/ble.conf`. Because it never leaves the Pi it uses no
+  pairing key; it rejects other hosts, cross-site requests and non-JSON bodies,
+  and reading state never writes to the SD card.
+- `kiosk/` holds the system side: `sparc-display.service` runs Chromium full
+  screen inside `cage` on the first console as the `sparc-display` user, and a
+  udev rule starts, stops or restarts it when a display is connected or removed.
+- Settings for a sideways panel or extra browser flags go in
+  `/etc/sparc-controller/display.conf`.
+
+Install from a bundle holding `controller-source.tgz`, its checksum and
+`install-display.sh`: `sudo sh install-display.sh`. It runs the controller tests,
+installs `cage`, `chromium`, `fonts-inter` and `wlr-randr`, backs up the current
+controller, and restores it if any check fails. Identity, Wi-Fi and pairing are
+unchanged. If the screen stays dark, `journalctl -b -u sparc-display` shows the
+service, and `journalctl -b _UID=$(id -u sparc-display)` shows cage and Chromium,
+which run in the kiosk user's own session. Without a display,
+`sudo sh controller/kiosk/kiosk-smoke.sh` runs the same service on a virtual
+screen and reports what the page shows, then puts everything back.
+
+The screen shows the Pi's demo car (on by default, plugged in at 40%), the same
+one the phone sees. To turn it off on the screen, tap the SPARC logo seven times
+to open the hidden Developer sheet; turning it back on starts again at 40%.
+
 ## Existing Banana Pi Pro / Armbian Minimal deployment
 
 The default controller persists weekly schedules and one-time departures.

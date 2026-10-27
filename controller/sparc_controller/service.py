@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .app_test import AppTestControl
+from .app_test import CHICAGO, VIRTUAL_CAPACITY_KWH, VIRTUAL_EFFICIENCY, AppTestControl
 from .network import NetworkManagerWiFi, WiFiError, local_hostname
 from .protocol import DeviceInfo, ProtocolError, SecureChannel, compact_json, pairing_code_key, setup_key
 
@@ -101,6 +101,9 @@ class ControllerService:
         self.wifi = (wifi if wifi is not None else NetworkManagerWiFi()) if allow_wifi_provision else None
         self.busy_wifi = False
         self._lock = asyncio.Lock()
+        self.started = time.monotonic()
+        self.last_contact: tuple[str, float] | None = None
+        self.ble_advertising = False
         default = {"weekly": {"targetPercent": 80, "departureMinutes": 420, "days": [1,2,3,4,5],
                               "enabled": True, "mode": "smart", "fixedStartMinutes": 60}, "today": None}
         self.settings = json.loads((state_dir / "settings.json").read_text()) if (state_dir / "settings.json").exists() else default
@@ -143,6 +146,36 @@ class ControllerService:
                 self.settings = updated
         self._virtual_anchor = now
 
+    def display_state(self) -> dict:
+        """What the Pi's own screen shows, projected to now without writing settings to disk."""
+        now = self.clock().astimezone(timezone.utc)
+        settings, snapshot, battery, per_hour, manual = self.settings, None, None, 0.0, None
+        if self.app_test is not None:
+            if self.virtual_car_enabled and now > self._virtual_anchor:
+                settings = dict(settings, virtualCarState=self.app_test.advance_virtual(settings, self._virtual_anchor, now))
+            snapshot = self.app_test.snapshot(settings)
+            # End or Pause can hold off the schedule until departure; the screen says so.
+            held, until = self.app_test.control_state(settings)
+            if held is not None and (until is None or until > now):
+                manual = {"state": held, "until": None if until is None else until.astimezone(timezone.utc).isoformat()}
+            if self.virtual_car_enabled:
+                battery = settings["virtualCarState"]["batteryPercent"]
+                if snapshot["state"] == "charging":
+                    per_hour = snapshot["powerKW"] * VIRTUAL_EFFICIENCY / VIRTUAL_CAPACITY_KWH * 100
+        try:
+            trip = validate_today(settings.get("today"), now=now)
+        except ValueError:
+            trip = None
+        local = now.astimezone(CHICAGO)
+        contact = self.last_contact
+        return {"snapshot": snapshot, "batteryPercent": battery, "batteryPercentPerHour": per_hour,
+                "manual": manual, "weekly": settings["weekly"], "trip": trip,
+                "local": {"date": local.date().isoformat(), "minutes": local.hour * 60 + local.minute},
+                "controller": {"id": self.info.device_id[:4].upper(), "bluetooth": self.ble_advertising,
+                               "uptimeSeconds": int(time.monotonic() - self.started),
+                               "phoneSeconds": None if contact is None else int(time.monotonic() - contact[1]),
+                               "phoneTransport": None if contact is None else contact[0]}}
+
     @property
     def setup_open(self) -> bool:
         return time.monotonic() < self.setup_deadline
@@ -156,6 +189,7 @@ class ControllerService:
 
     async def handle(self, data: bytes, transport: str) -> bytes:
         request = self.channel.open_request(data)
+        self.last_contact = (transport, time.monotonic())
         message_id = request["id"]
         try:
             result = await self.dispatch(request["operation"], request["body"], transport)

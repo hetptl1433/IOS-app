@@ -43,6 +43,17 @@ async def optional_bonjour(port, device_id):
         print("Bonjour unavailable; connect using the controller's private IP address.", file=sys.stderr)
 
 
+async def optional_display(service, port):
+    from .display import run_display
+    try:
+        await run_display(service, port)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        # The screen is a convenience; phones keep working over Bluetooth without it.
+        print(f"Touchscreen page unavailable on 127.0.0.1:{port}.", file=sys.stderr)
+
+
 async def run(args):
     lan_only = args.lan_only
     allow_wifi = not lan_only and not args.no_wifi_provision
@@ -60,6 +71,8 @@ async def run(args):
         tasks.append(required[-1])
     if not args.no_bonjour:
         tasks.append(asyncio.create_task(optional_bonjour(args.port, service.info.device_id)))
+    if args.display_port is not None:
+        tasks.append(asyncio.create_task(optional_display(service, args.display_port)))
     try:
         # HTTP must remain alive. In BLE mode an adapter failure must also be visible.
         done, _ = await asyncio.wait(required, return_when=asyncio.FIRST_COMPLETED)
@@ -88,10 +101,17 @@ def parse_args(argv=None):
     parser.add_argument("--app-test", action="store_true", help="Enable the default-on Virtual car for the physical app; never connects to a real vehicle")
     parser.add_argument("--pairing-code", default=os.environ.get("SPARC_PAIRING_CODE") or None,
                         help="App-test only: 4-8 digit code the app pairs with instead of the private key (default: $SPARC_PAIRING_CODE)")
+    parser.add_argument("--display-port", default=os.environ.get("SPARC_DISPLAY_PORT") or None,
+                        help="Serve the Pi's own touchscreen on 127.0.0.1 at this port (default: $SPARC_DISPLAY_PORT; off when unset)")
     args = parser.parse_args(argv)
     if args.pairing_code is not None and (not args.app_test or not 4 <= len(args.pairing_code) <= 8
                                           or any(c not in "0123456789" for c in args.pairing_code)):
         parser.error("A pairing code needs --app-test and must contain 4 to 8 digits.")
+    if args.display_port is not None:
+        port = args.display_port
+        if not port or any(c not in "0123456789" for c in port) or not 1024 <= int(port) <= 65535 or int(port) == args.port:
+            parser.error("Choose a display port from 1024 to 65535 that differs from --port.")
+        args.display_port = int(port)
     if not 1 <= args.port <= 65535 or not 0 <= args.setup_window <= 3600:
         parser.error("Choose a valid port and setup window from 0 to 3600 seconds.")
     if not args.adapter.startswith("/org/bluez/") or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_/" for c in args.adapter):

@@ -380,10 +380,12 @@ class BluetoothRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(registered.wait(), 1)
             await asyncio.sleep(0)
             self.assertFalse(task.done())
+            self.assertTrue(service.ble_advertising)
             advertiser.call_unregister_advertisement.assert_not_awaited()
             task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await task
+        self.assertFalse(service.ble_advertising)
         advertiser.call_unregister_advertisement.assert_awaited_once()
         manager.call_unregister_application.assert_awaited_once()
         bus.disconnect.assert_called_once()

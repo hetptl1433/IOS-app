@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SPARC</title>
+<link rel="stylesheet" href="/display.css">
+<script src="/display.js" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect fill="currentColor" stroke="none" x="6" y="5" width="4" height="14" rx="1.2"/><rect fill="currentColor" stroke="none" x="14" y="5" width="4" height="14" rx="1.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M7 4.5v15l12-7.5z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 16.5a8 8 0 1 1 15 0"/><path d="M12 13.5 16 9"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+  <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2.5v3.5M15 2.5v3.5M9 18v3.5M15 18v3.5M2.5 9h3.5M2.5 15h3.5M18 9h3.5M18 15h3.5"/></symbol>
+  <symbol id="i-temp" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-4 6-6.5 9.5-8"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/></symbol>
+</svg>
+
+<div class="app" id="app" data-view="charge" data-state="loading">
+  <header class="bar">
+    <button class="brand" type="button" id="brand" aria-label="SPARC"><span class="brand-mark"><svg class="i"><use href="#i-bolt"/></svg></span>SPARC</button>
+    <nav class="tabs" aria-label="Screens">
+      <button class="tab is-active" type="button" data-go="charge"><svg class="i"><use href="#i-bolt"/></svg><span>Charge</span></button>
+      <button class="tab" type="button" data-go="schedule"><svg class="i"><use href="#i-calendar"/></svg><span>Schedule</span></button>
+      <button class="tab" type="button" data-go="status"><svg class="i"><use href="#i-gauge"/></svg><span>Status</span></button>
+    </nav>
+    <div class="bar-end">
+      <span class="link" id="link"><span class="ping"></span><span id="link-label">Connecting</span></span>
+      <span class="clock num"><span id="clock">--:--</span><span class="ampm" id="ampm"></span></span>
+    </div>
+  </header>
+
+  <main class="views">
+    <section class="view view-charge" id="view-charge" aria-label="Charge">
+      <div class="hero">
+        <div class="hero-head">
+          <span class="chip" id="chip"><span class="ping"></span><span id="chip-label">Connecting</span></span>
+          <h1 id="title">Connecting to SPARC</h1>
+          <p class="sub num" id="subtitle">One moment.</p>
+        </div>
+        <div class="stage">
+          <div class="truck">
+            <div class="ground" aria-hidden="true"></div>
+            <div class="zaps" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+            <img src="/truck.webp" alt="Your Cybertruck" draggable="false">
+            <svg class="lightbar" viewBox="0 0 1536 1024" aria-hidden="true">
+              <defs><filter id="lb-glow" x="-10%" y="-300%" width="120%" height="700%"><feGaussianBlur stdDeviation="10"/></filter></defs>
+              <polyline class="lb-glow" pathLength="100" points="946,481 1094,500 1260,502.5 1472,503 1511,490" filter="url(#lb-glow)"/>
+              <polyline class="lb-core" pathLength="100" points="946,481 1094,500 1260,502.5 1472,503 1511,490"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="card battery">
+          <p class="label">Battery</p>
+          <div class="soc num"><span id="soc-int">--</span><span class="soc-dec" id="soc-dec"></span><span class="soc-unit">%</span></div>
+          <div class="meter">
+            <div class="meter-fill" id="meter-fill"><span class="sweep"></span></div>
+            <div class="meter-target" id="meter-target"></div>
+          </div>
+          <p class="caption" id="meter-caption">&nbsp;</p>
+        </div>
+        <div class="pair">
+          <div class="card power">
+            <p class="label">Power</p>
+            <p class="kw num"><span id="kw">0.0</span><small>kW</small></p>
+            <div class="wave" aria-hidden="true">
+              <svg viewBox="0 0 240 30" preserveAspectRatio="none"><path d="M0 15 C10 3 20 3 30 15 S50 27 60 15 S80 3 90 15 S110 27 120 15 S140 3 150 15 S170 27 180 15 S200 3 210 15 S230 27 240 15"/></svg>
+              <span class="flat"></span>
+            </div>
+            <p class="caption" id="power-caption">&nbsp;</p>
+          </div>
+          <div class="card">
+            <p class="label" id="eta-label">Ready by</p>
+            <p class="big num" id="eta">—</p>
+            <p class="caption" id="eta-caption">&nbsp;</p>
+          </div>
+        </div>
+        <div class="tiles">
+          <div class="tile"><p class="label">Added</p><p class="v num"><span id="added">—</span><small> kWh</small></p></div>
+          <div class="tile"><p class="label" id="left-label">To target</p><p class="v num" id="left">—</p></div>
+          <div class="tile"><p class="label">Cost so far</p><p class="v num" id="cost">—</p></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn cta" type="button" id="btn-main" disabled><span class="shine"></span><svg class="i"><use href="#i-bolt"/></svg><span class="txt">Charge now</span></button>
+        <button class="btn" type="button" id="btn-alt"><svg class="i"><use href="#i-calendar"/></svg><span class="txt">Schedule</span></button>
+      </div>
+    </section>
+
+    <section class="view view-schedule" id="view-schedule" aria-label="Schedule" hidden>
+      <div class="card sched" id="trip-card">
+        <div class="sched-head">
+          <div><h2>Next trip</h2><p class="sub" id="trip-sub">Just once. Your routine stays.</p></div>
+          <button class="btn small" type="button" id="trip-clear" hidden>Clear</button>
+        </div>
+        <div class="seg" id="trip-day">
+          <button type="button" data-day="0">Today</button>
+          <button type="button" data-day="1">Tomorrow</button>
+        </div>
+        <div class="stepper">
+          <button class="round" type="button" id="trip-earlier" aria-label="Leave 15 minutes earlier"><svg class="i"><use href="#i-minus"/></svg></button>
+          <div class="val"><span class="cap">Leave at</span><span class="num"><span id="trip-time">7:00</span><small id="trip-ampm">AM</small></span></div>
+          <button class="round" type="button" id="trip-later" aria-label="Leave 15 minutes later"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="targets" data-targets="trip">
+          <button type="button" class="target" data-target="60">60%</button>
+          <button type="button" class="target" data-target="70">70%</button>
+          <button type="button" class="target" data-target="80">80%</button>
+          <button type="button" class="target" data-target="90">90%</button>
+          <button type="button" class="target" data-target="100">100%</button>
+        </div>
+        <button class="btn cta" type="button" id="trip-save"><span class="shine"></span><svg class="i"><use href="#i-check"/></svg><span class="txt">Save trip</span></button>
+        <p class="hint" id="trip-hint"></p>
+      </div>
+
+      <div class="card sched" id="week-card">
+        <div class="sched-head">
+          <div><h2>Every week</h2><p class="sub num" id="week-sub">Your routine</p></div>
+          <button class="switch" type="button" id="week-enabled" role="switch" aria-checked="true" aria-label="Weekly routine"><span></span></button>
+        </div>
+        <div class="days" id="week-days">
+          <button class="day" type="button" data-day="1" aria-label="Monday">M</button>
+          <button class="day" type="button" data-day="2" aria-label="Tuesday">T</button>
+          <button class="day" type="button" data-day="3" aria-label="Wednesday">W</button>
+          <button class="day" type="button" data-day="4" aria-label="Thursday">T</button>
+          <button class="day" type="button" data-day="5" aria-label="Friday">F</button>
+          <button class="day" type="button" data-day="6" aria-label="Saturday">S</button>
+          <button class="day" type="button" data-day="7" aria-label="Sunday">S</button>
+        </div>
+        <div class="stepper">
+          <button class="round" type="button" id="week-earlier" aria-label="Leave 15 minutes earlier"><svg class="i"><use href="#i-minus"/></svg></button>
+          <div class="val"><span class="cap">Leave at</span><span class="num"><span id="week-time">7:00</span><small id="week-ampm">AM</small></span></div>
+          <button class="round" type="button" id="week-later" aria-label="Leave 15 minutes later"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="targets" data-targets="week">
+          <button type="button" class="target" data-target="60">60%</button>
+          <button type="button" class="target" data-target="70">70%</button>
+          <button type="button" class="target" data-target="80">80%</button>
+          <button type="button" class="target" data-target="90">90%</button>
+          <button type="button" class="target" data-target="100">100%</button>
+        </div>
+        <div class="seg" id="week-mode">
+          <button type="button" data-mode="smart">Smart</button>
+          <button type="button" data-mode="fixed">Fixed start</button>
+        </div>
+        <div class="stepper compact" id="week-fixed" hidden>
+          <button class="round" type="button" id="fixed-earlier" aria-label="Start 15 minutes earlier"><svg class="i"><use href="#i-minus"/></svg></button>
+          <div class="val"><span class="cap">Start at</span><span class="num"><span id="fixed-time">1:00</span><small id="fixed-ampm">AM</small></span></div>
+          <button class="round" type="button" id="fixed-later" aria-label="Start 15 minutes later"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="save-row">
+          <button class="btn cta" type="button" id="week-save"><span class="shine"></span><svg class="i"><use href="#i-check"/></svg><span class="txt">Save routine</span></button>
+          <button class="btn small" type="button" id="week-undo" hidden>Undo</button>
+        </div>
+        <p class="hint" id="week-hint"></p>
+      </div>
+    </section>
+
+    <section class="view view-status" id="view-status" aria-label="Status" hidden>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-chip"/></svg>SPARC <span id="st-id"></span></p>
+        <p class="v num" id="st-online">Online</p>
+        <p class="caption" id="st-uptime">&nbsp;</p>
+      </div>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-phone"/></svg>Your iPhone</p>
+        <p class="v num" id="st-phone">—</p>
+        <p class="caption" id="st-phone-sub">&nbsp;</p>
+      </div>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-bt"/></svg>Bluetooth</p>
+        <p class="v" id="st-bt">—</p>
+        <p class="caption" id="st-bt-sub">&nbsp;</p>
+      </div>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-temp"/></svg>Pi temperature</p>
+        <p class="v num" id="st-temp">—</p>
+        <p class="caption" id="st-temp-sub">&nbsp;</p>
+      </div>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-bolt"/></svg>Rate now</p>
+        <p class="v num" id="st-rate">—</p>
+        <div class="rate-bars" id="rate-bars" aria-hidden="true"></div>
+      </div>
+      <div class="tile stat">
+        <p class="label"><svg class="i"><use href="#i-leaf"/></svg>Saved this charge</p>
+        <p class="v num green" id="st-saved">—</p>
+        <p class="caption">vs. charging right away</p>
+      </div>
+      <div class="tile plan">
+        <div class="plan-head">
+          <p class="title"><svg class="i"><use href="#i-moon"/></svg>Tonight's plan</p>
+          <p class="plan-window num" id="plan-window">—</p>
+        </div>
+        <div class="plan-track" id="plan-track" aria-hidden="true"></div>
+        <div class="plan-scale num" id="plan-scale" aria-hidden="true"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="banner" id="banner" hidden><span class="dot"></span>Reconnecting to SPARC…</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg class="i"><use id="toast-icon" href="#i-check"/></svg></span><span id="toast-text"></span></div>
+
+  <div class="celebrate" id="celebrate" hidden>
+    <div class="cel-card">
+      <div class="cel-ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="cel-track" cx="60" cy="60" r="52"/><circle class="cel-arc" cx="60" cy="60" r="52" pathLength="100"/></svg>
+        <span class="num" id="cel-pct">80%</span>
+      </div>
+      <h2>Ready to go</h2>
+      <p class="num" id="cel-sub">Charged to 80%</p>
+    </div>
+  </div>
+
+  <div class="dev" id="dev" hidden>
+    <div class="card dev-card" role="dialog" aria-label="Developer">
+      <div class="sched-head">
+        <div><h2>Developer</h2><p class="sub num" id="dev-info">&nbsp;</p></div>
+        <button class="btn small" type="button" id="dev-close">Done</button>
+      </div>
+      <div class="dev-row">
+        <div>
+          <p class="dev-title">Demo car</p>
+          <p class="caption">On: a car plugged in at 40% that charges and follows your schedules. Turning it back on starts again at 40%.</p>
+        </div>
+        <button class="switch" type="button" id="dev-demo" role="switch" aria-checked="false" aria-label="Demo car"><span></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ambient" id="ambient" hidden>
+    <div class="amb-inner" id="amb-inner">
+      <p class="amb-clock num"><span id="amb-time">--:--</span><small id="amb-ampm"></small></p>
+      <p class="amb-line num" id="amb-line"><span class="ping"></span><span id="amb-soc">--%</span><span id="amb-state"></span></p>
+    </div>
+  </div>
+
+  <div class="splash" id="splash">
+    <span class="splash-mark"><svg class="i"><use href="#i-bolt"/></svg></span>
+    <span class="splash-word">SPARC</span>
+  </div>
+
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+</div>
+</body>
+</html>

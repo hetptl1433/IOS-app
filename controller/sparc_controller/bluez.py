@@ -191,9 +191,10 @@ async def run_ble(service, adapter="/org/bluez/hci0"):
         # reconnect for normal authenticated control. dispatch('pair') continues
         # to enforce setup_open; discovery grants no new access by itself.
         await advertiser.call_register_advertisement(advertisement_path, {})
-        advertising = True
+        advertising = service.ble_advertising = True
         await asyncio.Future()
     finally:
+        service.ble_advertising = False
         for task in rx.tasks: task.cancel()
         if advertising:
             try: await advertiser.call_unregister_advertisement(advertisement_path)
