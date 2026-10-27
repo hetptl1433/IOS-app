@@ -1,0 +1,2 @@
+# A display was connected or removed: let SPARC start or stop its screen.
+ACTION=="change", SUBSYSTEM=="drm", ENV{HOTPLUG}=="1", RUN+="/usr/bin/systemctl --no-block start sparc-display-hotplug.service"

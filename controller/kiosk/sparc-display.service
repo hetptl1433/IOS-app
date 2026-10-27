@@ -1,0 +1,37 @@
+[Unit]
+Description=SPARC touchscreen (runs whenever a display is connected)
+After=systemd-user-sessions.service sparc-controller-app-test.service
+Wants=sparc-controller-app-test.service
+# The screen takes over the first console while a display is connected.
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=sparc-display
+SupplementaryGroups=video render input
+PAMName=sparc-display
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+EnvironmentFile=-/etc/sparc-controller/display.conf
+# Start even before the touch panel's USB appears (or on a screen without touch);
+# input devices that arrive later are still picked up.
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+# Skipped, not failed, when nothing is plugged in; udev starts it on hotplug.
+ExecCondition=/usr/local/lib/sparc-display/display-connected
+ExecStartPre=+/usr/local/lib/sparc-display/display-connected --record
+ExecStart=/usr/local/lib/sparc-display/start-kiosk
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=sparc-display
+
+[Install]
+WantedBy=multi-user.target

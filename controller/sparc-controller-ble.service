@@ -1,0 +1,28 @@
+[Unit]
+Description=SPARC Bluetooth and LAN home controller
+After=network.target bluetooth.service NetworkManager.service
+Wants=bluetooth.service NetworkManager.service
+Conflicts=sparc-controller.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sparc-controller/controller
+# Required non-secret file: SPARC_BLUEZ_ADAPTER and SPARC_WIFI_INTERFACE.
+EnvironmentFile=/etc/sparc-controller/ble.conf
+ExecStart=/opt/sparc-controller/.venv-controller/bin/python -m sparc_controller --adapter ${SPARC_BLUEZ_ADAPTER} --wifi-interface ${SPARC_WIFI_INTERFACE}
+Restart=on-failure
+RestartSec=5
+# BLE Wi-Fi provisioning needs privileged NetworkManager D-Bus access.
+User=root
+StateDirectory=sparc-controller
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_BLUETOOTH
+ReadWritePaths=/var/lib/sparc-controller
+
+[Install]
+WantedBy=multi-user.target

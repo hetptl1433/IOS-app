@@ -1,0 +1,17 @@
+#!/bin/sh
+# Inside cage: turn a sideways panel if display.conf asks, then open the page as
+# a full-screen app with no browser chrome, prompts or pinch zoom.
+if [ -n "${SPARC_DISPLAY_ROTATE:-}" ] && command -v wlr-randr >/dev/null 2>&1; then
+    for output in $(wlr-randr | awk '/^[^ ]/ { print $1 }'); do
+        wlr-randr --output "$output" --transform "$SPARC_DISPLAY_ROTATE" || true
+    done
+fi
+browser=$(command -v chromium || command -v chromium-browser)
+# A fresh profile per launch in the session's tmpfs, so a quick unplug and replug
+# never hands the page to a Chromium that is still shutting down.
+profile="${XDG_RUNTIME_DIR:-/tmp}/sparc-chromium-$$"
+# SPARC_DISPLAY_CHROMIUM_FLAGS is split into separate flags on purpose.
+exec "$browser" --user-data-dir="$profile" --kiosk --incognito --no-first-run --no-default-browser-check --noerrdialogs \
+    --disable-infobars --disable-features=Translate,TranslateUI,MediaRouter --password-store=basic \
+    --ozone-platform=wayland --disable-pinch --overscroll-history-navigation=0 \
+    --check-for-update-interval=31536000 ${SPARC_DISPLAY_CHROMIUM_FLAGS:-} "$1"

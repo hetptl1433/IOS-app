@@ -8,11 +8,25 @@ control comes next, once a strategy has proven itself on real prices.
 
 New here? [`SPARC_EXPLAINED.md`](SPARC_EXPLAINED.md) explains the whole project and its results in plain words.
 
+## Native iPhone app
+
+The native SwiftUI app is in [`ios/`](ios/README.md). Open
+`ios/SPARC.xcodeproj` in Xcode to run the approved pitch-black Cybertruck design.
+It includes the five daily-use tabs, a small current-schedule shortcut,
+today-only and weekly edits, and Raspberry Pi 4 Bluetooth pairing and Wi-Fi setup.
+Demo mode uses labeled sample data; live mode uses only confirmed controller data.
+
+The companion service in [`controller/`](controller/README.md) provisions the Pi
+and stores its schedule locally. Tesla vehicle control is still the next backend
+integration, so the companion reports that capability as unavailable rather than
+pretending to charge a car. See the [iOS QA guide](docs/ios/QA.md) for automated
+checks and the real-device acceptance checklist.
+
 ## Start here (on a Mac)
 
 ```sh
-git clone https://github.com/hetptl1433/sparc.git
-cd sparc
+git clone https://github.com/hetptl1433/IOS-app.git
+cd IOS-app
 ./start.command        # or double-click start.command in Finder
 ```
 

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Run by udev after a display change: start the screen when a display appears,
+# stop it when the last one is removed, and restart it for a different display.
+systemctl --quiet is-enabled sparc-display.service || exit 0
+sleep 1
+now=$(/usr/local/lib/sparc-display/display-connected --list)
+if [ -z "$now" ]; then
+    exec systemctl --no-block stop sparc-display.service
+fi
+if ! systemctl --quiet is-active sparc-display.service; then
+    exec systemctl --no-block start sparc-display.service
+fi
+[ "$now" = "$(cat /run/sparc-display/outputs 2>/dev/null)" ] || exec systemctl --no-block restart sparc-display.service

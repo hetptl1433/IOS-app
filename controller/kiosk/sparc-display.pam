@@ -1,0 +1,5 @@
+#%PAM-1.0
+# SPARC touchscreen: a local seat session for the kiosk user, with no password prompt.
+account  required  pam_permit.so
+session  required  pam_unix.so
+session  required  pam_systemd.so class=user type=wayland
