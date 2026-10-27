@@ -7,8 +7,18 @@ schedule settings, charging-state updates and charge/pause/resume/end controls.
 This does not require the phone and Pi to communicate over Wi-Fi. Keep the Pi's
 working Wi-Fi and Raspberry Pi Connect configuration unchanged.
 
-Run the controller with **`--app-test --no-wifi-provision`** for this stage of
-the project. `--app-test` is an explicit software control mode: it never contacts
+Run the controller with **`--app-test`** for this stage of the project.
+
+Wi-Fi setup over Bluetooth: whenever the Pi is offline, and during the first ten
+minutes after it starts, the iPhone's **Status** screen can scan for networks and
+send a WPA2/WPA3 personal network to the Pi over the encrypted Bluetooth link.
+A Pi that is already online and past those ten minutes refuses, so its working
+connection (and Raspberry Pi Connect) is never replaced from a phone nearby. If
+joining fails, the Pi deletes only the attempted profile and returns to its
+previous network. The controller re-reads the network state every 30 seconds.
+Add `--no-wifi-provision` to turn Wi-Fi setup off entirely.
+
+`--app-test` is an explicit software control mode: it never contacts
 Tesla or any charger. A virtual car is enabled by default, plugged in at 40%.
 Its snapshots carry `virtualCar:true` and `controlOnly:false`; all battery,
 power, energy and prices are explicitly virtual examples. Without `--app-test`,
@@ -64,8 +74,9 @@ Before enabling Bluetooth, inspect the actual host and BlueZ adapter with
 `controller/tools/inspect_host.py`. Confirm a working adapter exposes
 `org.bluez.GattManager1` and `org.bluez.LEAdvertisingManager1`. Do not infer a
 working radio from the board name. Install BlueZ through the OS package manager
-if it is missing. No NetworkManager installation, Netplan change or Wi-Fi
-renderer migration is needed for `--no-wifi-provision`.
+if it is missing. Wi-Fi setup needs NetworkManager managing the interface named
+in `SPARC_WIFI_INTERFACE`; with `--no-wifi-provision` no NetworkManager, Netplan
+change or Wi-Fi renderer migration is needed.
 The app-test unit explicitly runs `/usr/sbin/rfkill unblock bluetooth` before
 starting its GATT service, so the inspected radio remains available after a boot
 that restores a Bluetooth software block. Hard-blocked or missing hardware still

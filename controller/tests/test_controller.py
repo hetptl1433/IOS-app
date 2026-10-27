@@ -110,10 +110,12 @@ class ValidationTests(unittest.TestCase):
 
 
 class FakeWiFi:
-    def __init__(self): self.calls = []
+    def __init__(self): self.calls = []; self.connected = True
     async def connect(self, ssid, password):
-        validate_wifi(ssid, password); self.calls.append((ssid, password))
+        validate_wifi(ssid, password); self.calls.append((ssid, password)); self.connected = True
         return {"host": "sparc-test.local", "connected": True}
+    async def status(self): return {"connected": self.connected, "ssid": "home" if self.connected else None}
+    async def scan(self): return [{"ssid": "home", "strength": 80, "secured": True}]
 
 
 class NetworkManagerTests(unittest.IsolatedAsyncioTestCase):
@@ -166,6 +168,46 @@ class NetworkManagerTests(unittest.IsolatedAsyncioTestCase):
         bus.disconnect.assert_called_once()
 
 
+class NetworkStatusTests(unittest.IsolatedAsyncioTestCase):
+    def nm_bus(self, interfaces):
+        bus = Mock()
+        bus.introspect = AsyncMock(return_value=None)
+        bus.get_proxy_object.side_effect = lambda destination, path, introspection: Mock(get_interface=Mock(return_value=interfaces[path]))
+        return Mock(connect=AsyncMock(return_value=bus)), bus
+
+    async def test_status_reports_connection_and_current_network(self):
+        from dbus_next import Variant
+        root = Mock(call_get=AsyncMock(return_value=Variant("u", 70)),
+                    call_get_device_by_ip_iface=AsyncMock(return_value="/device/wlan0"))
+        device = Mock(call_get=AsyncMock(return_value=Variant("o", "/ap/1")))
+        point = Mock(call_get=AsyncMock(return_value=Variant("ay", b"Home Wi-Fi")))
+        factory, bus = self.nm_bus({"/org/freedesktop/NetworkManager": root, "/device/wlan0": device, "/ap/1": point})
+        with patch("dbus_next.aio.MessageBus", return_value=factory):
+            self.assertEqual(await NetworkManagerWiFi().status(), {"connected": True, "ssid": "Home Wi-Fi"})
+            root.call_get.return_value = Variant("u", 20)
+            device.call_get.return_value = Variant("o", "/")
+            self.assertEqual(await NetworkManagerWiFi().status(), {"connected": False, "ssid": None})
+        self.assertEqual(bus.disconnect.call_count, 2)
+
+    async def test_scan_lists_each_network_once_strongest_first(self):
+        from dbus_next import Variant
+        def point(ssid, strength, rsn):
+            return Mock(call_get_all=AsyncMock(return_value={"Ssid": Variant("ay", ssid), "Strength": Variant("y", strength),
+                                                             "WpaFlags": Variant("u", 0), "RsnFlags": Variant("u", rsn)}))
+        manager = Mock(call_get_device_by_ip_iface=AsyncMock(return_value="/device/wlan0"))
+        wireless = Mock(call_request_scan=AsyncMock(side_effect=RuntimeError("scanned recently")),
+                        call_get_all_access_points=AsyncMock(return_value=["/ap/1", "/ap/2", "/ap/3", "/ap/4"]))
+        factory, bus = self.nm_bus({"/org/freedesktop/NetworkManager": manager, "/device/wlan0": wireless,
+                                    "/ap/1": point(b"Home", 40, 8), "/ap/2": point(b"Home", 75, 8),
+                                    "/ap/3": point(b"Cafe", 60, 0), "/ap/4": point(b"", 90, 8)})
+        wifi = NetworkManagerWiFi()
+        wifi.scan_wait = 0
+        with patch("dbus_next.aio.MessageBus", return_value=factory):
+            self.assertEqual(await wifi.scan(), [{"ssid": "Home", "strength": 75, "secured": True},
+                                                 {"ssid": "Cafe", "strength": 60, "secured": False}])
+        bus.disconnect.assert_called_once()
+
+
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.path = Path(self.temp.name)
@@ -199,6 +241,36 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await self.exchange("set_weekly", self.service.settings["weekly"]))["ok"])
         self.assertEqual(len(self.wifi.calls), 1)
 
+    async def test_offline_pi_accepts_wifi_after_setup_window_and_reports_status(self):
+        self.wifi.connected = False
+        self.service.setup_deadline = time.monotonic() - 1
+        status = await self.exchange("status")
+        self.assertTrue(status["ok"])
+        self.assertEqual(status["body"]["deviceId"], self.identity["deviceId"])
+        self.assertEqual(status["body"]["wifi"], {"connected": False, "ssid": None, "canSetUp": True})
+        self.assertFalse((await self.exchange("wifi.scan"))["ok"])
+        scan = await self.exchange("wifi.scan", transport="ble")
+        self.assertEqual(scan["body"]["networks"], [{"ssid": "home", "strength": 80, "secured": True}])
+        body = {"ssid": "home", "password": "test-only-password"}
+        self.assertTrue((await self.exchange("wifi.provision", body, "ble"))["ok"])
+        status = await self.exchange("status", transport="ble")
+        self.assertEqual(status["body"]["wifi"], {"connected": True, "ssid": "home", "canSetUp": False})
+        # Back online with the window closed: a nearby phone cannot switch networks.
+        refused = await self.exchange("wifi.provision", body, "ble")
+        self.assertIn("restart the Pi", refused["error"]["message"])
+        self.assertFalse((await self.exchange("wifi.scan", transport="ble"))["ok"])
+        self.assertEqual(len(self.wifi.calls), 1)
+
+    async def test_unreadable_network_state_never_opens_wifi_setup(self):
+        async def broken():
+            raise RuntimeError("NetworkManager unavailable")
+        self.wifi.status = broken
+        self.service.setup_deadline = time.monotonic() - 1
+        body = {"ssid": "home", "password": "test-only-password"}
+        self.assertFalse((await self.exchange("wifi.provision", body, "ble"))["ok"])
+        self.assertEqual((await self.exchange("status"))["body"]["wifi"], {"connected": True, "ssid": None, "canSetUp": False})
+        self.assertEqual(self.wifi.calls, [])
+
     async def test_lan_only_disables_network_provisioning_even_over_ble(self):
         with patch("sparc_controller.service.NetworkManagerWiFi", side_effect=AssertionError("must not create a Wi-Fi adapter")):
             self.service = ControllerService(self.path, allow_wifi_provision=False)
@@ -208,6 +280,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await self.exchange("pair"))["ok"])
         self.assertTrue((await self.exchange("ping"))["ok"])
         self.assertFalse((await self.exchange("wifi.provision", {"ssid": "home", "password": "test-only-password"}, "ble"))["ok"])
+        self.assertIsNone((await self.exchange("status"))["body"]["wifi"])
         self.assertEqual(self.wifi.calls, [])
 
     async def test_lan_pair_requires_authentication_and_cannot_replay_or_cross_boot(self):
@@ -375,15 +448,22 @@ class ControllerRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     await asyncio.Future()
                 finally:
                     stopped.set()
+            watched = []
+            async def watch(service):
+                watched.append(service.wifi.interface)
+                await asyncio.Future()
             async def ble(service, adapter):
                 self.assertEqual(adapter, "/org/bluez/hci2")
                 self.assertEqual(service.wifi.interface, "wlx1234")
+                await asyncio.sleep(0)
                 raise RuntimeError("adapter unavailable")
             with patch("sparc_controller.__main__.run_http", http), \
+                 patch("sparc_controller.__main__.watch_wifi", watch), \
                  patch.dict(sys.modules, {"sparc_controller.bluez": SimpleNamespace(run_ble=ble)}):
                 with self.assertRaisesRegex(RuntimeError, "adapter unavailable"):
                     await run(args)
             self.assertTrue(stopped.is_set())
+            self.assertEqual(watched, ["wlx1234"])
 
     async def test_http_failure_is_fatal_and_cleans_up_optional_task(self):
         with tempfile.TemporaryDirectory() as directory:

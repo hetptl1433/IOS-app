@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .app_test import CHICAGO, VIRTUAL_CAPACITY_KWH, VIRTUAL_EFFICIENCY, AppTestControl
-from .network import NetworkManagerWiFi, WiFiError, local_hostname
+from .network import NetworkManagerWiFi, WiFiError, local_hostname, pi_temperature
 from .protocol import DeviceInfo, ProtocolError, SecureChannel, compact_json, pairing_code_key, setup_key
 
 
@@ -100,6 +100,7 @@ class ControllerService:
         # LAN-only never creates a network provisioning adapter or needs its D-Bus package.
         self.wifi = (wifi if wifi is not None else NetworkManagerWiFi()) if allow_wifi_provision else None
         self.busy_wifi = False
+        self.wifi_state: dict | None = None
         self._lock = asyncio.Lock()
         self.started = time.monotonic()
         self.last_contact: tuple[str, float] | None = None
@@ -174,11 +175,33 @@ class ControllerService:
                 "controller": {"id": self.info.device_id[:4].upper(), "bluetooth": self.ble_advertising,
                                "uptimeSeconds": int(time.monotonic() - self.started),
                                "phoneSeconds": None if contact is None else int(time.monotonic() - contact[1]),
-                               "phoneTransport": None if contact is None else contact[0]}}
+                               "phoneTransport": None if contact is None else contact[0],
+                               "wifi": self.wifi_view()}}
 
     @property
     def setup_open(self) -> bool:
         return time.monotonic() < self.setup_deadline
+
+    @property
+    def wifi_setup_open(self) -> bool:
+        """New Wi-Fi is accepted while the Pi is offline, or in the setup window after it starts."""
+        return self.setup_open or (self.wifi_state is not None and self.wifi_state["connected"] is False)
+
+    async def refresh_wifi(self) -> None:
+        if self.wifi is None:
+            return
+        try:
+            self.wifi_state = await asyncio.wait_for(self.wifi.status(), timeout=10)
+        except Exception:
+            # An unreadable network state never opens Wi-Fi setup by itself.
+            self.wifi_state = None
+
+    def wifi_view(self) -> dict | None:
+        if self.wifi is None:
+            return None
+        state = self.wifi_state or {}
+        return {"connected": state.get("connected") is not False, "ssid": state.get("ssid"),
+                "canSetUp": self.wifi_setup_open}
 
     def expire_today(self) -> None:
         if self.settings.get("today") is not None:
@@ -210,18 +233,30 @@ class ControllerService:
             if transport not in ("ble", "lan") or not (self.setup_open or self.info.pairing_code):
                 raise ValueError("Open the controller’s local setup window, then pair again.")
             return {"deviceId": self.info.device_id, "host": local_hostname(), **self.mode_info()}
-        if operation == "wifi.provision":
+        if operation == "status":
+            await self.refresh_wifi()
+            return {"deviceId": self.info.device_id, "uptimeSeconds": int(time.monotonic() - self.started),
+                    "temperatureC": pi_temperature(), "bluetooth": self.ble_advertising,
+                    "wifi": self.wifi_view(), **self.mode_info()}
+        if operation in ("wifi.scan", "wifi.provision"):
             if not self.allow_wifi_provision:
-                raise ValueError("Wi-Fi provisioning is disabled in LAN-only mode. Use the controller’s existing network connection.")
-            if transport != "ble" or not self.setup_open:
-                raise ValueError("Open the controller’s local setup window and reconnect over Bluetooth.")
+                raise ValueError("Wi-Fi setup is off on this controller. It keeps its existing network connection.")
+            if transport != "ble":
+                raise ValueError("Set up Wi-Fi over Bluetooth with your Pi nearby.")
+            await self.refresh_wifi()
+            if not self.wifi_setup_open:
+                raise ValueError("Your Pi is already on Wi-Fi. To switch networks, restart the Pi and set Wi-Fi within 10 minutes.")
+            if operation == "wifi.scan":
+                return {"networks": await asyncio.wait_for(self.wifi.scan(), timeout=20)}
             if self.busy_wifi:
                 raise ValueError("Wi-Fi setup is already running. Wait for it to finish.")
             self.busy_wifi = True
             try:
-                return await asyncio.wait_for(self.wifi.connect(body.get("ssid"), body.get("password")), timeout=65)
+                result = await asyncio.wait_for(self.wifi.connect(body.get("ssid"), body.get("password")), timeout=65)
             finally:
                 self.busy_wifi = False
+            await self.refresh_wifi()
+            return result
         if operation == "get_settings":
             async with self._lock:
                 self.advance_virtual()

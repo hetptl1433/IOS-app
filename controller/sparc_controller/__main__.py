@@ -54,6 +54,13 @@ async def optional_display(service, port):
         print(f"Touchscreen page unavailable on 127.0.0.1:{port}.", file=sys.stderr)
 
 
+async def watch_wifi(service):
+    """Keep the Wi-Fi state current, so an offline Pi accepts a new network from the phone."""
+    while True:
+        await service.refresh_wifi()
+        await asyncio.sleep(30)
+
+
 async def run(args):
     lan_only = args.lan_only
     allow_wifi = not lan_only and not args.no_wifi_provision
@@ -73,6 +80,8 @@ async def run(args):
         tasks.append(asyncio.create_task(optional_bonjour(args.port, service.info.device_id)))
     if args.display_port is not None:
         tasks.append(asyncio.create_task(optional_display(service, args.display_port)))
+    if service.wifi is not None:
+        tasks.append(asyncio.create_task(watch_wifi(service)))
     try:
         # HTTP must remain alive. In BLE mode an adapter failure must also be visible.
         done, _ = await asyncio.wait(required, return_when=asyncio.FIRST_COMPLETED)

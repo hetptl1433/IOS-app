@@ -21,7 +21,7 @@ For iOS 17 and later, the app declares `NSAllowsLocalNetworking` for `.local` na
 
 Public information contains `version:1`, `deviceId` (UUID), `bootId` (new random UUID each service process), `name`, `serverTime` (Unix seconds), `capabilities`, and `vehicleAdapterAvailable:false`. App-test mode advertises an `app-test` capability. Public information contains no secret and does not establish whether a trusted snapshot is virtual. An attacker can forge discovery information and cause a failed connection, but cannot authenticate a response without the setup key. A previously paired device ID must match on reconnect.
 
-Bluetooth carries the same encrypted operations as LAN, including snapshots, commands and schedule changes. A saved Bluetooth pairing stores the peripheral UUID alongside the controller identity; legacy pairings without that field continue to use LAN. The app reconnects that peripheral, obtains a fresh boot challenge and verifies the expected identity before each exchange. Wi-Fi provisioning is optional and is not required for Bluetooth controls. Advertising remains active after the first-pairing window closes; only new `pair` requests are time limited.
+Bluetooth carries the same encrypted operations as LAN, including snapshots, commands and schedule changes. A saved Bluetooth pairing stores the peripheral UUID alongside the controller identity; legacy pairings without that field continue to use LAN. The app reconnects that peripheral, obtains a fresh boot challenge and verifies the expected identity before each exchange. Wi-Fi setup is optional and is not required for Bluetooth controls; the app shows it on the Status screen. Advertising remains active after the first-pairing window closes; only new `pair` requests are time limited.
 
 BLE frames are a four-byte unsigned big-endian length followed by UTF-8 envelope JSON. Maximum envelope size is 16,384 bytes. iOS splits writes using the negotiated `maximumWriteValueLength(for:.withResponse)`, acknowledges every write, and waits for the complete authenticated notification frame. The Pi sends conservative 20-byte notification chunks. Incomplete incoming frames expire after 15 seconds; invalid sizes and trailing bytes are rejected. Only one exchange per phone is in flight. Long Wi-Fi activation is acknowledged through the response characteristic rather than blocking an ATT write.
 
@@ -51,7 +51,9 @@ Responses contain matching `id`, `ok`, and either `body` or `error:{code,message
 | Operation | Body | Behavior |
 | --- | --- | --- |
 | `pair` | `{}` | LAN or BLE, during local setup window; returns authenticated device ID and LAN hostname. Does not rotate identity or change networking. |
-| `wifi.provision` | `{ssid,password}` | BLE only, during setup window, with Wi-Fi provisioning enabled; activates personal Wi-Fi through NetworkManager D-Bus and returns hostname after the new connection is active. On failure, deletes only the attempted new profile and tries to restore the previous connection. Unavailable in LAN-only mode. |
+| `status` | `{}` | Returns `uptimeSeconds`, `temperatureC` (or `null`), `bluetooth` (advertising), mode fields and `wifi`: `{connected,ssid,canSetUp}`, or `null` when this Pi keeps its own network settings. |
+| `wifi.scan` | `{}` | BLE only, while Wi-Fi setup is open. Returns up to 20 `networks` as `{ssid,strength,secured}`, strongest first, one entry per name. The app lists secured networks only. |
+| `wifi.provision` | `{ssid,password}` | BLE only, while Wi-Fi setup is open; activates personal Wi-Fi through NetworkManager D-Bus and returns `{host,connected:true}` after the new connection is active. On failure, deletes only the attempted new profile and tries to restore the previous connection. Unavailable in LAN-only mode. |
 | `ping` | `{}` | Returns authenticated device ID, connection status, and adapter availability. |
 | `get_settings` | `{}` | Returns `{weekly,today}`; app-test mode also returns `virtualCarEnabled`. Expired overrides are omitted as `null`. |
 | `set_weekly` | Weekly schedule object | Atomically stores the routine on the Pi. Returns `storedOnly:true` until an active planner adapter is attached. |
@@ -59,6 +61,8 @@ Responses contain matching `id`, `ok`, and either `body` or `error:{code,message
 | `get_snapshot` | `{}` | Returns a labeled virtual snapshot in app-test mode; otherwise requires a vehicle adapter. |
 | `charge_now`, `pause`, `resume`, `end` | `{}` | Control the virtual charge in app-test mode; otherwise require a real adapter acknowledgement. |
 | `set_virtual_car` | `{enabled:boolean}` | App-test mode only. Changes the persisted virtual-car setting. Turning it on from off resets the car to plugged in at 40%; repeated enable requests do not reset an active session. |
+
+Wi-Fi setup is open during the first ten minutes after the controller starts, and at any time NetworkManager reports the Pi offline (state below connected-local). The controller re-reads that state every 30 seconds and before each `status`, `wifi.scan` and `wifi.provision`. If the state cannot be read, setup stays closed outside the first ten minutes, so a D-Bus hiccup never lets a nearby phone replace a working network.
 
 A weekly schedule has `targetPercent`, `departureMinutes`, `days`, `enabled`, `mode` (`smart` or `fixed`), and `fixedStartMinutes`. At least one day is required while enabled. A one-time departure has `targetPercent` and `departure`. Configuration persistence alone does not issue a Tesla command. The research planner's existing timezone and tariff logic remain the future adapter's responsibility.
 

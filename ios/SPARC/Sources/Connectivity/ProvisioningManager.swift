@@ -14,6 +14,50 @@ enum ControllerWiFiCredentials {
     }
 }
 
+/// What the Pi reports for the Status screen: its health, Bluetooth and Wi-Fi.
+struct ControllerStatus: Equatable, Sendable {
+    struct WiFi: Equatable, Sendable {
+        let connected: Bool
+        let ssid: String?
+        /// The Pi accepts a new network while it is offline, or in the first ten minutes after it starts.
+        let canSetUp: Bool
+    }
+    let uptimeSeconds: Int
+    let temperatureC: Double?
+    let bluetooth: Bool
+    /// Nil when this controller keeps its own network settings.
+    let wifi: WiFi?
+
+    init?(_ body: [String: WireValue]) {
+        guard case .number(let uptime)? = body["uptimeSeconds"], case .bool(let bluetooth)? = body["bluetooth"] else { return nil }
+        uptimeSeconds = Int(uptime)
+        self.bluetooth = bluetooth
+        if case .number(let celsius)? = body["temperatureC"] { temperatureC = celsius } else { temperatureC = nil }
+        if case .object(let fields)? = body["wifi"], case .bool(let connected)? = fields["connected"],
+           case .bool(let canSetUp)? = fields["canSetUp"] {
+            wifi = WiFi(connected: connected, ssid: fields["ssid"]?.string, canSetUp: canSetUp)
+        } else {
+            wifi = nil
+        }
+    }
+}
+
+struct ControllerWiFiNetwork: Identifiable, Equatable, Sendable {
+    let ssid: String
+    let strength: Int
+    var id: String { ssid }
+
+    /// Password-protected networks only: the Pi joins WPA2/WPA3 personal networks.
+    static func list(_ body: [String: WireValue]) -> [ControllerWiFiNetwork] {
+        guard case .array(let items)? = body["networks"] else { return [] }
+        return items.compactMap { item in
+            guard case .object(let fields) = item, let ssid = fields["ssid"]?.string, !ssid.isEmpty,
+                  case .number(let strength)? = fields["strength"], fields["secured"] == .bool(true) else { return nil }
+            return ControllerWiFiNetwork(ssid: ssid, strength: Int(strength))
+        }
+    }
+}
+
 struct DiscoveredController: Identifiable, Equatable {
     let id: UUID
     let name: String
@@ -35,8 +79,16 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     @Published private(set) var savedController: PairedController?
     @Published private(set) var pendingController: PairedController?
     @Published private(set) var isWorking = false
+    @Published private(set) var controllerStatus: ControllerStatus?
+    @Published private(set) var wifiNetworks: [ControllerWiFiNetwork] = []
+    @Published private(set) var statusWorking = false
+    @Published private(set) var statusError: String?
+    @Published private(set) var wifiNotice: String?
     var controllerForSetup: PairedController? { pendingController ?? savedController }
-    var supportsWiFiProvisioning: Bool { info?.capabilities.contains("wifi.provision") == true }
+    /// Status and Wi-Fi setup use the saved, encrypted Bluetooth pairing and never move it to the LAN.
+    private var bluetoothController: PairedController? {
+        savedController.flatMap { $0.bluetoothPeripheralID == nil ? nil : $0 }
+    }
     private var generation: UInt64 = 0
     private let vault: any ControllerCredentialStore
     private let verifyController: @Sendable (PairedController) async throws -> Void
@@ -139,19 +191,56 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
             try saveVerified(paired)
         } catch { guard generation == attempt else { return }; if Task.isCancelled || error is CancellationError { cancel(); return }; pendingController = nil; codec = nil; errorMessage = error.localizedDescription; stage = peripheral == nil ? .idle : .needsKey }
     }
-    func configureWiFi(ssid: String, password: String) async {
-        guard (stage == .paired || stage == .ready), !isWorking else { return }
-        do { try ControllerWiFiCredentials.validate(ssid: ssid, password: password) }
-        catch { errorMessage = error.localizedDescription; return }
-        let attempt = generation; isWorking = true
-        defer { if generation == attempt { isWorking = false } }
-        errorMessage = nil; stage = .configuringWiFi; statusMessage = "Securely connecting your controller to Wi-Fi…"
+    func refreshStatus() async {
+        guard let paired = bluetoothController, !statusWorking else { return }
+        statusWorking = true
+        defer { statusWorking = false }
         do {
-            let response = try await exchange(operation: "wifi.provision", body: ["ssid": .string(ssid), "password": .string(password)], timeout: 75)
-            guard generation == attempt else { return }
-            guard let host = response.body?["host"]?.string else { throw ControllerConnectionError.invalidMessage }
-            try await verifyLAN(host: host, attempt: attempt)
-        } catch { guard generation == attempt else { return }; if Task.isCancelled || error is CancellationError { cancel(); return }; stage = peripheral == nil ? .idle : .paired; errorMessage = error.localizedDescription; statusMessage = "Wi-Fi setup did not finish. Check your network and retry." }
+            let body = try await routedExchange(controller: paired, operation: "status", body: [:], timeout: 15)
+            guard let status = ControllerStatus(body) else { throw ControllerConnectionError.invalidMessage }
+            controllerStatus = status
+            statusError = nil
+        } catch {
+            statusError = error.localizedDescription
+        }
+    }
+
+    func scanWiFi() async {
+        guard let paired = bluetoothController, !statusWorking else { return }
+        statusWorking = true
+        defer { statusWorking = false }
+        wifiNotice = nil
+        do {
+            let body = try await routedExchange(controller: paired, operation: "wifi.scan", body: [:], timeout: 30)
+            wifiNetworks = ControllerWiFiNetwork.list(body)
+            if wifiNetworks.isEmpty { wifiNotice = "Your Pi didn't find a password-protected network nearby. Enter the name below." }
+        } catch {
+            wifiNotice = error.localizedDescription
+        }
+    }
+
+    /// Sends the network over Bluetooth. If joining fails, the Pi returns to its previous network.
+    @discardableResult
+    func configureWiFi(ssid: String, password: String) async -> Bool {
+        guard let paired = bluetoothController, !statusWorking else { return false }
+        do { try ControllerWiFiCredentials.validate(ssid: ssid, password: password) }
+        catch { wifiNotice = error.localizedDescription; return false }
+        statusWorking = true
+        wifiNotice = "Your Pi is joining \(ssid). This can take up to a minute."
+        do {
+            let body = try await routedExchange(controller: paired, operation: "wifi.provision",
+                                                body: ["ssid": .string(ssid), "password": .string(password)], timeout: 75)
+            guard body["connected"] == .bool(true) else { throw ControllerConnectionError.invalidMessage }
+            wifiNetworks = []
+            wifiNotice = "Your Pi joined \(ssid)."
+            statusWorking = false
+            await refreshStatus()
+            return true
+        } catch {
+            statusWorking = false
+            wifiNotice = error.localizedDescription
+            return false
+        }
     }
     /// First-time LAN setup needs only a local address and the owner's private key.
     /// The transport authenticates pair + ping before this method can persist anything.
@@ -228,6 +317,12 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     /// Every operation obtains a fresh boot challenge and never retries a mutation.
     func exchangeBLE(controller: PairedController, operation: String,
                      body: [String: WireValue]) async throws -> [String: WireValue] {
+        try await routedExchange(controller: controller, operation: operation, body: body, timeout: 15)
+    }
+
+    /// Joining Wi-Fi can take the Pi up to a minute, so callers choose how long to wait.
+    private func routedExchange(controller: PairedController, operation: String,
+                                body: [String: WireValue], timeout: UInt64) async throws -> [String: WireValue] {
         // Polling and a tapped control share one radio link: a control waits for
         // the in-flight poll instead of failing as busy. Nothing is retried.
         if exchangeInFlight { await withCheckedContinuation { exchangeQueue.append($0) } }
@@ -250,7 +345,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         let challenge = try await readFreshChallenge()
         guard challenge.deviceId == controller.deviceID else { throw ControllerConnectionError.invalidMessage }
         codec = try ControllerWireCodec(setupKey: controller.setupKey, info: challenge)
-        let response = try await exchange(operation: operation, body: body)
+        let response = try await exchange(operation: operation, body: body, timeout: timeout)
         try Task.checkCancellation()
         guard generation == attempt else { throw ControllerConnectionError.cancelled }
         return response.body ?? [:]
@@ -353,7 +448,10 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     }
     func forget() {
         cancel()
-        do { try vault.clear(); savedController = nil; statusMessage = "Pairing removed from this iPhone." }
+        do {
+            try vault.clear(); savedController = nil; statusMessage = "Pairing removed from this iPhone."
+            controllerStatus = nil; wifiNetworks = []; statusError = nil; wifiNotice = nil
+        }
         catch { errorMessage = error.localizedDescription }
     }
     private func exchange(operation: String, body: [String: WireValue] = [:], timeout: UInt64 = 15) async throws -> ControllerWireResponse {

@@ -374,8 +374,11 @@
   function renderStatus() {
     const c = data.controller || {};
     setText('st-id', c.id || '');
-    setText('st-online', failures >= 2 ? 'Reconnecting' : 'Online');
-    setText('st-uptime', `Running for ${duration((c.uptimeSeconds || 0) / 60)}`);
+    const wifi = c.wifi;
+    setText('st-online', failures >= 2 ? 'Reconnecting' : wifi && !wifi.connected ? 'No Wi-Fi' : 'Online');
+    setText('st-uptime', !wifi ? `Running for ${duration((c.uptimeSeconds || 0) / 60)}`
+      : wifi.connected ? (wifi.ssid ? `Wi-Fi · ${wifi.ssid}` : 'On your network')
+      : 'Set up Wi-Fi from Status in the iPhone app');
     if (c.phoneSeconds == null) {
       setText('st-phone', 'Not yet');
       setText('st-phone-sub', 'Open SPARC on your iPhone nearby');

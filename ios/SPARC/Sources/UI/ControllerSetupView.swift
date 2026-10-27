@@ -5,13 +5,11 @@ struct ControllerSetupView: View {
     @EnvironmentObject private var manager: ProvisioningManager
     @Environment(\.dismiss) private var dismiss
     @State private var setupKey = ""
-    @State private var ssid = ""
-    @State private var password = ""
     @State private var host = "sparc.local"
     @State private var pairAnotherController = false
     @FocusState private var focused: Field?
 
-    private enum Field { case key, ssid, password, host }
+    private enum Field { case key, host }
     private var working: Bool { manager.isWorking || manager.stage == .connecting || manager.stage == .configuringWiFi }
     private var paired: Bool { manager.stage == .paired || manager.stage == .configuringWiFi || manager.stage == .ready || ((manager.stage == .idle || manager.stage == .scanning) && manager.controllerForSetup != nil) }
 
@@ -37,7 +35,6 @@ struct ControllerSetupView: View {
                     }
                 }
                 if manager.stage == .needsKey && !manager.isWorking { pairingCard }
-                if manager.supportsWiFiProvisioning && (manager.stage == .paired || manager.stage == .configuringWiFi) && manager.connectedDeviceName != nil { wifiCard }
                 if manager.pendingController != nil && manager.connectedDeviceName != nil && manager.stage != .connecting { localNetworkCard }
                 if !paired && manager.stage != .needsKey {
                     SPARCNotice(title: "Keep your Raspberry Pi nearby and powered on, then tap it below to connect. Bluetooth carries controls and schedules without joining the same Wi-Fi network.", symbol: "power")
@@ -51,7 +48,7 @@ struct ControllerSetupView: View {
                 }.accessibilityIdentifier("setup.status")
             }
             if manager.stage == .scanning || working || manager.stage == .needsKey || manager.pendingController != nil {
-                Button("Cancel connection") { manager.cancel(); setupKey = ""; password = ""; pairAnotherController = false }
+                Button("Cancel connection") { manager.cancel(); setupKey = ""; pairAnotherController = false }
                     .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                     .frame(maxWidth: .infinity).padding(.vertical, 8)
             }
@@ -65,7 +62,7 @@ struct ControllerSetupView: View {
             if let newHost { host = newHost }
         }
         .onDisappear {
-            setupKey = ""; password = ""
+            setupKey = ""
             if manager.stage != .ready { manager.cancel() }
         }
     }
@@ -151,31 +148,6 @@ struct ControllerSetupView: View {
             }
         }
     }
-    private var wifiCard: some View {
-        SPARCCard {
-            VStack(alignment: .leading, spacing: 16) {
-                Label("Connect your controller to Wi-Fi", systemImage: "wifi").sparcFont(16, weight: .semibold)
-                Text("Use your home network. Your iPhone should join the same network to reach your controller afterward.")
-                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                setupField("Network name (SSID)", text: $ssid, field: .ssid)
-                    .accessibilityIdentifier("setup.ssid")
-                SecureField("Wi-Fi password", text: $password)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .padding(14).background(.black, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(SPARCTheme.line))
-                    .focused($focused, equals: .password).accessibilityIdentifier("setup.password")
-                Text("Use a WPA2/WPA3 personal network password.").sparcFont(11).foregroundStyle(SPARCTheme.muted)
-                SPARCButton(title: "Set up Wi-Fi", symbol: "wifi", busy: working) {
-                    focused = nil
-                    let network = ssid
-                    let credential = password
-                    password = ""
-                    Task { await manager.configureWiFi(ssid: network, password: credential) }
-                }
-                .disabled(ssid.isEmpty || working)
-                .accessibilityIdentifier("setup.wifi")
-            }
-        }
-    }
     private var lanPairingCard: some View {
         SPARCCard {
             VStack(alignment: .leading, spacing: 16) {
@@ -240,6 +212,13 @@ struct ControllerSetupView: View {
                     store.setDemoMode(false)
                     Task { await store.refresh(); dismiss() }
                 }.accessibilityIdentifier("setup.finish")
+                if manager.savedController?.bluetoothPeripheralID != nil {
+                    NavigationLink(destination: ControllerStatusView()) {
+                        SPARCNavigationButton(title: "Status & Wi-Fi", subtitle: "See your Pi's connection and set up its Wi-Fi", symbol: "wifi")
+                    }
+                    .buttonStyle(SPARCPressStyle())
+                    .accessibilityIdentifier("setup.status")
+                }
             }
         }
     }

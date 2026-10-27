@@ -5,6 +5,7 @@ import asyncio
 import ipaddress
 import socket
 import uuid
+from pathlib import Path
 
 
 class WiFiError(RuntimeError):
@@ -30,9 +31,80 @@ def local_hostname() -> str:
     return name + ".local"
 
 
+def pi_temperature() -> float | None:
+    try:
+        return round(int(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
+    except (OSError, ValueError):
+        return None
+
+
+NM = "org.freedesktop.NetworkManager"
+NM_PATH = "/org/freedesktop/NetworkManager"
+PROPERTIES = "org.freedesktop.DBus.Properties"
+
+
+async def _interface(bus, path: str, name: str):
+    proxy = bus.get_proxy_object(NM, path, await bus.introspect(NM, path))
+    return proxy.get_interface(name)
+
+
 class NetworkManagerWiFi:
+    scan_wait = 4.0
+
     def __init__(self, interface: str = "wlan0"):
         self.interface = interface
+
+    async def _bus(self):
+        from dbus_next import BusType
+        from dbus_next.aio import MessageBus
+        return await MessageBus(bus_type=BusType.SYSTEM).connect()
+
+    async def status(self) -> dict:
+        """Whether NetworkManager has a connection, and the Wi-Fi network the Pi is on."""
+        bus = await self._bus()
+        try:
+            state = (await (await _interface(bus, NM_PATH, PROPERTIES)).call_get(NM, "State")).value
+            ssid = None
+            try:
+                manager = await _interface(bus, NM_PATH, NM)
+                device = await manager.call_get_device_by_ip_iface(self.interface)
+                point = (await (await _interface(bus, device, PROPERTIES)).call_get(
+                    NM + ".Device.Wireless", "ActiveAccessPoint")).value
+                if point != "/":
+                    raw = (await (await _interface(bus, point, PROPERTIES)).call_get(NM + ".AccessPoint", "Ssid")).value
+                    ssid = bytes(raw).decode("utf-8", "replace") or None
+            except Exception:
+                pass  # No Wi-Fi device or access point; the connection state still answers.
+            # NM_STATE_CONNECTED_LOCAL (50) and above: some network is up.
+            return {"connected": state >= 50, "ssid": ssid}
+        finally:
+            bus.disconnect()
+
+    async def scan(self) -> list[dict]:
+        """Nearby networks, strongest first, one entry per name."""
+        bus = await self._bus()
+        try:
+            manager = await _interface(bus, NM_PATH, NM)
+            device = await manager.call_get_device_by_ip_iface(self.interface)
+            wireless = await _interface(bus, device, NM + ".Device.Wireless")
+            try:
+                await wireless.call_request_scan({})
+                await asyncio.sleep(self.scan_wait)
+            except Exception:
+                pass  # NetworkManager refuses scans requested too often; its recent results still apply.
+            networks: dict[str, dict] = {}
+            for point in await wireless.call_get_all_access_points():
+                values = await (await _interface(bus, point, PROPERTIES)).call_get_all(NM + ".AccessPoint")
+                ssid = bytes(values["Ssid"].value).decode("utf-8", "replace")
+                if not ssid or "\0" in ssid:
+                    continue
+                entry = {"ssid": ssid, "strength": int(values["Strength"].value),
+                         "secured": bool(values["WpaFlags"].value or values["RsnFlags"].value)}
+                if ssid not in networks or entry["strength"] > networks[ssid]["strength"]:
+                    networks[ssid] = entry
+            return sorted(networks.values(), key=lambda n: -n["strength"])[:20]
+        finally:
+            bus.disconnect()
 
     async def connect(self, ssid: str, password: str) -> dict:
         ssid, password = validate_wifi(ssid, password)

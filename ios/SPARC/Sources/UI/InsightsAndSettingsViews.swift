@@ -227,6 +227,11 @@ struct SettingsView: View {
                         .sparcFont(11).foregroundStyle(SPARCTheme.muted)
                 }
             }
+            NavigationLink(destination: ControllerStatusView()) {
+                SPARCNavigationButton(title: "Status", subtitle: "Your Pi, Bluetooth, Wi-Fi and charging", symbol: "gauge.with.dots.needle.33percent")
+            }
+            .buttonStyle(SPARCPressStyle())
+            .accessibilityIdentifier("settings.status")
             NavigationLink(destination: ControllerSetupView()) {
                 SPARCNavigationButton(title: provisioning.savedController == nil ? "Connect home controller" : "Manage home controller", subtitle: "Bluetooth controls · home network", symbol: "network")
             }
@@ -293,4 +298,168 @@ private struct PrivacyInformationView: View {
 @MainActor func openSystemSettings() {
     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
     UIApplication.shared.open(url)
+}
+
+/// Everything about the paired Pi in one place, and where its Wi-Fi is set up.
+struct ControllerStatusView: View {
+    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var manager: ProvisioningManager
+    @State private var ssid = ""
+    @State private var password = ""
+    @State private var changingWiFi = false
+    @FocusState private var passwordFocused: Bool
+
+    private var status: ControllerStatus? { manager.controllerStatus }
+    private var wifi: ControllerStatus.WiFi? { status?.wifi }
+
+    var body: some View {
+        SPARCPage {
+            SPARCPageTitle(title: "Status", subtitle: "Your Pi, its connections and its Wi-Fi.")
+            if let paired = manager.savedController {
+                if let error = manager.statusError {
+                    SPARCNotice(title: error, symbol: "exclamationmark.circle").accessibilityIdentifier("status.error")
+                }
+                controllerCard(paired)
+                if paired.bluetoothPeripheralID != nil {
+                    wifiCard
+                } else {
+                    SPARCNotice(title: "This iPhone reaches your Pi over your home network. Wi-Fi setup works with a Bluetooth pairing.", symbol: "network")
+                }
+                if !store.isDemo { chargingCard }
+            } else {
+                SPARCNotice(title: "Connect your Raspberry Pi from Settings to see its status here.", symbol: "antenna.radiowaves.left.and.right")
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await manager.refreshStatus() }
+        .task { await manager.refreshStatus() }
+        .onDisappear { password = "" }
+    }
+
+    private func controllerCard(_ paired: PairedController) -> some View {
+        SPARCCard {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Label("Home controller", systemImage: "cpu").sparcFont(16, weight: .semibold)
+                    Spacer()
+                    if manager.statusWorking { ProgressView().tint(.white) }
+                }
+                .padding(.bottom, 6)
+                SPARCDetail(title: "Controller", value: "SPARC \(paired.deviceID.prefix(4).uppercased())")
+                SPARCDetail(title: "Connection", value: paired.bluetoothPeripheralID == nil ? "Home network"
+                            : status != nil && manager.statusError == nil ? "Connected over Bluetooth" : "Bluetooth · not reached")
+                SPARCDetail(title: "Bluetooth on Pi", value: status.map { $0.bluetooth ? "On" : "Off" } ?? "—")
+                SPARCDetail(title: "Running for", value: status.map { SPARCFormat.duration($0.uptimeSeconds / 60) } ?? "—")
+                SPARCDetail(title: "Pi temperature", value: status?.temperatureC.map { "\(Int($0.rounded()))°C" } ?? "—")
+            }
+        }
+        .accessibilityIdentifier("status.controller")
+    }
+
+    private var wifiCard: some View {
+        SPARCCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Pi Wi-Fi", systemImage: wifi?.connected == false ? "wifi.slash" : "wifi").sparcFont(16, weight: .semibold)
+                Text(wifiSummary).sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("status.wifi")
+                if let wifi {
+                    if wifi.canSetUp && (!wifi.connected || changingWiFi) {
+                        wifiForm
+                    } else if wifi.canSetUp {
+                        SPARCButton(title: "Change Wi-Fi network", symbol: "wifi", busy: manager.statusWorking) {
+                            changingWiFi = true
+                            Task { await manager.scanWiFi() }
+                        }
+                        .accessibilityIdentifier("status.changeWiFi")
+                    } else if wifi.connected {
+                        Text("To switch networks, restart your Pi, then set it up here within 10 minutes.")
+                            .sparcFont(12).foregroundStyle(SPARCTheme.muted)
+                    }
+                }
+                if let notice = manager.wifiNotice {
+                    Text(notice).sparcFont(12).foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("status.wifiNotice")
+                }
+            }
+        }
+    }
+
+    private var wifiSummary: String {
+        guard let status else { return manager.statusWorking ? "Checking your Pi…" : "Pull down to check your Pi." }
+        guard let wifi = status.wifi else { return "This Pi keeps its own network settings." }
+        if wifi.connected { return wifi.ssid.map { "Connected to \($0)." } ?? "Connected to your network." }
+        return "Your Pi isn't on Wi-Fi. Pick your network and enter its password. It travels to the Pi over your encrypted Bluetooth link."
+    }
+
+    private var wifiForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if manager.wifiNetworks.isEmpty {
+                Button { Task { await manager.scanWiFi() } } label: {
+                    Label("Find networks near your Pi", systemImage: "antenna.radiowaves.left.and.right")
+                        .sparcFont(13, weight: .medium)
+                        .frame(minHeight: 44)
+                }
+                .foregroundStyle(.white)
+                .disabled(manager.statusWorking)
+                .accessibilityIdentifier("status.scan")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(manager.wifiNetworks) { network in
+                        Button { ssid = network.ssid; passwordFocused = true } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "wifi", variableValue: Double(network.strength) / 100)
+                                    .foregroundStyle(SPARCTheme.green)
+                                Text(network.ssid).sparcFont(14).lineLimit(1)
+                                Spacer()
+                                if ssid == network.ssid { Image(systemName: "checkmark").foregroundStyle(SPARCTheme.green) }
+                            }
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SPARCPressStyle())
+                        .foregroundStyle(.white)
+                    }
+                }
+            }
+            TextField("Network name", text: $ssid)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .sparcFont(14)
+                .padding(14).background(.black, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(SPARCTheme.line))
+                .accessibilityIdentifier("status.ssid")
+            SecureField("Wi-Fi password", text: $password)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .padding(14).background(.black, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(SPARCTheme.line))
+                .focused($passwordFocused)
+                .accessibilityIdentifier("status.password")
+            SPARCButton(title: "Connect Pi to Wi-Fi", symbol: "wifi", busy: manager.statusWorking) {
+                passwordFocused = false
+                let network = ssid.trimmingCharacters(in: .whitespacesAndNewlines)
+                let secret = password
+                password = ""
+                Task { if await manager.configureWiFi(ssid: network, password: secret) { changingWiFi = false } }
+            }
+            .disabled(ssid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.statusWorking)
+            .accessibilityIdentifier("status.joinWiFi")
+            Text("Use a WPA2/WPA3 personal network. If joining fails, your Pi goes back to its previous network.")
+                .sparcFont(11).foregroundStyle(SPARCTheme.muted)
+        }
+    }
+
+    private var chargingCard: some View {
+        SPARCCard {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Charging", systemImage: "bolt").sparcFont(16, weight: .semibold).padding(.bottom, 6)
+                SPARCDetail(title: "Now", value: store.snapshot.state.displayTitle)
+                SPARCDetail(title: "Battery", value: store.showsTelemetry ? "\(store.snapshot.batteryPercent)%" : "—")
+                SPARCDetail(title: "Power", value: store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.powerKW)) kW" : "—")
+                SPARCDetail(title: "Target", value: store.displayedTarget)
+                SPARCDetail(title: "Ready by", value: store.displayedReadyTime)
+            }
+        }
+        .accessibilityIdentifier("status.charging")
+    }
 }

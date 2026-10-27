@@ -37,6 +37,19 @@ default at 40%); seven taps on the logo open a hidden Developer switch for it.
 **Not yet verified with a real display:** HDMI output, touch and the plug-in
 event need the physical panel. Review screenshots are in `artifacts/display/`.
 
+## Status screen and Wi-Fi over Bluetooth (October 27, 2026)
+
+Settings → **Status** (also linked from the controller's ready card) shows the
+paired Pi's connection, Bluetooth, Wi-Fi network, uptime, temperature and charging
+state from a new encrypted `status` operation. When the Pi is offline, or within ten
+minutes of starting, the screen scans nearby networks (`wifi.scan`) and joins one
+(`wifi.provision`) over the Bluetooth pairing, which stays a Bluetooth pairing
+afterward. An online Pi past that window refuses, and a failed join restores the
+previous network. The Pi touchscreen shows "No Wi-Fi" and points to the app. The
+app-test service no longer passes `--no-wifi-provision`. **Not yet verified:**
+joining a network from a real phone; the Pi stayed on its existing network during
+verification.
+
 ## Project location
 
 - User's app checkout: `~/Documents/project/sparc APP`.

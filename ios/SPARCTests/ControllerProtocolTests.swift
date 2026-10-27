@@ -535,6 +535,32 @@ final class ControllerProtocolTests: XCTestCase {
                          setupKey: String(repeating: "a1", count: 32))
     }
 
+    func testControllerStatusReadsWiFiAndToleratesMissingOptionalFields() throws {
+        let offline = try XCTUnwrap(ControllerStatus([
+            "uptimeSeconds": .number(3_725), "temperatureC": .number(48.3), "bluetooth": .bool(true),
+            "wifi": .object(["connected": .bool(false), "ssid": .null, "canSetUp": .bool(true)]),
+        ]))
+        XCTAssertEqual(offline.uptimeSeconds, 3_725)
+        XCTAssertEqual(offline.temperatureC, 48.3)
+        XCTAssertEqual(offline.wifi, ControllerStatus.WiFi(connected: false, ssid: nil, canSetUp: true))
+
+        let lanOnly = try XCTUnwrap(ControllerStatus(["uptimeSeconds": .number(5), "bluetooth": .bool(false), "wifi": .null]))
+        XCTAssertNil(lanOnly.temperatureC)
+        XCTAssertNil(lanOnly.wifi)
+        XCTAssertNil(ControllerStatus(["bluetooth": .bool(true)]))
+    }
+
+    func testWiFiNetworkListKeepsOnlyNamedPasswordProtectedNetworks() {
+        let networks = ControllerWiFiNetwork.list(["networks": .array([
+            .object(["ssid": .string("home"), "strength": .number(82), "secured": .bool(true)]),
+            .object(["ssid": .string("cafe"), "strength": .number(60), "secured": .bool(false)]),
+            .object(["ssid": .string(""), "strength": .number(50), "secured": .bool(true)]),
+            .string("garbage"),
+        ])])
+        XCTAssertEqual(networks, [ControllerWiFiNetwork(ssid: "home", strength: 82)])
+        XCTAssertEqual(ControllerWiFiNetwork.list([:]), [])
+    }
+
 }
 
 

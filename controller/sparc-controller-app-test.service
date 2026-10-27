@@ -7,10 +7,11 @@ Conflicts=sparc-controller.service sparc-controller-ble.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/sparc-controller/controller
-# Supply the inspected BlueZ adapter; this mode never provisions Wi-Fi.
+# Supply the inspected BlueZ adapter. The phone can set Wi-Fi over Bluetooth only while
+# the Pi is offline or in the first ten minutes after start; failures restore the old network.
 EnvironmentFile=/etc/sparc-controller/ble.conf
 ExecStartPre=/usr/sbin/rfkill unblock bluetooth
-ExecStart=/opt/sparc-controller/.venv-controller/bin/python -m sparc_controller --no-wifi-provision --app-test --adapter ${SPARC_BLUEZ_ADAPTER}
+ExecStart=/opt/sparc-controller/.venv-controller/bin/python -m sparc_controller --app-test --adapter ${SPARC_BLUEZ_ADAPTER}
 Restart=on-failure
 RestartSec=5
 User=root

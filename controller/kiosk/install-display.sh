@@ -33,6 +33,7 @@ rollback() {
             /etc/udev/rules.d/99-sparc-display.rules /etc/pam.d/sparc-display
         rm -rf "$kiosk" /opt/sparc-controller/controller
         tar --no-same-owner -xzf "$backup" -C /opt/sparc-controller
+        install -m 0644 /opt/sparc-controller/controller/sparc-controller-app-test.service /etc/systemd/system/ || true
         cp "$staging/ble.conf.before" "$conf"
         systemctl daemon-reload
         udevadm control --reload-rules || true
@@ -52,6 +53,8 @@ install -m 0755 "$src/display-connected" "$src/start-kiosk" "$src/session" "$src
 install -m 0644 "$src/sparc-display.pam" /etc/pam.d/sparc-display
 install -m 0644 "$src/sparc-display.service" "$src/sparc-display-hotplug.service" /etc/systemd/system/
 install -m 0644 "$src/99-sparc-display.rules" /etc/udev/rules.d/
+# The controller's own unit travels with its code (it now allows Wi-Fi setup over Bluetooth).
+install -m 0644 /opt/sparc-controller/controller/sparc-controller-app-test.service /etc/systemd/system/
 test -e /etc/sparc-controller/display.conf || install -m 0644 "$src/display.conf" /etc/sparc-controller/display.conf
 grep -q '^SPARC_DISPLAY_PORT=' "$conf" || printf 'SPARC_DISPLAY_PORT=8767\n' >> "$conf"
 systemctl daemon-reload

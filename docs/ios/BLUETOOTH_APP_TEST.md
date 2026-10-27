@@ -33,6 +33,12 @@ controller identity, Wi-Fi connection and saved schedule. Bluetooth supports
 charging controls and schedule edits directly; the phone and Pi do not have to
 join the same Wi-Fi network. Keep the devices within Bluetooth range.
 
+Settings → **Status** shows the Pi's connection, Bluetooth, Wi-Fi, uptime,
+temperature and charging state. If the Pi isn't on Wi-Fi (or restarted less than
+ten minutes ago), the same screen finds nearby networks and sends the chosen
+network and password to the Pi over Bluetooth. A failed join returns the Pi to its
+previous network.
+
 1. On the phone, open Settings → Connect home controller → Search for controllers.
    Allow Bluetooth when iOS requests it. Tap the nearby **SPARC-D0D4**. The app
    connects with the Pi's pairing code **0000** automatically; nothing is typed.

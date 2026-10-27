@@ -10,6 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from .app_test import CHICAGO, local_instant
+from .network import pi_temperature
 from .protocol import compact_json
 
 PAGES = Path(__file__).resolve().parents[1] / "display"
@@ -33,13 +34,6 @@ def loopback(address):
         return ip.is_loopback
     except ValueError:
         return False
-
-
-def pi_temperature():
-    try:
-        return round(int(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
-    except (OSError, ValueError):
-        return None
 
 
 class DisplayTransport:
