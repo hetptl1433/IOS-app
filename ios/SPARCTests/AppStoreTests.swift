@@ -477,4 +477,38 @@ final class AppStoreTests: XCTestCase {
         XCTAssertNil(store.today)
         XCTAssertEqual(store.snapshot.targetPercent, 80)
     }
+
+    @MainActor
+    func testSampleRecordsGiveASixNightStreakAndFourOfSixMilestones() {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = AppStore(defaults: defaults, client: MockControllerClient(), arguments: [])
+        XCTAssertEqual(store.smartNightStreak, 6)
+        let nights = store.recentNights(7)
+        XCTAssertEqual(nights.map(\.charged), [true, true, true, true, true, true, false])
+        XCTAssertEqual(nights.last?.isTonight, true)
+        let milestones = store.milestones
+        XCTAssertEqual(milestones.filter(\.unlocked).map(\.id), ["first", "run5", "save10", "kwh100"])
+        XCTAssertEqual(milestones.first { $0.id == "save25" }?.detail, "$8.92 to go")
+        XCTAssertEqual(milestones.first { $0.id == "run10" }?.detail, "4 to go")
+        XCTAssertEqual(store.displayVehicleName, "Cybertruck")
+    }
+
+    @MainActor
+    func testNoRecordsMeansNoStreakAndNothingUnlocked() {
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(false, forKey: "sparc.demoMode")
+        let store = AppStore(defaults: defaults, client: MockControllerClient(), arguments: [])
+        XCTAssertEqual(store.smartNightStreak, 0)
+        XCTAssertTrue(store.milestones.allSatisfy { !$0.unlocked })
+        XCTAssertEqual(store.milestones.first { $0.id == "save10" }?.detail, "$10.00 to go")
+    }
+
+    func testAgoNeverTicksBySeconds() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(SPARCFormat.ago(now.addingTimeInterval(-45), now: now), "Just now")
+        XCTAssertEqual(SPARCFormat.ago(now.addingTimeInterval(-125), now: now), "2 min ago")
+        XCTAssertEqual(SPARCFormat.ago(now.addingTimeInterval(-7300), now: now), "2 h ago")
+    }
 }

@@ -4,37 +4,49 @@ import SwiftUI
 /// The image's light bar is off; only an actual charging state adds illumination.
 struct CybertruckView: View {
     let charging: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var breathing = false
 
     var body: some View {
         Image("Cybertruck")
             .resizable()
             .aspectRatio(1.5, contentMode: .fit)
             .overlay {
-                if charging {
-                    CybertruckLightBar()
-                        .stroke(.white.opacity(reduceMotion ? 0.6 : (breathing ? 0.82 : 0.38)), style: StrokeStyle(lineWidth: 2.8, lineCap: .round, lineJoin: .round))
-                        .blur(radius: 2)
-                        .overlay {
-                            CybertruckLightBar()
-                                .stroke(.white.opacity(0.96), style: StrokeStyle(lineWidth: 1.0, lineCap: .round, lineJoin: .round))
-                        }
-                        .transition(.opacity)
-                }
+                if charging { CybertruckLightGlow() }
             }
-            .onAppear { updateBreathing() }
-            .onChange(of: charging) { updateBreathing() }
-            .onChange(of: reduceMotion) { updateBreathing() }
             .accessibilityLabel("Silver Cybertruck, front light \(charging ? "illuminated while charging" : "off")")
             .accessibilityIdentifier("cybertruck.model")
     }
+}
 
-    private func updateBreathing() {
-        breathing = false
-        if charging && !reduceMotion {
-            withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) { breathing = true }
+/// A soft white line along the front light bar. It breathes slowly (4 s, 60% to 100%) and only exists while
+/// charging, so its animation state starts fresh each time charging begins and is gone when it ends.
+private struct CybertruckLightGlow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var bright = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            // Stroke widths follow the approved 1536 pt artwork so the light looks the same at any size.
+            let scale = proxy.size.width / 1536
+            ZStack {
+                CybertruckLightBar()
+                    .stroke(.white, style: StrokeStyle(lineWidth: max(2.8, 24 * scale), lineCap: .round, lineJoin: .round))
+                    .blur(radius: max(2, 10 * scale))
+                    .opacity(reduceMotion ? 1 : (bright ? 1 : 0.6))
+                CybertruckLightBar()
+                    .stroke(.white, style: StrokeStyle(lineWidth: max(1, 5 * scale), lineCap: .round, lineJoin: .round))
+            }
         }
+        .accessibilityHidden(true)
+        .onAppear { startBreathing() }
+        .onChange(of: reduceMotion) { startBreathing() }
+    }
+
+    private func startBreathing() {
+        var reset = Transaction(animation: nil)
+        reset.disablesAnimations = true
+        withTransaction(reset) { bright = false }
+        guard !reduceMotion else { return }
+        withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { bright = true }
     }
 }
 

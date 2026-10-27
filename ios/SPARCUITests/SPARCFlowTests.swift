@@ -63,9 +63,8 @@ final class SPARCFlowTests: XCTestCase {
         }
         let tab = app.buttons["tab.home"]
         if tab.exists && tab.isHittable {
+            // The tab bar floats over the page, so its top edge is where the visible content ends.
             bottom = min(bottom, tab.frame.minY)
-            let footer = app.staticTexts["Demo mode. All charging data is sample data."]
-            if footer.exists { bottom = min(bottom, footer.frame.minY) }
         }
         return CGRect(x: pageFrame.minX, y: top, width: pageFrame.width,
                       height: max(0, bottom - top)).insetBy(dx: 1, dy: 4)
@@ -84,10 +83,15 @@ final class SPARCFlowTests: XCTestCase {
     }
 
     private func waitForScrollToSettle(_ page: XCUIElement, file: StaticString, line: UInt) {
-        let content = page.children(matching: .other).firstMatch
+        // A page whose content is one container exposes it as an "other" child; a flat page falls back to its first child.
+        func scrollContent() -> XCUIElement {
+            let container = page.children(matching: .other).firstMatch
+            return container.exists ? container : page.children(matching: .any).firstMatch
+        }
         var previousFrame: CGRect?
         var stableSince = Date()
         let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let content = scrollContent()
             guard content.exists else { return false }
             let frame = content.frame
             if frame != previousFrame {
@@ -112,6 +116,36 @@ final class SPARCFlowTests: XCTestCase {
                        "Expected the presented view to finish dismissing", file: file, line: line)
     }
 
+    private func waitForLabel(_ element: XCUIElement, _ label: String, timeout: TimeInterval = 5,
+                              file: StaticString = #filePath, line: UInt = #line) {
+        let matches = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", label), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [matches], timeout: timeout), .completed,
+                       "Expected \(element) to read \"\(label)\"", file: file, line: line)
+    }
+
+    private func waitForSelected(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
+                       "Expected the control to be selected: \(element)", file: file, line: line)
+    }
+
+    /// Nothing on screen may mention the demo data or the virtual car; it is plain Home for everyone.
+    private func assertNoDemoWording(file: StaticString = #filePath, line: UInt = #line) {
+        let wording = NSPredicate(format: "label CONTAINS[c] 'demo' OR label CONTAINS[c] 'virtual'")
+        let matches = app.descendants(matching: .any).matching(wording)
+        XCTAssertEqual(matches.count, 0,
+                       "No visible text may mention demo or virtual: \(matches.allElementsBoundByIndex.map(\.label))",
+                       file: file, line: line)
+    }
+
+    /// A button of the confirmation dialog. The page's own End button has the same label, so page controls are skipped.
+    private func dialogButton(_ title: String, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        let predicate = NSPredicate(format: "label == %@ AND NOT (identifier BEGINSWITH %@)", title, "charge.")
+        let button = app.buttons.matching(predicate).firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 3), "Expected the dialog button: \(title)", file: file, line: line)
+        return button
+    }
+
     private func tapTab(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
         let button = app.buttons["tab.\(name)"]
         let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: button)
@@ -128,6 +162,11 @@ final class SPARCFlowTests: XCTestCase {
         reveal(schedule)
         schedule.tap()
         waitForPage("Current schedule.")
+    }
+
+    private func openPlan() {
+        tapTab("plan")
+        waitForPage("Your charging rhythm.")
     }
 
     private func openWeeklyEditor() {
@@ -161,7 +200,7 @@ final class SPARCFlowTests: XCTestCase {
     func testFreshLaunchUsesWaitingDemoAndAllFiveTabsAreReachable() {
         launch()
         XCTAssertTrue(app.staticTexts["Waiting for a better charging time"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["demo.banner"].firstMatch.exists)
+        assertNoDemoWording()
         for tab in ["charge", "plan", "insights", "records", "home"] {
             tapTab(tab)
             screenshot("tab-\(tab)")
@@ -176,6 +215,7 @@ final class SPARCFlowTests: XCTestCase {
             let button = app.buttons["home.chargeNow"]
             reveal(button)
             XCTAssertEqual(button.label, "Charge now", "Home CTA changed for \(state)")
+            assertNoDemoWording()
             let car = app.descendants(matching: .any)["cybertruck.model"].firstMatch
             reveal(car)
             XCTAssertTrue(car.exists)
@@ -186,6 +226,37 @@ final class SPARCFlowTests: XCTestCase {
             screenshot("home-\(state)")
             app.terminate()
         }
+    }
+
+    func testHomeShortcutsOpenConnectionInsightsAndPlan() {
+        launch()
+        let connection = app.buttons["home.connection"]
+        reveal(connection)
+        connection.tap()
+        let sync = app.buttons["connection.syncNow"]
+        XCTAssertTrue(sync.waitForExistence(timeout: 5), "The connection pill must open the connection details")
+        screenshot("home-connection")
+        app.buttons["sheet.done"].tap()
+        waitForDismissal(sync)
+
+        let savings = app.buttons["home.savings"]
+        reveal(savings)
+        savings.tap()
+        waitForSelected(app.buttons["tab.insights"])
+
+        tapTab("home")
+        let rate = app.buttons["home.rate"]
+        reveal(rate)
+        rate.tap()
+        waitForSelected(app.buttons["tab.plan"])
+        waitForPage("Your charging rhythm.")
+
+        tapTab("home")
+        let viewPlan = app.buttons["home.viewPlan"]
+        reveal(viewPlan)
+        viewPlan.tap()
+        waitForSelected(app.buttons["tab.plan"])
+        waitForPage("Your charging rhythm.")
     }
 
     func testTodayEditDoesNotChangeWeeklyRoutineAndCancelDiscardsDraft() throws {
@@ -234,17 +305,86 @@ final class SPARCFlowTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, savedTarget)
     }
 
+    func testPlanTabWeeklyRoutineSavesAndUnsavedEditsAreDropped() {
+        launch()
+        openPlan()
+        let slider = app.sliders["schedule.target"]
+        reveal(slider)
+        XCTAssertTrue(app.descendants(matching: .any)["plan.edit"].firstMatch.exists,
+                      "The weekly routine card edits in place on the Plan tab")
+        XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, "80%")
+
+        // An edit that is never saved is only a draft: leaving the tab and coming back restores the saved routine.
+        selectMaximumTarget(slider)
+        tapTab("charge")
+        openPlan()
+        reveal(app.sliders["schedule.target"])
+        XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, "80%")
+        screenshot("plan-weekly-draft-dropped")
+
+        // A saved edit confirms in place and is still there after leaving and returning.
+        let savedTarget = selectMaximumTarget(app.sliders["schedule.target"])
+        let save = app.buttons["schedule.save"]
+        reveal(save)
+        save.tap()
+        waitForLabel(save, "Saved to your home controller")
+        screenshot("plan-weekly-saved")
+        tapTab("charge")
+        openPlan()
+        reveal(app.sliders["schedule.target"])
+        XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, savedTarget)
+    }
+
+    func testPlanTabJustThisDepartureLeavesTheWeeklyRoutineUntouched() {
+        launch()
+        openPlan()
+        let open = app.buttons["plan.once.open"]
+        reveal(open)
+
+        // Cancel closes the one-time editor without saving anything.
+        open.tap()
+        let cancel = app.buttons["plan.once.cancel"]
+        reveal(cancel)
+        cancel.tap()
+        waitForDismissal(cancel)
+        XCTAssertFalse(app.buttons["schedule.removeToday"].exists)
+
+        reveal(open)
+        open.tap()
+        let hundred = app.buttons["plan.once.target.100"]
+        reveal(hundred)
+        hundred.tap()
+        waitForSelected(hundred)
+        let save = app.buttons["plan.once.save"]
+        reveal(save)
+        save.tap()
+        waitForDismissal(save)
+        let remove = app.buttons["schedule.removeToday"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), "The one-time change must be listed with a way to remove it")
+        screenshot("plan-once-saved")
+
+        // The weekly routine above keeps its own target.
+        reveal(app.sliders["schedule.target"])
+        XCTAssertEqual(app.staticTexts["schedule.targetValue"].label, "80%")
+
+        reveal(remove)
+        remove.tap()
+        waitForDismissal(remove)
+    }
+
     func testDemoChargeCanBeStartedPausedAndResumed() {
         launch()
-        reveal(app.buttons["home.chargeNow"])
-        app.buttons["home.chargeNow"].tap()
-        let dialog = app.sheets.firstMatch
-        XCTAssertTrue(dialog.waitForExistence(timeout: 3))
-        dialog.buttons["Charge now"].tap()
-        waitForDismissal(dialog)
-        let charging = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Charging with good energy"),
-                                                 object: app.staticTexts["home.chargeStatus"])
-        XCTAssertEqual(XCTWaiter.wait(for: [charging], timeout: 5), .completed)
+        let chargeNow = app.buttons["home.chargeNow"]
+        reveal(chargeNow)
+        chargeNow.tap()
+        // Charge now opens a bottom sheet with its own buttons, not a system confirmation dialog.
+        let confirm = app.buttons["home.chargeNow.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["home.chargeNow.wait"].exists)
+        screenshot("home-charge-now-sheet")
+        confirm.tap()
+        waitForDismissal(confirm)
+        waitForLabel(app.staticTexts["home.chargeStatus"], "Charging with good energy")
         tapTab("charge")
         waitForPage("Your charge.")
         let pause = app.buttons["charge.pause"]
@@ -256,11 +396,74 @@ final class SPARCFlowTests: XCTestCase {
         reveal(pause)
     }
 
+    func testChargeNowSheetCanBeDismissedWithoutStartingACharge() {
+        launch()
+        let chargeNow = app.buttons["home.chargeNow"]
+        reveal(chargeNow)
+        chargeNow.tap()
+        let wait = app.buttons["home.chargeNow.wait"]
+        XCTAssertTrue(wait.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["home.chargeNow.confirm"].exists)
+        wait.tap()
+        waitForDismissal(wait)
+        waitForLabel(app.staticTexts["home.chargeStatus"], "Waiting for a better charging time")
+    }
+
+    func testHomeControlsPauseResumeAndOpenTheChargeTab() {
+        launch(state: "charging")
+        let pause = app.buttons["home.pause"]
+        reveal(pause)
+        pause.tap()
+        let resume = app.buttons["home.resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5), "Pausing swaps Pause for Resume in place")
+        waitForLabel(app.staticTexts["home.chargeStatus"], "Charging paused")
+        screenshot("home-paused")
+        reveal(resume)
+        resume.tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 5), "Resuming swaps Resume back for Pause")
+        waitForLabel(app.staticTexts["home.chargeStatus"], "Charging with good energy")
+        let manage = app.buttons["home.manage"]
+        reveal(manage)
+        manage.tap()
+        waitForSelected(app.buttons["tab.charge"])
+        waitForPage("Your charge.")
+    }
+
+    func testChargeTabStartsImmediatelyAndEndAsksFirst() {
+        launch()
+        tapTab("charge")
+        waitForPage("Your charge.")
+        let start = app.buttons["charge.start"]
+        reveal(start)
+        start.tap()
+        // Starting needs no confirmation: charging controls are there straight away.
+        let pause = app.buttons["charge.pause"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 5), "Charge now on the Charge tab must start charging at once")
+        screenshot("charge-started")
+
+        // Keep charging closes the dialog and leaves the charge running.
+        let end = app.buttons["charge.end"]
+        reveal(end)
+        end.tap()
+        let keep = dialogButton("Keep charging")
+        keep.tap()
+        waitForDismissal(keep)
+        XCTAssertTrue(app.buttons["charge.pause"].exists)
+
+        // End session ends it, and the page offers to start again.
+        reveal(end)
+        end.tap()
+        let confirmEnd = dialogButton("End session")
+        confirmEnd.tap()
+        waitForDismissal(confirmEnd)
+        XCTAssertTrue(app.buttons["charge.start"].waitForExistence(timeout: 5), "Ending the session returns to Charge now")
+    }
+
     func testControllerSetupIsReachableWithoutPretendingToPair() {
         launch()
         app.buttons["home.settings"].tap()
         let connect = app.buttons["settings.connectController"]
-        waitForPage("Make Sparc yours.")
+        waitForPage("Settings")
         reveal(connect)
         connect.tap()
         waitForPage("Meet your home controller.")
@@ -274,7 +477,44 @@ final class SPARCFlowTests: XCTestCase {
         reveal(pair)
         XCTAssertFalse(pair.isEnabled, "A private setup key is required before first-time LAN pairing")
         screenshot("controller-setup-entry")
-        XCTAssertFalse(app.staticTexts["Controller connected"].exists)
+        XCTAssertFalse(app.staticTexts["You're connected."].exists)
+        XCTAssertFalse(app.buttons["setup.finish"].exists)
+    }
+
+    func testSettingsHasANewTitleAndOpensTheChargingSchedule() {
+        launch()
+        app.buttons["home.settings"].tap()
+        waitForPage("Settings")
+        XCTAssertFalse(app.staticTexts["Make Sparc yours."].exists)
+        let schedule = app.buttons["settings.schedule"]
+        reveal(schedule)
+        schedule.tap()
+        waitForPage("Current schedule.")
+        screenshot("settings-schedule")
+    }
+
+    func testDeveloperOptionsAreHiddenInSettingsByDefault() {
+        launch()
+        app.buttons["home.settings"].tap()
+        waitForPage("Settings")
+        // The version line is the last thing on the page; the developer card would sit just above it.
+        reveal(app.buttons["settings.version"])
+        for identifier in ["settings.demoMode", "settings.virtualCar", "settings.forgetController"] {
+            XCTAssertFalse(app.descendants(matching: .any)[identifier].firstMatch.exists, "\(identifier) must stay hidden")
+        }
+        screenshot("settings-default")
+    }
+
+    func testDeveloperOptionsAppearInSettingsWithTheLaunchArgument() {
+        launch(extra: ["-SPARCShowDeveloper"])
+        app.buttons["home.settings"].tap()
+        waitForPage("Settings")
+        for identifier in ["settings.demoMode", "settings.virtualCar"] {
+            let toggle = app.descendants(matching: .any)[identifier].firstMatch
+            reveal(toggle)
+            XCTAssertTrue(toggle.exists, "\(identifier) must show with -SPARCShowDeveloper")
+        }
+        screenshot("settings-developer-options")
     }
 
     func testAccessibilityTextKeepsTabsAndScheduleReachable() {
@@ -282,6 +522,12 @@ final class SPARCFlowTests: XCTestCase {
         for tab in ["home", "charge", "plan", "insights", "records"] {
             XCTAssertTrue(app.buttons["tab.\(tab)"].isHittable)
         }
+        openPlan()
+        reveal(app.sliders["schedule.target"])
+        reveal(app.buttons["schedule.save"])
+        reveal(app.buttons["plan.once.open"])
+        screenshot("plan-accessibility-text")
+        tapTab("home")
         openSchedule()
         reveal(app.buttons["schedule.today"])
         screenshot("schedule-accessibility-text")
