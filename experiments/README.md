@@ -16,12 +16,12 @@ The pitch setup is a Cybertruck (123 kWh) on an 11.5 kW Wall Connector, plugged 
 and a heavy one (200). Savings are a year, against the default setup: standard delivery, charging as
 soon as the car is plugged in.
 
-| | Average | Moderate | Heavy | Where |
-|---|---|---|---|---|
-| Delivery Time-of-Day rate alone | $165 | $363 | $1,020 | `scenarios/` |
-| SPARC's day-ahead plan, on Time-of-Day delivery | **$355** (54%) | **$643** (51%) | **$1,224** (41%) | `scenarios/` |
-| Perfect hindsight, one night at a time | $393 | $697 | $1,297 | `scenarios/` |
-| Battery buffer (new, not yet in the app) | **$410** (62%) | **$697** (56%) | **$1,233** (41%) | `battery_buffer/` |
+|                                                 | Average              | Moderate             | Heavy                  | Where               |
+| ----------------------------------------------- | -------------------- | -------------------- | ---------------------- | ------------------- |
+| Delivery Time-of-Day rate alone                 | $165                 | $363                 | $1,020                 | `scenarios/`      |
+| SPARC's day-ahead plan, on Time-of-Day delivery | **$355** (54%) | **$643** (51%) | **$1,224** (41%) | `scenarios/`      |
+| Perfect hindsight, one night at a time          | $393                 | $697                 | $1,297                 | `scenarios/`      |
+| Battery buffer (new, not yet in the app)        | **$410** (62%) | **$697** (56%) | **$1,233** (41%) | `battery_buffer/` |
 
 1. **The day-ahead plan is hard to beat within a night.** It charges in the cheapest hours by the
    published day-ahead prices and gets 90–94% of what perfect hindsight saves. 97 other strategies were
@@ -44,6 +44,7 @@ soon as the car is plugged in.
 ## How the backtests work
 
 - **Prices as they were known.** A strategy deciding at time t sees:
+
   - day-ahead prices published by t (the afternoon before);
   - 5-minute real-time prices posted by t (about 7 minutes after each interval starts), as first
     posted;
@@ -56,6 +57,7 @@ soon as the car is plugged in.
   strategies, because energy in ComEd's and PJM's peak hours sets next year's capacity charge.
 - **Fair comparisons.** Every strategy runs on the same nights. A night missing any price it needs is
   skipped for all of them, and the skips are counted.
+
   - "Tied" means within two standard errors of the night-by-night (paired) difference.
   - Tuned rules are chosen on earlier nights and scored on later ones (`strategies/sweep.py`,
     `battery_buffer/`).
@@ -67,15 +69,15 @@ soon as the car is plugged in.
 
 ## Folders
 
-| Folder | Question |
-|---|---|
-| [`scenarios/`](scenarios/README.md) | Which drivers, plug-in windows and rates save the most |
-| [`strategies/`](strategies/README.md) | Can any single-night strategy beat the day-ahead plan? |
-| [`forecasting/`](forecasting/README.md) and `foundation_models.py` | Can forecasting the real-time price beat the day-ahead price? |
-| [`battery_buffer/`](battery_buffer/README.md) | What does using the battery across nights add? |
-| [`data/`](data/README.md) | Where the data comes from, its coverage, and where the prices are kept |
-| [`webapp/`](webapp/README.md) | Browser checks and screenshots of the web app |
-| [`dev/`](dev/README.md) | Profiling and an equivalence check used during development |
+| Folder                                                                | Question                                                               |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`scenarios/`](scenarios/README.md)                                  | Which drivers, plug-in windows and rates save the most                 |
+| [`strategies/`](strategies/README.md)                                | Can any single-night strategy beat the day-ahead plan?                 |
+| [`forecasting/`](forecasting/README.md) and `foundation_models.py` | Can forecasting the real-time price beat the day-ahead price?          |
+| [`battery_buffer/`](battery_buffer/README.md)                        | What does using the battery across nights add?                         |
+| [`data/`](data/README.md)                                            | Where the data comes from, its coverage, and where the prices are kept |
+| [`webapp/`](webapp/README.md)                                        | Browser checks and screenshots of the web app                          |
+| [`dev/`](dev/README.md)                                              | Profiling and an equivalence check used during development             |
 
 Every script writes what it prints. The committed `results/` files are those outputs, regenerated from
 these scripts on the data described in `data/`. A few come from a second environment that had 2024
