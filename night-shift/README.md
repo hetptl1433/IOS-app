@@ -32,7 +32,15 @@ test. Saved results from unrestricted charging are not reused for a custom windo
 Choose a date range and session size, then **Run filtered sessions**. Replay any individual session,
 compare the recorded-pattern estimate, immediate charging, a 1 AM timer, SPARC's day-ahead plan, and
 perfect hindsight. Change power or delivery rate to explore alternatives, then export per-session results
-with **Export CSV**. The simulator uses the existing `simulation-engine.js` planner and billing code.
+with **Session CSV** or **Daily CSV**. The simulator uses the existing `simulation-engine.js` planner and billing code.
+
+**Daily CSV** groups complete session costs by the session's start date in America/Chicago, in chronological
+order, with one row for every date in the selected range. An overnight session is assigned to its start date.
+It includes daily costs, dollars saved, daily percentages, cumulative totals, and compared/skipped/shortfall
+counts. Dates without sessions have zero costs and a blank daily percentage. Dates with only excluded sessions
+have blank daily costs and percentages. Amounts retain six decimal places to avoid rounding cents before summing.
+The overall percentage is **total dollars saved ÷ total standard-delivery cost × 100**, weighted by cost.
+It is not an arithmetic average of daily percentages. The last cumulative row reconciles to the page headline.
 
 - The default window uses each row's recorded start and finish, rounded outward to five-minute boundaries.
   These are charging-event timestamps, not verified connection times. Rows are replayed independently.

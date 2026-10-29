@@ -10,6 +10,7 @@ The headline results, written to be easy to read. Open `index.html` in a browser
 | `how-it-works.html` | How a kWh is priced, how a night's cost and a year's saving are worked out, one real night added up hour by hour, and how the simulation works, step by step |
 | `details.html` | Every study with its error bars, for reviewers |
 | Test models | In SPARC only (`./start.command`, then the home page): test AI forecasters yourself with one click |
+| `charging-history/daily-savings.csv` | Daily and cumulative savings on the custom charging dataset: standard immediate charging versus SPARC time-of-day delivery. Dates are grouped by session start in Chicago time. |
 
 How the files fit together:
 - `data.js` holds every number on the pages, each block labelled with the results file in `experiments/` it

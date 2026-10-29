@@ -288,3 +288,63 @@ test("full morning scenarios retain equal energy and cap extensions before the n
     console.log(`Morning-window totals (${tariff}):`, JSON.stringify(summary));
   }
 });
+
+function dailyFixture(day, baselineCost, sparcCost) {
+  return {valid:true,eligible:true,row:{startLocal:day+" 23:50:00",gridKwh:1,loggedCost:0},
+    config:{tariff:"time-of-day"},saving:baselineCost-sparcCost,
+    tracks:[{id:"charge-now",result:{totalCost:baselineCost}},{id:"day-ahead",result:{totalCost:sparcCost}}]};
+}
+
+test("daily savings group sessions by Chicago start date, fill gaps, and use cost-weighted percentages", () => {
+  const results = [dailyFixture("2025-05-03",90,81),dailyFixture("2025-05-01",4,2),dailyFixture("2025-05-01",6,3)];
+  const days = Lab.dailyRows(results);
+  assert.deepEqual(days.map(day=>day.date),["2025-05-01","2025-05-02","2025-05-03"]);
+  assert.equal(days[0].comparable,2);
+  close(days[0].savingPct,50);
+  close(days[2].savingPct,10);
+  assert.equal(days[1].status,"no_sessions");
+  assert.equal(days[1].baselineCost,0);
+  assert.equal(days[1].savingPct,null);
+  close(days[2].cumulativeSaving,14);
+  close(days[2].cumulativeSavingPct,14);
+  assert.notEqual(days[2].cumulativeSavingPct,(days[0].savingPct+days[2].savingPct)/2);
+});
+
+test("daily exports distinguish unpriced sessions, shortfalls, and days without charging", () => {
+  const valid = dailyFixture("2025-05-01",10,12);
+  const skipped = {valid:false,eligible:false,row:{startLocal:"2025-05-02 01:00:00"},tracks:[]};
+  const shortfall = {...dailyFixture("2025-05-03",1,0),eligible:false,saving:null};
+  const days = Lab.dailyRows([valid,skipped,shortfall],{startDate:"2025-05-01",endDate:"2025-05-04"});
+  assert.equal(days[1].skipped,1);
+  assert.equal(days[1].baselineCost,null);
+  assert.equal(days[1].saving,null);
+  assert.equal(days[2].shortfall,1);
+  assert.equal(days[2].sparcCost,null);
+  assert.equal(days[3].status,"no_sessions");
+  assert.equal(days[3].baselineCost,0);
+  close(days[3].cumulativeSavingPct,-20);
+  const lines = Lab.exportDailyCsv([valid,skipped,shortfall],{endDate:"2025-05-04"}).split("\r\n");
+  assert.match(lines[0],/"saving_pct"/);
+  assert.match(lines[0],/"cumulative_saving_pct"/);
+  assert.match(lines[1],/"-2.000000","-20.000000"/);
+  assert.match(lines[2],/^"2025-05-02","","","",""/);
+  assert.match(lines[4],/^"2025-05-04","0.000000","0.000000","0.000000",""/);
+});
+
+test("the daily CSV reconciles to the complete history and its 31 percent headline", () => {
+  const results = history.rows.map((row,i)=>Lab.simulate(market,row,{},history.rows[i+1]));
+  const summary = Lab.summarize(results);
+  const days = Lab.dailyRows(results);
+  const last = days.at(-1);
+  assert.equal(days[0].date,"2024-09-17");
+  assert.equal(last.date,"2026-10-14");
+  assert.equal(days.reduce((sum,day)=>sum+day.total,0),summary.total);
+  assert.equal(days.reduce((sum,day)=>sum+day.comparable,0),summary.comparable);
+  assert.equal(days.reduce((sum,day)=>sum+day.skipped,0),summary.skipped);
+  close(days.reduce((sum,day)=>sum+(day.baselineCost||0),0),summary.baselineCost);
+  close(days.reduce((sum,day)=>sum+(day.sparcCost||0),0),summary.sparcCost);
+  close(last.cumulativeSaving,summary.saving);
+  close(last.cumulativeSavingPct,summary.saving/summary.baselineCost*100);
+  close(last.cumulativeSavingPct,30.973164938850122);
+  assert.equal(Lab.exportDailyCsv(results,{}).split("\r\n").length,days.length+1);
+});

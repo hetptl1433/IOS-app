@@ -127,5 +127,55 @@
     const quote = value => `"${String(value).replace(/"/g, '""')}"`;
     return lines.map(line => line.map(quote).join(",")).join("\r\n");
   }
-  return {createMarket, configuration, simulate, summarize, exportCsv, strategies};
+  function dailyRows(results, options) {
+    options = options || {};
+    const groups = new Map();
+    results.forEach(function (result) {
+      const day = result.row.startLocal.slice(0, 10);
+      if (!groups.has(day)) groups.set(day, []);
+      groups.get(day).push(result);
+    });
+    const dates = Array.from(groups.keys()).sort();
+    const start = options.startDate || dates[0], end = options.endDate || dates[dates.length - 1];
+    if (!start || !end) return [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) throw new RangeError("Choose a valid daily export date range.");
+    const days = [];
+    let baseline = 0, sparc = 0, saving = 0;
+    for (let day = start; day <= end; day = nextDate(day)) {
+      const summary = summarize(groups.get(day) || []);
+      const unavailable = summary.total > 0 && summary.comparable === 0;
+      baseline += summary.baselineCost;
+      sparc += summary.sparcCost;
+      saving += summary.saving;
+      days.push({date: day, total: summary.total, comparable: summary.comparable,
+        skipped: summary.skipped, shortfall: summary.shortfall, energyKwh: summary.energyKwh,
+        baselineCost: unavailable ? null : summary.baselineCost,
+        sparcCost: unavailable ? null : summary.sparcCost, saving: unavailable ? null : summary.saving,
+        savingPct: summary.baselineCost > 0 ? summary.saving / summary.baselineCost * 100 : null,
+        cumulativeBaselineCost: baseline, cumulativeSparcCost: sparc, cumulativeSaving: saving,
+        cumulativeSavingPct: baseline > 0 ? saving / baseline * 100 : null,
+        status: !summary.total ? "no_sessions" : unavailable ? "no_comparable_sessions" :
+          summary.skipped || summary.shortfall ? "partial" : "compared"});
+    }
+    return days;
+  }
+  function exportDailyCsv(results, options) {
+    options = options || {};
+    const fields = ["session_start_date_chicago","standard_immediate_usd","sparc_planned_usd","saving_usd","saving_pct",
+      "grid_kwh","sessions_compared","sessions_skipped","sessions_shortfall","sessions_total",
+      "cumulative_standard_usd","cumulative_sparc_usd","cumulative_saving_usd","cumulative_saving_pct",
+      "baseline_tariff","planned_tariff","window","status"];
+    const fixed = value => Number.isFinite(value) ? value.toFixed(6) : "";
+    const tariff = results.find(result => result.config)?.config.tariff || options.tariff || "time-of-day";
+    const lines = [fields];
+    dailyRows(results, options).forEach(function (day) {
+      lines.push([day.date,fixed(day.baselineCost),fixed(day.sparcCost),fixed(day.saving),fixed(day.savingPct),
+        fixed(day.energyKwh),day.comparable,day.skipped,day.shortfall,day.total,
+        fixed(day.cumulativeBaselineCost),fixed(day.cumulativeSparcCost),fixed(day.cumulativeSaving),fixed(day.cumulativeSavingPct),
+        BASELINE_TARIFF,tariff,options.window || "recorded",day.status]);
+    });
+    const quote = value => `"${String(value).replace(/"/g, '""')}"`;
+    return lines.map(line => line.map(quote).join(",")).join("\r\n");
+  }
+  return {createMarket, configuration, simulate, summarize, exportCsv, dailyRows, exportDailyCsv, strategies};
 });

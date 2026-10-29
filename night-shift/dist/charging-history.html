@@ -68,9 +68,10 @@
         </section>
 
         <section class="history-panel" aria-labelledby="batch-title">
-          <div class="history-panel-head"><div><p class="eyebrow">02 / THE WHOLE PICTURE</p><h2 id="batch-title">Put your history to the test.</h2></div><button id="export-history" class="history-button" type="button" disabled>Export CSV <span aria-hidden="true">↗</span></button></div>
+          <div class="history-panel-head"><div><p class="eyebrow">02 / THE WHOLE PICTURE</p><h2 id="batch-title">Put your history to the test.</h2></div><div class="history-export-actions"><button id="export-daily-history" class="history-button" type="button" disabled>Daily CSV <span aria-hidden="true">↗</span></button><button id="export-history" class="history-button" type="button" disabled>Session CSV <span aria-hidden="true">↗</span></button></div></div>
           <div class="history-progress" id="batch-progress" hidden><progress id="batch-meter" value="0" max="100"></progress></div>
           <p id="batch-status" class="history-hint" role="status" aria-live="polite">Run filtered sessions to compare your history. Sessions without complete prices or enough time are reported separately.</p>
+          <p id="savings-math" class="history-hint">Overall savings % = total dollars saved ÷ total standard-delivery cost × 100. Daily CSV groups sessions by their Chicago start date and includes cumulative totals.</p>
           <div class="history-table-wrap"><table class="history-table"><caption class="sr-only">Recorded sessions and simulated costs</caption><thead><tr><th scope="col">Session · Chicago time</th><th scope="col">Grid kWh</th><th scope="col">Immediate · standard</th><th scope="col" id="sparc-rate-heading">SPARC · time-of-day</th><th scope="col">Savings</th><th scope="col">Status</th></tr></thead><tbody id="history-table-body"></tbody></table></div>
           <div class="history-pagination"><span id="table-count"></span><div><button id="table-previous" class="history-button" type="button" aria-label="Previous page">←</button><button id="table-next" class="history-button" type="button" aria-label="Next page">→</button></div></div>
         </section>

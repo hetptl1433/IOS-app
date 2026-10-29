@@ -58,6 +58,8 @@
     page = 0;
     $("run-history").disabled = false;
     $("export-history").disabled = true;
+    $("export-daily-history").disabled = true;
+    put("savings-math", "Overall savings % = total dollars saved ÷ total standard-delivery cost × 100. Daily CSV groups sessions by their Chicago start date and includes cumulative totals.");
     $("batch-progress").hidden = true;
     const start = $("history-start").value, end = $("history-end").value;
     const invalid = !start || !end || start > end;
@@ -297,6 +299,7 @@
     const results = [];
     $("run-history").disabled = true;
     $("export-history").disabled = true;
+    $("export-daily-history").disabled = true;
     $("batch-progress").hidden = false;
     $("batch-meter").value = 0;
     $("batch-meter").max = filtered.length;
@@ -325,9 +328,11 @@
       put("summary-energy-note", "Comparable sessions only");
       put("summary-baseline", summary.comparable ? `${money(summary.baselineCost)} immediate · standard delivery` : "No comparable sessions in this range");
       const ratio = summary.baselineCost > 0 ? Math.abs(summary.saving) / summary.baselineCost * 100 : null;
+      put("savings-math", summary.comparable && ratio !== null ? `${money(summary.saving)} total saved ÷ ${money(summary.baselineCost)} total standard-delivery cost × 100 = ${(summary.saving / summary.baselineCost * 100).toFixed(3)}%. Calculated from unrounded costs. This is weighted by cost, not a simple average of daily percentages. Daily CSV includes every date and cumulative totals.` : "Overall savings % requires a positive standard-delivery cost across comparable sessions. Daily CSV identifies dates without comparable sessions.");
       put("summary-saving-note", summary.comparable ? `${ratio === null ? "" : `${ratio.toFixed(1)}% ${summary.saving >= 0 ? "saved" : "extra cost"} · `}${settings.tariff === "time-of-day" ? "rate + timing" : "timing only"}` : "Savings require complete, equal-energy comparisons");
       put("batch-status", `${num(summary.comparable)} sessions compared: standard immediate charging versus SPARC on ${rateName(settings.tariff)}. ${settings.tariff === "time-of-day" ? "Savings include delivery-rate and timing changes." : "Savings reflect timing changes only."} ${num(summary.skipped)} skipped for data or price gaps; ${num(summary.shortfall)} excluded for energy shortfall. ${settings.window === "morning" ? "Morning availability is modeled, with extensions capped at the next session." : "Only recorded charging windows are used."} Totals cover this selected history; they are not annualized.`);
       $("export-history").disabled = false;
+      $("export-daily-history").disabled = false;
       renderTable();
     } catch (error) {
       put("history-error", `The comparison could not finish: ${error.message}`);
@@ -337,11 +342,12 @@
     }
   }
 
-  function exportCsv() {
+  function exportCsv(daily = false) {
     if (!batch) return;
-    const blob = new Blob([Lab.exportCsv(batch, options())], {type:"text/csv;charset=utf-8"});
+    const settings = {...options(),startDate:$("history-start").value,endDate:$("history-end").value};
+    const blob = new Blob([daily ? Lab.exportDailyCsv(batch, settings) : Lab.exportCsv(batch, settings)], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob), anchor = element("a");
-    anchor.href = url; anchor.download = `sparc-charging-history-${$("history-start").value}-${$("history-end").value}.csv`;
+    anchor.href = url; anchor.download = `sparc-charging-${daily ? "daily-savings" : "sessions"}-${$("history-start").value}-${$("history-end").value}.csv`;
     document.body.append(anchor); anchor.click(); anchor.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -369,6 +375,7 @@
   $("replay-scrub").addEventListener("input", () => { stop(); cursor = Number($("replay-scrub").value); drawReplay(); });
   $("table-previous").addEventListener("click", () => { page--; renderTable(); });
   $("table-next").addEventListener("click", () => { page++; renderTable(); });
-  $("export-history").addEventListener("click", exportCsv);
+  $("export-history").addEventListener("click", () => exportCsv());
+  $("export-daily-history").addEventListener("click", () => exportCsv(true));
   updateFilters();
 })();
