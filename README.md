@@ -12,6 +12,12 @@ New here? [`SPARC_EXPLAINED.md`](SPARC_EXPLAINED.md) explains the whole project 
 
 The complete [Night Shift charging simulator](night-shift/README.md) is in `night-shift/`, including its historical ComEd data and instructions for running and editing it locally. [Open the hosted website](https://sparc-nightshift-lab-het.hetptl1433.chatgpt.site).
 
+The local simulator also has a separate **Charging history** page that replays
+`charging-history-data/charging_sessions_tm1.csv` with SPARC's planner. Filter sessions, compare strategies,
+explore an assumed morning departure, and export results. Open
+http://127.0.0.1:8765/simulation/charging-history.html while the local app is running, or follow
+**Charging history** from Night Shift. See the [history assumptions and data rebuild instructions](night-shift/README.md#simulate-charging-history).
+
 ## Start here (on a Mac)
 
 ```sh

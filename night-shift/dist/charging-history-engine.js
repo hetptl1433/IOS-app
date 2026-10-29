@@ -8,9 +8,10 @@
 })(typeof window !== "undefined" ? window : globalThis, function (Engine) {
   "use strict";
   const SLOT = 300, HOUR = 3600, EPS = 1e-6;
+  const BASELINE_TARIFF = "standard";
   const strategies = [
     {id: "recorded", label: "Recorded pattern · estimated", color: "#8b7868"},
-    {id: "charge-now", label: "Charge immediately", color: "#87968d"},
+    {id: "charge-now", label: "Immediate · standard delivery", color: "#87968d"},
     {id: "timer-0100", label: "1 AM timer", color: "#c9954f"},
     {id: "day-ahead", label: "SPARC day-ahead plan", color: "#678b32"},
     {id: "hindsight", label: "Perfect hindsight · reference", color: "#299a91"},
@@ -59,7 +60,7 @@
       if (!Number.isFinite(power) || power <= 0) return {valid: false, reason: "Choose positive charging power."};
       const config = {date: row.startLocal.slice(0, 10), vehicle: "history", startEpoch: start, endEpoch: end,
         gridEnergyKwh: row.gridKwh, power: power, efficiency: 1, reserveMinutes: 0,
-        tariff: options.tariff || "standard", strategy: "day-ahead"};
+        tariff: options.tariff || "time-of-day", strategy: "day-ahead"};
       return {valid: true, config, recordedEnd, capped, powerAdjusted: observedPower < minimumPower - EPS,
         extended: end > recordedEnd, recordedDurationHours: (recordedEnd - start) / HOUR};
     }
@@ -74,9 +75,11 @@
     const flatSlotKwh = row.gridKwh / ((prepared.recordedEnd - config.startEpoch) / SLOT);
     const tracks = strategies.map(function (strategy) {
       const recorded = strategy.id === "recorded";
-      const result = Engine.simulate(market, Object.assign({}, config, {strategy: recorded ? "manual" : strategy.id}),
+      const tariff = strategy.id === "charge-now" ? BASELINE_TARIFF : config.tariff;
+      const result = Engine.simulate(market, Object.assign({}, config, {strategy: recorded ? "manual" : strategy.id, tariff}),
         recorded ? {manual: function (now) { return now < prepared.recordedEnd ? flatSlotKwh : 0; }} : undefined);
-      return Object.assign({}, strategy, {result});
+      const rateLabel = tariff === "standard" ? "standard delivery" : "time-of-day delivery";
+      return Object.assign({}, strategy, {tariff, label: strategy.id === "charge-now" ? strategy.label : `${strategy.label} · ${rateLabel}`, result});
     });
     const immediate = tracks.find(t => t.id === "charge-now").result;
     const sparc = tracks.find(t => t.id === "day-ahead").result;
@@ -100,7 +103,7 @@
     return summary;
   }
   function exportCsv(results, options) {
-    const fields = ["session_id","start_chicago","end_chicago","window","departure_hour","tariff",
+    const fields = ["session_id","start_chicago","end_chicago","window","departure_hour","baseline_tariff","planned_tariff",
       "modeled_start_utc","modeled_end_utc","modeled_power_kw","power_adjusted","morning_extension_capped",
       "grid_kwh","battery_kwh","logged_csv_cost_usd","recorded_pattern_estimate_usd","immediate_usd",
       "timer_1am_usd","sparc_usd","hindsight_usd","immediate_delivered_kwh","sparc_delivered_kwh",
@@ -113,7 +116,7 @@
       const cost = id => fixed(track(id)?.totalCost);
       const iso = epoch => Number.isFinite(epoch) ? new Date(epoch * 1000).toISOString() : "";
       lines.push([row.id,row.startLocal,row.endLocal,options.window || "recorded",
-        options.window === "morning" ? options.departureHour ?? 7 : "",options.tariff || "standard",
+        options.window === "morning" ? options.departureHour ?? 7 : "",BASELINE_TARIFF,result.config?.tariff || options.tariff || "time-of-day",
         iso(result.config?.startEpoch),iso(result.config?.endEpoch),result.config?.power ?? "",
         result.prepared?.powerAdjusted ?? "",result.prepared?.capped ?? "",row.gridKwh,row.batteryKwh,row.loggedCost,
         cost("recorded"),cost("charge-now"),cost("timer-0100"),cost("day-ahead"),cost("hindsight"),

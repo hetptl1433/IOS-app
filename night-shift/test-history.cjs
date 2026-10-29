@@ -36,15 +36,37 @@ test("2024 history uses real supplemental prices and grid energy without another
   }
 });
 
-test("costs bill energy at settled prices with the same tariff for each strategy", () => {
+test("the baseline uses standard delivery and the plans use the selected delivery rate", () => {
   const run = Lab.simulate(market, sample, {tariff:"time-of-day"});
   assert.equal(run.eligible, true);
   for (const track of run.tracks) {
     close(track.result.totalCost, track.result.slots.reduce((sum, slot) => sum + slot.energyKwh * (slot.billedPrice + slot.deliveryCents) / 100, 0));
-    assert.equal(track.result.session.config.tariff, "time-of-day");
+    assert.equal(track.result.session.config.tariff, track.id === "charge-now" ? "standard" : "time-of-day");
+    assert.equal(track.tariff, track.result.session.config.tariff);
     close(track.result.energyKwh, sample.gridKwh);
   }
   close(run.saving, run.tracks[1].result.totalCost - run.tracks[3].result.totalCost);
+});
+
+test("time-of-day is the default and changing the plans' rate preserves the standard baseline", () => {
+  const defaultRun = Lab.simulate(market, sample, {});
+  const standard = Lab.simulate(market, sample, {tariff:"standard"});
+  const baseline = run => run.tracks.find(track => track.id === "charge-now").result;
+  assert.equal(defaultRun.config.tariff,"time-of-day");
+  assert.equal(standard.config.tariff,"standard");
+  close(baseline(defaultRun).totalCost,baseline(standard).totalCost);
+  assert.deepEqual(baseline(defaultRun).slots,baseline(standard).slots);
+  const expectedBase = Engine.simulate(market,{...defaultRun.config,strategy:"charge-now",tariff:"standard"});
+  const expectedPlan = Engine.simulate(market,{...defaultRun.config,strategy:"day-ahead",tariff:"time-of-day"});
+  close(defaultRun.saving,expectedBase.totalCost-expectedPlan.totalCost);
+});
+
+test("the recorded CSV cost does not enter the savings comparison", () => {
+  const original = Lab.simulate(market,sample,{});
+  const edited = Lab.simulate(market,{...sample,loggedCost:999999},{});
+  close(original.saving,edited.saving);
+  close(Lab.summarize([original]).baselineCost,Lab.summarize([edited]).baselineCost);
+  close(Lab.summarize([original]).sparcCost,Lab.summarize([edited]).sparcCost);
 });
 
 test("recorded pattern distributes the recorded grid energy only inside its recorded window", () => {
@@ -225,6 +247,9 @@ test("the full history preserves equal delivered energy and honest aggregate tot
   assert.ok(summary.comparable > 2000);
   assert.equal(summary.comparable + summary.skipped + summary.shortfall, summary.total);
   close(summary.baselineCost-summary.sparcCost, summary.saving);
+  // Fixed source-data regression: standard immediate versus time-of-day SPARC.
+  close(summary.baselineCost,747.4704790506762);
+  close(summary.sparcCost,515.9552147050971);
   for (const run of results.filter(result => result.eligible)) {
     close(run.tracks[1].result.energyKwh, run.tracks[3].result.energyKwh);
     assert.ok(Number.isFinite(run.saving));
@@ -241,6 +266,8 @@ test("CSV export preserves precision and distinguishes skipped and shortfall res
   assert.equal(lines.length, 4);
   assert.match(lines[0], /modeled_start_utc/);
   assert.match(lines[0], /sparc_delivered_kwh/);
+  assert.match(lines[0], /"baseline_tariff","planned_tariff"/);
+  assert.match(lines[1], /"standard","time-of-day"/);
   assert.match(lines[1], /"compared"/);
   assert.match(lines[1], new RegExp(complete.saving.toFixed(6)));
   assert.match(lines[2], /"shortfall"/);

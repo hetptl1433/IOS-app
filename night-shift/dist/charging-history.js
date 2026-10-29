@@ -23,6 +23,7 @@
   const clock = t => clockFormat.format(new Date(t * 1000));
   const date = day => dateFormat.format(new Date(day + "T12:00:00Z"));
   const dateTime = row => `${date(row.startLocal.slice(0, 10))} · ${clock(row.start)}`;
+  const rateName = tariff => tariff === "standard" ? "standard delivery" : "time-of-day delivery";
   const element = (tag, className, value) => {
     const el = document.createElement(tag);
     if (className) el.className = className;
@@ -70,7 +71,10 @@
     put("summary-cost", "—");
     put("summary-saving", "—");
     put("summary-baseline", "Run the history to compare costs");
-    put("summary-saving-note", "Same grid energy. Same delivery rate.");
+    const rateChange = options().tariff === "time-of-day";
+    put("summary-saving-note", rateChange ? "Includes delivery-rate and timing changes" : "Timing savings on standard delivery");
+    put("comparison-note", `Baseline: immediate charging on standard delivery. SPARC and the alternative plans use ${rateName(options().tariff)}. ${rateChange ? "Savings include the rate and timing changes." : "This isolates timing savings."}`);
+    put("sparc-rate-heading", rateChange ? "SPARC · time-of-day" : "SPARC · standard");
     put("batch-status", filtered.length ? "Ready to compare these sessions. Run filtered sessions to calculate the totals." : "No sessions match these filters. Choose another date range or session size.");
     const morning = $("history-window").value === "morning";
     $("departure-field").hidden = !morning;
@@ -187,7 +191,7 @@
       const plan = run.tracks.find(track => track.id === "day-ahead").result;
       const percent = base.totalCost > 0 ? `${(Math.abs(run.saving) / base.totalCost * 100).toFixed(1)}%` : null;
       const savingLabel = Math.abs(run.saving) > .000001 && Math.abs(run.saving) < .005 ? "less than $0.01" : money(Math.abs(run.saving));
-      put("replay-outcome", run.eligible ? `SPARC ${run.saving >= 0 ? "saves" : "costs an extra"} ${savingLabel}${percent ? ` (${percent})` : ""} versus immediate charging. Both deliver ${num(plan.energyKwh)} grid kWh on the same delivery rate.` : "At least one strategy could not deliver all the recorded energy. Savings are not counted for this session.");
+      put("replay-outcome", run.eligible ? `SPARC on ${rateName(run.config.tariff)} ${run.saving >= 0 ? "saves" : "costs an extra"} ${savingLabel}${percent ? ` (${percent})` : ""} versus immediate charging on standard delivery. Both deliver ${num(plan.energyKwh)} grid kWh.` : "At least one strategy could not deliver all the recorded energy. Savings are not counted for this session.");
     } else put("replay-outcome", cursor ? "Replay in progress. Final savings are compared after both strategies deliver the same energy." : "Play the replay or move the slider to inspect each strategy. Costs settle at the historical hourly prices.");
     const marker = $("history-chart").querySelector(".replay-marker");
     if (marker) {
@@ -319,10 +323,10 @@
       put("summary-coverage", `${num(summary.comparable)} compared · ${num(summary.skipped)} skipped · ${num(summary.shortfall)} shortfall`);
       put("summary-energy", `${num(summary.energyKwh)} kWh`);
       put("summary-energy-note", "Comparable sessions only");
-      put("summary-baseline", summary.comparable ? `${money(summary.baselineCost)} charging immediately` : "No comparable sessions in this range");
+      put("summary-baseline", summary.comparable ? `${money(summary.baselineCost)} immediate · standard delivery` : "No comparable sessions in this range");
       const ratio = summary.baselineCost > 0 ? Math.abs(summary.saving) / summary.baselineCost * 100 : null;
-      put("summary-saving-note", summary.comparable ? `${ratio === null ? "" : `${ratio.toFixed(1)}% ${summary.saving >= 0 ? "saved" : "extra cost"} · `}same energy & rate` : "Savings require complete, equal-energy comparisons");
-      put("batch-status", `${num(summary.comparable)} sessions compared on ${settings.tariff === "standard" ? "standard" : "time-of-day"} delivery. ${num(summary.skipped)} skipped for data or price gaps; ${num(summary.shortfall)} excluded for energy shortfall. ${settings.window === "morning" ? "Morning availability is modeled, with extensions capped at the next session." : "Only recorded charging windows are used."} Totals cover this selected history; they are not annualized.`);
+      put("summary-saving-note", summary.comparable ? `${ratio === null ? "" : `${ratio.toFixed(1)}% ${summary.saving >= 0 ? "saved" : "extra cost"} · `}${settings.tariff === "time-of-day" ? "rate + timing" : "timing only"}` : "Savings require complete, equal-energy comparisons");
+      put("batch-status", `${num(summary.comparable)} sessions compared: standard immediate charging versus SPARC on ${rateName(settings.tariff)}. ${settings.tariff === "time-of-day" ? "Savings include delivery-rate and timing changes." : "Savings reflect timing changes only."} ${num(summary.skipped)} skipped for data or price gaps; ${num(summary.shortfall)} excluded for energy shortfall. ${settings.window === "morning" ? "Morning availability is modeled, with extensions capped at the next session." : "Only recorded charging windows are used."} Totals cover this selected history; they are not annualized.`);
       $("export-history").disabled = false;
       renderTable();
     } catch (error) {

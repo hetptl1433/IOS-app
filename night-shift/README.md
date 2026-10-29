@@ -43,9 +43,12 @@ with **Export CSV**. The simulator uses the existing `simulation-engine.js` plan
   uniformly over the recorded window because interval power traces are absent.
 - Recorded peak power is raised and flagged when it cannot explain the recorded energy within the rounded
   window. Lower what-if power may cause a shortfall. Only completed equal-energy comparisons enter savings totals.
-- Both strategies use the same delivery rate. The existing study's fixed delivery rates apply across all years;
-  this models supply plus distribution, excluding other flat charges and capacity charges. Logged CSV cost is
-  not used as the savings baseline. Perfect hindsight is a reference, not a deployable strategy.
+- The baseline is immediate charging on standard delivery. SPARC and the alternative plans default to
+  time-of-day delivery, so savings include rate and timing changes. **Planned delivery rate** changes the plans'
+  rate while keeping the baseline on standard; choosing standard isolates timing savings. The existing study's
+  fixed delivery rates apply across all years. This models supply plus distribution, excluding other flat and
+  capacity charges. Logged CSV cost is a reference and is not the savings baseline. CSV exports identify both
+  `baseline_tariff` and `planned_tariff`. Perfect hindsight is a reference, not a deployable strategy.
 - Missing-price windows and ambiguous Chicago daylight-saving times are skipped and counted. Earlier prices
   needed by the history are bundled from the repository's hourly ComEd CSVs; no live APIs are called.
 
