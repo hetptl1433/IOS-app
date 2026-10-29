@@ -79,15 +79,15 @@ Other per-kWh charges are flat: they change the bill, not the best time to charg
 
 ## Strategies
 
-| Strategy | Knows | Does |
-|---|---|---|
-| Charge on plug-in | nothing | the baseline every saving is measured against |
-| Timer 21:00 … 01:00 | the clock | starts at a fixed time, or at once if plugged in up to 6 hours after it (as a Tesla's schedule does) |
-| Below 2¢, 3¢, 5¢ | the latest 5-minute price | charges while the price is at or under the cap, pauses above it |
-| Day-ahead plan | ComEd's day-ahead prices, out around 4:30 p.m. CT for the next day | charges in the cheapest hours |
-| Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts | re-plans every 5 minutes |
-| Forecast, refit monthly | a learned forecast of each hour's price (ridge or LightGBM), with or without weather and holidays | plans from the forecast, re-plans hourly |
-| Perfect hindsight | every hour's final price | the lowest cost reachable without capacity risk: a reference, not a strategy |
+| Strategy                | Knows                                                                                             | Does                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Charge on plug-in       | nothing                                                                                           | the baseline every saving is measured against                                                        |
+| Timer 21:00 … 01:00    | the clock                                                                                         | starts at a fixed time, or at once if plugged in up to 6 hours after it (as a Tesla's schedule does) |
+| Below 2¢, 3¢, 5¢     | the latest 5-minute price                                                                         | charges while the price is at or under the cap, pauses above it                                      |
+| Day-ahead plan          | ComEd's day-ahead prices, out around 4:30 p.m. CT for the next day                                | charges in the cheapest hours                                                                        |
+| Day-ahead + live prices | each 5-minute price as well, about 7 minutes after its interval starts                            | re-plans every 5 minutes                                                                             |
+| Forecast, refit monthly | a learned forecast of each hour's price (ridge or LightGBM), with or without weather and holidays | plans from the forecast, re-plans hourly                                                             |
+| Perfect hindsight       | every hour's final price                                                                          | the lowest cost reachable without capacity risk: a reference, not a strategy                         |
 
 Every strategy starts early when waiting would mean not finishing. The planned
 strategies share one planner (`sparc/planner.py`). It fills the cheapest hours
@@ -113,23 +113,23 @@ The default setup is standard delivery and charging as soon as the car is
 plugged in. SPARC puts the car on Time-of-Day delivery and charges it in the
 cheapest hours of the day-ahead plan.
 
-| Driver | Charged a night | Default setup, $/night | SPARC, $/night | Saved a year | Cheaper |
-|---|---|---|---|---|---|
-| Average, about 37 miles a day | 15 kWh | 1.80 | 0.83 | $355 | 54% |
-| Moderate, about 75 miles a day | 30 kWh | 3.43 | 1.67 | $643 | 51% |
-| Heavy, about 200 miles a day | 80 kWh | 8.21 | 4.85 | $1,224 | 41% |
+| Driver                         | Charged a night | Default setup, $/night | SPARC, $/night | Saved a year | Cheaper |
+| ------------------------------ | --------------- | ---------------------- | -------------- | ------------ | ------- |
+| Average, about 37 miles a day  | 15 kWh          | 1.80                   | 0.83           | $355         | 54%     |
+| Moderate, about 75 miles a day | 30 kWh          | 3.43                   | 1.67           | $643         | 51%     |
+| Heavy, about 200 miles a day   | 80 kWh          | 8.21                   | 4.85           | $1,224       | 41%     |
 
 Every strategy on Time-of-Day delivery, saved a year against the default setup:
 
-| Strategy | Average | Moderate | Heavy |
-|---|---|---|---|
-| Charge on plug-in (the rate alone) | 165 | 363 | 1,020 |
-| Timer 01:00 | 346 | 638 | 1,167 |
-| Below 3¢ | 290 | 553 | 1,173 |
-| Day-ahead plan | 355 | 643 | 1,224 |
-| Day-ahead + live prices | 348 | 641 | 1,228 |
-| Forecast: LightGBM + weather, refit monthly | 345 | 636 | 1,226 |
-| Perfect hindsight | 393 | 697 | 1,297 |
+| Strategy                                    | Average | Moderate | Heavy |
+| ------------------------------------------- | ------- | -------- | ----- |
+| Charge on plug-in (the rate alone)          | 165     | 363      | 1,020 |
+| Timer 01:00                                 | 346     | 638      | 1,167 |
+| Below 3¢                                   | 290     | 553      | 1,173 |
+| Day-ahead plan                              | 355     | 643      | 1,224 |
+| Day-ahead + live prices                     | 348     | 641      | 1,228 |
+| Forecast: LightGBM + weather, refit monthly | 345     | 636      | 1,226 |
+| Perfect hindsight                           | 393     | 697      | 1,297 |
 
 - The delivery rate alone is worth $165–1,020 a year here, and the plan's timing
   adds $190, $280 and $204 on top. Time-of-Day delivery charges 10.7¢ from 1 to
@@ -153,27 +153,27 @@ strategy and the first month's forecasts learned from the 90 days before.
 
 Commuter: plug in at 6 p.m., leave at 7 a.m., add 15 kWh at 7.7 kW.
 
-| Strategy | Standard delivery, $/night | saved $/yr | Time-of-Day delivery, $/night | saved $/yr |
-|---|---|---|---|---|
-| Charge on plug-in | 2.40 | – | 2.52 | – |
-| Timer 23:00 | 1.49 | 333 | 0.94 | 575 |
-| Timer 01:00 | 1.39 | 368 | 0.85 | 610 |
-| Below 2¢ | 1.51 | 322 | 1.07 | 529 |
-| Below 3¢ | 1.54 | 314 | 1.17 | 493 |
-| Day-ahead plan | 1.37 | 374 | 0.83 | 616 |
-| Day-ahead + live prices | 1.38 | 371 | 0.84 | 613 |
-| Forecast: ridge, refit monthly | 1.39 | 368 | 0.85 | 610 |
-| Forecast: LightGBM, refit monthly | 1.39 | 369 | 0.85 | 611 |
-| Perfect hindsight | 1.27 | 410 | 0.74 | 649 |
+| Strategy                          | Standard delivery, $/night | saved $/yr | Time-of-Day delivery, $/night | saved $/yr |
+| --------------------------------- | -------------------------- | ---------- | ----------------------------- | ---------- |
+| Charge on plug-in                 | 2.40                       | –         | 2.52                          | –         |
+| Timer 23:00                       | 1.49                       | 333        | 0.94                          | 575        |
+| Timer 01:00                       | 1.39                       | 368        | 0.85                          | 610        |
+| Below 2¢                         | 1.51                       | 322        | 1.07                          | 529        |
+| Below 3¢                         | 1.54                       | 314        | 1.17                          | 493        |
+| Day-ahead plan                    | 1.37                       | 374        | 0.83                          | 616        |
+| Day-ahead + live prices           | 1.38                       | 371        | 0.84                          | 613        |
+| Forecast: ridge, refit monthly    | 1.39                       | 368        | 0.85                          | 610        |
+| Forecast: LightGBM, refit monthly | 1.39                       | 369        | 0.85                          | 611        |
+| Perfect hindsight                 | 1.27                       | 410        | 0.74                          | 649        |
 
 Savings per year against charging on plug-in, standard delivery:
 
-| Driver | Timer 23:00 | Below 3¢ | Day-ahead | + live prices | Ridge forecast | Perfect hindsight |
-|---|---|---|---|---|---|---|
-| Commuter: 6 p.m.–7 a.m., +15 kWh, 7.7 kW | 333 | 314 | 374 | 371 | 368 | 410 |
-| Big day: 6 p.m.–7 a.m., +40 kWh, 7.7 kW | 503 | 457 | 517 | 519 | 514 | 574 |
-| Late arrival: 10 p.m.–6 a.m., +50 kWh, 11.5 kW | 55 | 70 | 92 | 98 | 90 | 152 |
-| Afternoon plug-in: 2 p.m.–7 a.m., +30 kWh, 7.7 kW | 452 | 418 | 490 | 495 | 484 | 557 |
+| Driver                                             | Timer 23:00 | Below 3¢ | Day-ahead | + live prices | Ridge forecast | Perfect hindsight |
+| -------------------------------------------------- | ----------- | --------- | --------- | ------------- | -------------- | ----------------- |
+| Commuter: 6 p.m.–7 a.m., +15 kWh, 7.7 kW          | 333         | 314       | 374       | 371           | 368            | 410               |
+| Big day: 6 p.m.–7 a.m., +40 kWh, 7.7 kW           | 503         | 457       | 517       | 519           | 514            | 574               |
+| Late arrival: 10 p.m.–6 a.m., +50 kWh, 11.5 kW    | 55          | 70        | 92        | 98            | 90             | 152               |
+| Afternoon plug-in: 2 p.m.–7 a.m., +30 kWh, 7.7 kW | 452         | 418       | 490       | 495           | 484            | 557               |
 
 What the numbers say:
 
@@ -231,6 +231,7 @@ dates and the four example drivers in the app.
 
 Every study behind these results is in [`experiments/`](experiments/README.md), with its script, its
 output and what it showed:
+
 - scenarios for different drivers and plug-in times, and a 97-strategy sweep;
 - Tesla's scheduler modes, learned forecasts, weather, and six time-series foundation models;
 - a battery buffer across nights, which adds about $54 a year for the average and moderate drivers.
@@ -299,23 +300,23 @@ python -m unittest discover -s tests              # tests
 
 ## Layout
 
-| Module | |
-|---|---|
-| `clock.py` | epoch-second timestamps; Chicago wall-clock rules |
-| `comed.py` | ComEd client: 5-minute feed, hourly table, polite fetcher |
-| `store.py` | SQLite storage |
-| `market.py` | hourly billing prices; when each price became public |
-| `tariff.py` | delivery rates, capacity-risk hours |
-| `planner.py` | cheapest-hours plan with buffer, blocked hours and hysteresis |
-| `strategies.py` | the strategies above |
-| `forecast.py` | forecast features, ridge and LightGBM fits, monthly refits |
-| `weather.py`, `holidays.py` | Chicago weather from Open-Meteo; NERC holidays |
-| `backtest.py` | night-by-night simulation and summaries |
-| `lab.py` | backtest runs and model training, shared by the app and the command line |
-| `foundation.py` | AI price forecasters: install, download, the one-click test |
-| `dataset.py` | prices and weather as yearly CSV files (`comed-data/`) |
-| `server.py`, `web/` | the local web app: `home.*` is the Test models page, `lab.html` and `app.js` the lab |
-| `history.py`, `collector.py` | backfill and live recording |
+| Module                           |                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `clock.py`                     | epoch-second timestamps; Chicago wall-clock rules                                          |
+| `comed.py`                     | ComEd client: 5-minute feed, hourly table, polite fetcher                                  |
+| `store.py`                     | SQLite storage                                                                             |
+| `market.py`                    | hourly billing prices; when each price became public                                       |
+| `tariff.py`                    | delivery rates, capacity-risk hours                                                        |
+| `planner.py`                   | cheapest-hours plan with buffer, blocked hours and hysteresis                              |
+| `strategies.py`                | the strategies above                                                                       |
+| `forecast.py`                  | forecast features, ridge and LightGBM fits, monthly refits                                 |
+| `weather.py`, `holidays.py`  | Chicago weather from Open-Meteo; NERC holidays                                             |
+| `backtest.py`                  | night-by-night simulation and summaries                                                    |
+| `lab.py`                       | backtest runs and model training, shared by the app and the command line                   |
+| `foundation.py`                | AI price forecasters: install, download, the one-click test                                |
+| `dataset.py`                   | prices and weather as yearly CSV files (`comed-data/`)                                   |
+| `server.py`, `web/`          | the local web app: `home.*` is the Test models page, `lab.html` and `app.js` the lab |
+| `history.py`, `collector.py` | backfill and live recording                                                                |
 
 ## Next
 
