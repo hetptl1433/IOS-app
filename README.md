@@ -8,6 +8,10 @@ control comes next, once a strategy has proven itself on real prices.
 
 New here? [`SPARC_EXPLAINED.md`](SPARC_EXPLAINED.md) explains the whole project and its results in plain words.
 
+## Night Shift website
+
+The complete [Night Shift charging simulator](night-shift/README.md) is in `night-shift/`, including its historical ComEd data and instructions for running and editing it locally. [Open the hosted website](https://sparc-nightshift-lab-het.hetptl1433.chatgpt.site).
+
 ## Start here (on a Mac)
 
 ```sh

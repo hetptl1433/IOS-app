@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f4ec">
+  <meta name="description" content="Replay real ComEd electricity prices with electric cars, buses and commercial vehicles. Race charging strategies and discover your estimated yearly savings.">
+  <title>Night Shift · SPARC charging simulator</title>
+  <link rel="stylesheet" href="simulation.css">
+  <script src="simulation-data.js" defer></script>
+  <script src="simulation-engine.js" defer></script>
+  <script src="simulation-charge-target.js" defer></script>
+  <script src="simulation-view.js" defer></script>
+  <script src="simulation.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
+    <nav aria-label="Main navigation"><a href="#benchmark-title">The full test <span aria-hidden="true">↗</span></a><a href="#simulation-assumptions">How it works</a><a class="nav-current" href="simulation.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span> Play the simulation</a></nav>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow"><span class="mini-bolt" aria-hidden="true">ϟ</span> THE EVERYDAY ENERGY GAME</p><h1 id="page-title">A whole night.<br><span>In seconds.</span></h1><p class="intro-copy">Plug in. Watch the price move. Get ready by morning.<br>Replay real ComEd nights with your electric vehicle and find your charging advantage.</p></div>
+      <div class="intro-aside"><span class="replay-tag"><span class="status-dot" aria-hidden="true"></span> REAL PRICES · HISTORICAL REPLAY</span><div class="mode-switch" role="group" aria-label="Simulation mode"><button id="race-mode" class="active" aria-pressed="true"><span aria-hidden="true">⚑</span> Watch the race</button><button id="challenge-mode" aria-pressed="false"><span aria-hidden="true">⌘</span> Take the wheel</button></div><p>One vehicle. One deadline. A smarter way to charge.</p></div>
+    </section>
+
+    <section class="telemetry" aria-label="Live simulation statistics">
+      <div class="stat"><span class="stat-label"><span aria-hidden="true">◷</span> SIMULATION TIME</span><strong id="sim-clock">8:00 PM</strong><span class="stat-foot">Time moves faster here.</span></div>
+      <div class="stat"><span class="stat-label"><span aria-hidden="true">ϟ</span> ENERGY ADDED</span><strong id="energy-now">0.0 <small>kWh</small></strong><span class="stat-foot">Working toward your morning target</span></div>
+      <div class="stat"><span class="stat-label"><span aria-hidden="true">◎</span> <span id="cost-label">BILL ESTIMATE</span></span><strong id="cost-now">$0.00</strong><span class="stat-foot">Posted-price estimate; settled at the end</span></div>
+      <div class="stat stat-savings"><span class="stat-label"><span aria-hidden="true">↗</span> <span id="savings-label">COST GAP SO FAR</span></span><strong id="saved-now">$0.00</strong><span id="saved-percent" class="savings-percent">Savings % at the finish</span><span id="billing-scope" class="stat-foot">Final savings require the same delivered energy.</span><span class="stat-decoration" aria-hidden="true">↗</span></div>
+    </section>
+
+    <div class="simulation-layout">
+      <aside class="configuration" aria-labelledby="config-title">
+        <div class="panel-heading"><div><p class="eyebrow">SET THE SCENE</p><h2 id="config-title">Your night.</h2></div><span class="heading-icon" aria-hidden="true">☷</span></div>
+        <div class="field"><label for="vehicle">Your vehicle</label><select id="vehicle"><option value="cybertruck" selected>Cybertruck</option><option value="model-x">Model X Plaid · 22-inch</option><option value="bus">Electric bus</option><option value="commercial">Commercial vehicle</option></select></div>
+        <div class="field"><label for="scenario">Pick a real night</label><select id="scenario"><option value="">Loading historical nights…</option></select></div>
+        <div class="field usage-field"><span id="usage-label" class="usage-label">Driving pattern</span><input id="usage" type="hidden" value="heavy"><div id="usage-switch" class="usage-switch is-heavy" role="group" aria-labelledby="usage-label" aria-describedby="usage-note"><button id="usage-average" type="button" aria-pressed="false"><span class="usage-symbol" aria-hidden="true">◷</span><strong id="usage-average-label">Average</strong><span id="usage-average-note">50% on arrival</span></button><button id="usage-heavy" type="button" aria-pressed="true"><span class="usage-symbol" aria-hidden="true">ϟ</span><strong>Heavy</strong><span id="usage-heavy-note">20% on arrival</span></button></div><p id="usage-note" class="usage-note">Modeled arrival battery: 50% for Average, 20% for Heavy.</p></div>
+        <div class="field charge-target-field"><div class="label-row"><label for="charge-target">Morning charge target</label><output id="target-value" for="charge-target">80%</output></div><input id="charge-target" type="range" min="55" max="100" step="5" value="80" aria-describedby="charge-target-note"><div class="range-labels"><span>55%</span><span class="target-balanced-label">80% balanced</span><span>100%</span></div><p id="charge-target-note" class="usage-note">80% balances a useful recharge with room to shift charging. Energy is calculated from your arrival battery to this target.</p></div>
+        <div class="field-grid"><div class="field"><label for="arrival">Plug in</label><select id="arrival"><option value="16">4:00 PM</option><option value="18">6:00 PM</option><option value="20" selected>8:00 PM</option><option value="22">10:00 PM</option><option value="23">11:00 PM</option></select></div><div class="field"><label for="departure">Ready by</label><select id="departure"><option value="5">5:00 AM</option><option value="6">6:00 AM</option><option value="7" selected>7:00 AM</option><option value="8">8:00 AM</option><option value="9">9:00 AM</option></select></div></div>
+        <div class="field-grid"><div class="field"><label for="power">Charger</label><select id="power"><option value="3.6">3.6 kW</option><option value="7.7">7.7 kW</option><option value="11.5" selected>11.5 kW</option></select></div><div class="field"><label id="tariff-label" for="tariff">Delivery rate</label><select id="tariff"><option value="time-of-day" selected>Time-of-day</option><option value="standard">Standard</option></select></div></div>
+        <div class="field strategy-field"><label for="strategy">Your charging strategy</label><select id="strategy"><option value="day-ahead">SPARC · day-ahead plan</option><option value="live">SPARC · live adaptation</option><option value="timer">Simple overnight timer</option><option value="cap">Charge below my price</option></select></div>
+        <div class="field" id="timer-settings" hidden><label for="timer-hour">Timer starts at</label><select id="timer-hour"><option value="0" selected>12:00 AM</option><option value="1">1:00 AM</option><option value="2">2:00 AM</option><option value="3">3:00 AM</option><option value="4">4:00 AM</option><option value="5">5:00 AM</option><option value="6">6:00 AM</option><option value="7">7:00 AM</option><option value="8">8:00 AM</option><option value="9">9:00 AM</option><option value="10">10:00 AM</option><option value="11">11:00 AM</option><option value="12">12:00 PM</option><option value="13">1:00 PM</option><option value="14">2:00 PM</option><option value="15">3:00 PM</option><option value="16">4:00 PM</option><option value="17">5:00 PM</option><option value="18">6:00 PM</option><option value="19">7:00 PM</option><option value="20">8:00 PM</option><option value="21">9:00 PM</option><option value="22">10:00 PM</option><option value="23">11:00 PM</option></select></div>
+        <div class="field" id="cap-settings" hidden><label for="cap-cents">Supply price cap <output id="cap-value">3.0¢</output></label><input id="cap-cents" type="range" min="0" max="10" step="0.5" value="3"><div class="range-labels"><span>0¢</span><span>10¢</span></div></div>
+        <p id="configuration-note" class="configuration-note">Your settings apply to the same real prices for every strategy.</p>
+        <div class="sidebar-foot"><span class="small-sun" aria-hidden="true">☀</span><p>The goal: the energy you need,<br>at the lowest practical cost.</p></div>
+      </aside>
+
+      <div class="play-area">
+        <section class="garage-card" aria-labelledby="garage-title">
+          <div class="garage-heading"><h2 id="garage-title"><span class="step-number">01</span> THE GARAGE</h2><span class="scene-status"><span class="status-dot" aria-hidden="true"></span><span id="car-status">Plugged in · ready to replay</span></span></div>
+          <div id="garage-scene" class="garage-scene" style="--night-progress:0">
+            <svg id="garage-art" class="garage-art" viewBox="0 0 900 410" role="img" aria-label="A Cybertruck plugged in beside a home, under a night sky">
+              <defs><linearGradient id="night-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c383a"/><stop offset="1" stop-color="#3b5b54"/></linearGradient><linearGradient id="house-side" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#91a391"/><stop offset="1" stop-color="#627d70"/></linearGradient><linearGradient id="metal-body" x1="0" y1="0" x2="0.7" y2="1"><stop stop-color="#d6e1d8"/><stop offset="1" stop-color="#8baca6"/></linearGradient><linearGradient id="suv-body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eeeae1"/><stop offset="1" stop-color="#a6c4b4"/></linearGradient><radialGradient id="charger-glow"><stop stop-color="#cbff62" stop-opacity=".22"/><stop offset="1" stop-color="#cbff62" stop-opacity="0"/></radialGradient><pattern id="garage-slats" width="5" height="14" patternUnits="userSpaceOnUse"><rect width="5" height="14" fill="#364c44"/><path d="M0 13H5" stroke="#506259" stroke-width="1"/></pattern><pattern id="drive-pavers" width="30" height="16" patternUnits="userSpaceOnUse" patternTransform="skewX(-25)"><path d="M0 0H30V16H0Z" fill="none" stroke="#849680" stroke-opacity=".12"/></pattern></defs>
+              <rect width="900" height="410" fill="url(#night-sky)"/>
+              <g class="scene-stars" fill="#d5e8bd"><circle cx="340" cy="38" r="1.3"/><circle cx="501" cy="56" r="1"/><circle cx="621" cy="30" r="1.1"/><circle cx="784" cy="101" r="1.3"/><circle cx="850" cy="31" r="1"/><circle cx="430" cy="100" r="1"/><circle cx="694" cy="91" r="1.1"/><path d="M574 82v7m-3.5-3.5h7M741 38v7m-3.5-3.5h7" stroke="#d5e8bd" stroke-width="1"/></g>
+              <g class="scene-moon"><circle cx="735" cy="76" r="25" fill="#e4edc5"/><circle cx="744" cy="67" r="23" fill="#223f3e"/></g><g class="scene-sun"><circle cx="735" cy="76" r="25" fill="#f1dc87"/><circle cx="735" cy="76" r="38" fill="#f1dc87" opacity=".09"/></g>
+              <path d="M0 188Q64 152 125 181T247 177T376 186T500 177T640 185T790 177T900 183V410H0Z" fill="#243f38"/>
+              <g fill="#355344"><path d="M67 195l22-61 23 61Z"/><path d="M795 220l26-79 27 79Z"/><path d="M842 218l20-59 20 59Z"/><path d="M23 222l21-65 24 65Z"/></g>
+              <path d="M0 312L391 184L900 298V410H0Z" fill="#526b58"/><path d="M127 355L440 236L831 326L581 410H294Z" fill="#697d67"/><path d="M127 355L440 236L831 326L581 410H294Z" fill="url(#drive-pavers)"/>
+              <path d="M0 366L123 324L530 410H0Z" fill="#203a32"/><path d="M690 410l210-72v72Z" fill="#203a32"/><path d="M40 397l48-16m35-12 48-16M774 405l48-16m35-12 35-12" stroke="#a6b39a" stroke-width="3" opacity=".35"/>
+              <ellipse cx="459" cy="294" rx="233" ry="55" fill="#142a26" opacity=".3"/>
+              <g class="scene-house"><path d="M164 144l195-66 143 76-195 65Z" fill="#adb9a3"/><path d="M307 219l195-65v135l-195 67Z" fill="url(#house-side)"/><path d="M164 144l143 75v137l-143-75Z" fill="#d7d8bc"/><path d="M151 146L360 73l157 80-15 13-143-72-195 66Z" fill="#e7e7c9"/><path d="M163 173l144 75v12l-144-75Z" fill="#bdc6a9"/>
+              <path d="M335 228l133-45v104l-133 46Z" fill="#223c34"/><path d="M341 233l121-41v90l-121 42Z" fill="url(#garage-slats)"/><path d="M343 236l116-39" stroke="#a9c3a1" stroke-width="2" opacity=".8"/><path d="M173 206l40 20v57l-40-20Z" fill="#566a56"/><path d="M179 214l28 14v34l-28-14Z" fill="#ddedb8"/><path d="M192 221v34m-13-23 28 14" stroke="#8b9c74" stroke-width="3"/><path d="M234 238l50 26v80l-50-26Z" fill="#869c7e"/><path d="M242 249l34 18v40l-34-18Z" fill="#c7dfa5"/><path d="M270 313v5" stroke="#e6ecc4" stroke-width="3"/><path d="M161 281l146 76 195-67v7l-195 67-146-76Z" fill="#9eaf91"/>
+              <path d="M184 144l166-55 42 22-168 57Z" fill="#23473f"/><path d="M196 143l155-50m-120 68 155-50m-111 36-34-17m73 4-34-17m74 4-34-17" stroke="#6d9f8c" stroke-width="1" opacity=".75"/>
+              <path d="M478 192v23" stroke="#daf0b2" stroke-width="4"/><ellipse cx="479" cy="214" rx="14" ry="7" fill="#d9f5a2" opacity=".12"/>
+              </g>
+              <g class="scene-landscaping"><path d="M149 281l-21 8 22 12 21-7Z" fill="#3c5542"/><path d="M139 284v-29m-5 16 5 5 9-13m-9 3-6-9" fill="none" stroke="#9bab78" stroke-width="4" stroke-linecap="round"/><path d="M510 276l47-16 40 15-47 17Z" fill="#819373"/><path d="M524 275l22-8 25 10-22 7Z" fill="#375d43"/><ellipse cx="547" cy="267" rx="24" ry="12" fill="#618158"/><ellipse cx="550" cy="259" rx="17" ry="12" fill="#75975e"/></g>
+              <g class="charger"><ellipse class="charging-aura" cx="479" cy="302" rx="91" ry="60" fill="url(#charger-glow)"/><path d="M466 251l12-4 9 5v47l-12 4-9-5Z" fill="#e1e7cd"/><path d="M478 252l9-1v48l-12 4v-48Z" fill="#9aad92"/><path d="M469 259l7 3v15l-7-3Z" fill="#214a3c"/><path class="charger-led" d="M470 260l5 2" stroke="#cbff62" stroke-width="2"/><path d="M473 278c-13 2-14 21-6 24 12 5 8-18 18-20 12-1 17 11 30 12" fill="none" stroke="#162f28" stroke-width="4" stroke-linecap="round"/><path class="power-cable" d="M473 278c-13 2-14 21-6 24 12 5 8-18 18-20 12-1 17 11 30 12" fill="none" stroke="#cbff62" stroke-width="1.7" stroke-dasharray="4 10" stroke-linecap="round"/></g>
+              <g class="car-shadow"><ellipse cx="597" cy="340" rx="145" ry="34" fill="#19322a" opacity=".44"/></g>
+              <g class="vehicle-cybertruck-art">
+                <path d="M476 295l83-57 80 21 81 55 18 27-69 32-177-47Z" fill="url(#metal-body)"/>
+                <path d="M476 295l83-57 80 21 81 55-111-28Z" fill="#d2ded4"/>
+                <path d="M492 291l68-45 64 17 64 44-79-21Z" fill="#203e3b"/>
+                <path d="M560 246l49 40m15-23 8 29" stroke="#94ada3" stroke-width="2"/>
+                <path d="M476 295l133-9 111 28 18 27-69 32-177-47Z" fill="#93afa4"/>
+                <path d="M476 295l133-9 111 28-65 31-163-39Z" fill="#c9d8cd"/>
+                <path d="M655 345l65-31 18 27-69 32Z" fill="#688f83"/>
+                <path d="M488 306l165 40 71-32" fill="none" stroke="#e4f2dc" stroke-width="3"/>
+                <path d="M557 315l-3 28m61-15 2 30" stroke="#7e9a8e" stroke-width="1.8"/>
+                <path d="M496 324l161 41 69-30" fill="none" stroke="#37594c" stroke-width="7"/>
+                <ellipse cx="530" cy="339" rx="20" ry="26" fill="#142e27" transform="rotate(-16 530 339)"/><ellipse cx="530" cy="339" rx="12" ry="17" fill="#526f62" transform="rotate(-16 530 339)"/><path d="M530 323l10 21-19 4Z" fill="#a4b8a6"/>
+                <ellipse cx="676" cy="358" rx="20" ry="26" fill="#142e27" transform="rotate(-16 676 358)"/><ellipse cx="676" cy="358" rx="12" ry="17" fill="#526f62" transform="rotate(-16 676 358)"/><path d="M676 342l10 21-19 4Z" fill="#a4b8a6"/>
+                <path d="M571 320l12 3m41 10 12 3" stroke="#58796a" stroke-width="2.5" stroke-linecap="round"/>
+              </g>
+              <g class="vehicle-bus-art" transform="translate(230 85) scale(.65)">
+            <path d="M374 249c0-18 8-29 26-32l283-45c15-2 30 0 42 7l53 29c13 7 20 17 20 31v104l-82 28-326-62c-10-2-16-10-16-22Z" fill="url(#suv-body)"/>
+            <path d="M400 217l283-45c15-2 30 0 42 7l53 29-300 55-104-14c0-18 8-29 26-32Z" fill="#dfe8cd"/>
+            <path d="M374 249l326 36 98-46v104l-82 28-326-62c-10-2-16-10-16-22Z" fill="url(#metal-body)"/>
+            <path d="M386 234l292-45c14-2 24-1 35 4l34 17-48 21-312 48Z" fill="#23443e"/>
+            <path d="M387 279l312-48v53l-312 47Z" fill="#23443e"/>
+            <path d="M387 279v-45l312-45v42Z" fill="#23443e"/>
+            <path d="M391 236l305-44v88l-305 45Z" fill="#385b55" opacity=".23"/>
+            <path d="m437 227 0 97m51-105 0 95m52-102 0 94m52-102 0 94m52-101 0 93" fill="none" stroke="#b3c7ad" stroke-width="4"/>
+            <path d="M386 267l312-46" stroke="#b3c7ad" stroke-width="2" opacity=".6"/>
+            <path d="M374 290l326-47 98-34v24l-82 30-342 53Z" fill="#d5e2be"/>
+            <path d="M374 300l326-47 98-34v12l-82 30-342 53Z" fill="#b6e064"/>
+            <path d="M374 316l326-48 98-34v37l-82 29-342 53Z" fill="#496f57"/>
+            <path d="M704 232l75-29c8 5 12 12 12 20v64l-77 28-10-2Z" fill="#203c38"/>
+            <path d="m716 241 62-23v48l-62 23Z" fill="#45655a"/>
+            <path d="M706 287l85-30v44l-78 28Z" fill="#c6d7b6"/>
+            <path d="M710 248l73-27v11l-73 27Z" fill="#1b3632"/>
+            <path d="m720 248 52-19" stroke="#caff79" stroke-width="3" stroke-dasharray="2 2"/>
+            <path d="m715 305 65-25" stroke="#f0f3d1" stroke-width="5" stroke-linecap="round"/>
+            <path d="M717 332l70-26v21l-71 26Z" fill="#688b71"/>
+            <path d="m724 335 53-19" stroke="#1e3b33" stroke-width="6"/>
+            <path d="M387 332l312-47v53l-312 47Z" fill="#7b9b7d"/>
+            <path d="M385 338l314-47" stroke="#d1dfba" stroke-width="2"/>
+            <path d="M646 201l45-7v142l-45 7Z" fill="#405f4e"/><path d="M651 207l16-3v94l-16 2Zm22-4 13-2v94l-13 2Z" fill="#1f3f38"/><path d="m651 309 35-5v28l-35 5Z" fill="#7d9f7a"/><path d="M670 202v137" stroke="#a6bd98" stroke-width="2"/>
+            <path d="M405 347l84-12m41-6 60-9" stroke="#d8e6c1" stroke-width="3" opacity=".8"/>
+            <path d="M388 364l28-4m88-13 86-13m81-12 27-4" stroke="#263f34" stroke-width="4"/>
+            <ellipse cx="451" cy="360" rx="25" ry="32" fill="#18322b" transform="rotate(12 451 360)"/><ellipse cx="451" cy="360" rx="15" ry="22" fill="#829b7d" transform="rotate(12 451 360)"/><ellipse cx="451" cy="360" rx="7" ry="11" fill="#bcc9a6" transform="rotate(12 451 360)"/>
+            <ellipse cx="620" cy="336" rx="25" ry="32" fill="#18322b" transform="rotate(12 620 336)"/><ellipse cx="620" cy="336" rx="15" ry="22" fill="#829b7d" transform="rotate(12 620 336)"/><ellipse cx="620" cy="336" rx="7" ry="11" fill="#bcc9a6" transform="rotate(12 620 336)"/>
+            <path d="m512 190 85-13 37 16-86 14Z" fill="#96ad93"/><path d="m521 187 66-9 29 12-68 11Z" fill="#b4c6a5"/>
+            <circle cx="395" cy="322" r="4" fill="#c9ff66"/><path d="m402 293 12-2" stroke="#eff4cb" stroke-width="3"/>
+          </g>
+              <g class="vehicle-commercial-art" transform="translate(120 50) scale(.8)">
+            <path d="m429 227 173-33 96 45-172 40Z" fill="#e2e9cd"/><path d="m429 227 97 52v91l-97-49Z" fill="#c3d4b6"/><path d="m526 279 172-40v92l-172 39Z" fill="#a6bea0"/>
+            <path d="m429 283 97 48 172-39v21l-172 39-97-48Z" fill="#b8e267"/>
+            <path d="m698 258 37 7 49 59v25l-61 22-25-40Z" fill="#dce5c8"/><path d="m706 267 26 7 30 35-55-10Z" fill="#254840"/><path d="m708 310 61 13 15 1v25l-61 22-15-28Z" fill="#9eb99a"/>
+            <path d="m715 344 58-17m-56 31 57-18" stroke="#e8edce" stroke-width="3"/>
+            <path d="m437 322 88 45 171-38 27 39 61-21" fill="none" stroke="#264337" stroke-width="5"/>
+            <ellipse cx="480" cy="345" rx="21" ry="28" fill="#18322b" transform="rotate(-15 480 345)"/><ellipse cx="480" cy="345" rx="12" ry="18" fill="#a2b695" transform="rotate(-15 480 345)"/>
+            <ellipse cx="663" cy="352" rx="21" ry="28" fill="#18322b" transform="rotate(13 663 352)"/><ellipse cx="663" cy="352" rx="12" ry="18" fill="#a2b695" transform="rotate(13 663 352)"/>
+            <ellipse cx="742" cy="363" rx="21" ry="28" fill="#18322b" transform="rotate(13 742 363)"/><ellipse cx="742" cy="363" rx="12" ry="18" fill="#a2b695" transform="rotate(13 742 363)"/>
+            <path d="m546 296 127-29" stroke="#cbdcbb" stroke-width="2"/><path d="m551 307 116-26" stroke="#cbdcbb" stroke-width="2"/><path d="m713 316 11 3" stroke="#365a45" stroke-width="3"/>
+          </g>
+              <g class="vehicle-model-x-art">
+                <path d="M474 313c-2-14 7-26 23-32l46-29c17-10 40-13 63-7l61 14c20 4 34 18 44 36l16 28c6 10 1 21-10 26l-61 27c-10 4-22 4-34 1l-131-34c-11-3-17-14-17-30Z" fill="url(#suv-body)"/>
+                <path d="M497 282l50-29c15-9 37-10 57-5l45 10c15 3 24 11 30 22l18 30-84-19Z" fill="#25433f"/>
+                <path d="M547 253l29 28m31-33 29 48m13-38 25 43" fill="none" stroke="#b1c4b0" stroke-width="2.5"/>
+                <path d="M497 282l79-1 37 10 84 19 21 20-64 29-141-35-33-23" fill="none" stroke="#88a38f" stroke-width="1.5"/>
+                <path d="M575 283l-9 43 3 21m67-48-4 45 4 22" fill="none" stroke="#9bb49e" stroke-width="1.4"/>
+                <path d="M510 300l45 11m136 10 23 7m-60 31 17-7" stroke="#edffd9" stroke-width="3" stroke-linecap="round"/>
+                <path d="M501 314l6 12 15 4m160 16 14-5" fill="none" stroke="#6f8b78" stroke-width="3" stroke-linecap="round"/>
+                <ellipse cx="529" cy="338" rx="18" ry="25" fill="#172d28" transform="rotate(-16 529 338)"/><ellipse cx="529" cy="338" rx="11" ry="17" fill="#779382" transform="rotate(-16 529 338)"/><path d="M521 324l16 28m-1-28-14 27m-4-16 21 6" stroke="#c4d0b7" stroke-width="2"/>
+                <ellipse cx="674" cy="358" rx="18" ry="25" fill="#172d28" transform="rotate(-16 674 358)"/><ellipse cx="674" cy="358" rx="11" ry="17" fill="#779382" transform="rotate(-16 674 358)"/><path d="M666 344l16 28m-1-28-14 27m-4-16 21 6" stroke="#c4d0b7" stroke-width="2"/>
+                <path d="M585 309l12 3m46 13 12 3" stroke="#688474" stroke-width="2.5" stroke-linecap="round"/><path d="M496 289l-9 13" stroke="#e6efe1" stroke-width="3"/>
+              </g>
+              <g class="scene-foreground"><path d="M767 369l25-8 21 11-25 8Z" fill="#304e38"/><path d="M789 365v-39m-8 13 8 10 13-17m-13 1-7-12" fill="none" stroke="#97ac70" stroke-width="5" stroke-linecap="round"/><path d="M98 331l27-10 26 13-28 10Z" fill="#38533e"/><ellipse cx="125" cy="320" rx="20" ry="13" fill="#7e985c"/></g>
+            </svg>
+            <div class="scene-battery"><div class="scene-battery-top"><span>BATTERY</span><strong id="battery-soc">20<span>%</span></strong></div><div class="battery-track"><div id="battery-fill" style="width:20%"></div></div><div class="battery-target">Morning target <strong id="target-soc">80%</strong></div></div>
+            <div class="price-ticket"><span id="current-price-label">CURRENT SUPPLY PRICE</span><strong id="current-price">—<small> ¢/kWh</small></strong><span class="price-ticket-foot"><span class="price-tick" aria-hidden="true"></span> Real historical ComEd price</span></div>
+            <div class="scene-coordinate" aria-hidden="true">41.88° N · 87.63° W<br>CHICAGO, IL</div>
+            <div class="scene-caption"><span class="status-dot" aria-hidden="true"></span> YOUR OVERNIGHT ENERGY PLAYGROUND</div>
+          </div>
+          <div class="decision-strip"><span class="decision-icon" aria-hidden="true">ϟ</span><div><span class="tiny-label">THE NEXT MOVE</span><p id="decision-reason">Choose a night, press play, and watch the charging plan unfold.</p></div></div>
+          <div class="playback"><div class="playback-buttons"><button id="play" class="button button-primary"><span aria-hidden="true">▶</span> Play the night</button><button id="reset" class="button button-icon" title="Reset this night" aria-label="Reset this night">↺</button><button id="finish" class="button button-quiet">Skip to morning <span aria-hidden="true">↗</span></button></div><label class="speed-control" for="speed"><span>REPLAY SPEED</span><select id="speed"><option value="15">15 min / sec</option><option value="30" selected>30 min / sec</option><option value="60">1 hour / sec</option><option value="180">3 hours / sec</option></select></label></div>
+          <div class="timeline-control"><input id="timeline" type="range" min="0" max="1000" value="0" aria-label="Replay position"><div class="timeline-captions"><span>PLUG IN</span><span id="timeline-label">Your whole night, on one timeline</span><span>READY BY MORNING</span></div></div>
+          <section id="challenge-panel" class="challenge-panel" hidden aria-labelledby="challenge-title"><div><span class="tiny-label">YOUR CALL</span><h3 id="challenge-title">Can you beat the plan?</h3><p id="manual-status">Switch charging on and off as the night unfolds.</p></div><button id="manual-charge" class="button button-primary">Turn charging on <span aria-hidden="true">ϟ</span></button></section>
+        </section>
+
+        <section id="run-summary" class="run-summary" hidden aria-labelledby="result-title"><div class="finish-icon" aria-hidden="true">⚑</div><div class="result-copy"><p class="eyebrow">MORNING HAS ARRIVED</p><h2 id="result-title">Night complete.</h2><p id="result-detail"></p></div><div class="result-number"><span>YOUR SAVINGS</span><strong id="result-saving">—</strong><span id="result-percent" class="savings-percent"></span><span id="result-ready"></span></div></section>
+
+        <section id="race-card" class="race-card is-replay-paused" style="--replay-progress:0%" aria-labelledby="race-title">
+          <div class="section-heading"><div><p class="eyebrow">SIDE BY SIDE</p><h2 id="race-title">Same clock. Different moves.</h2></div><span class="small-pill">Equal energy. Fair comparison.</span></div>
+          <div class="race-clock-heading"><span><span class="race-clock-icon" aria-hidden="true">◷</span> SAME CLOCK <strong id="race-clock">8:00 PM</strong></span><span id="race-target-label">Same 80% morning battery target</span></div>
+          <div class="race-lane baseline-lane" id="baseline-lane">
+            <div class="lane-name"><span class="lane-icon" aria-hidden="true">↯</span><div><h3>Regular charging</h3><span id="baseline-description">Standard delivery · immediate charging</span></div></div>
+            <div class="lane-progress">
+              <div class="lane-battery-heading"><span class="lane-soc"><strong id="baseline-soc">20%</strong> battery</span><span class="lane-charge-state"><i class="lane-state-icon" aria-hidden="true"></i><span id="baseline-charge-state">Ready to replay</span></span></div>
+              <div class="lane-track"><div id="baseline-bar" style="width:20%"></div><span id="baseline-target" class="lane-target" style="left:80%" aria-hidden="true"></span></div>
+              <div class="lane-energy-row"><span id="baseline-energy">0.0 kWh added</span><span id="baseline-progress-label">Battery target</span></div>
+              <div class="lane-time-track" aria-hidden="true"><span class="lane-time-fill"></span><span class="lane-time-marker"></span></div>
+            </div>
+            <strong id="baseline-cost">$0.00</strong>
+          </div>
+          <div class="race-lane plan-lane" id="plan-lane">
+            <div class="lane-name"><span class="lane-icon" aria-hidden="true">ϟ</span><div><h3 id="plan-label">Your strategy</h3><span>Every hour is a choice</span></div></div>
+            <div class="lane-progress">
+              <div class="lane-battery-heading"><span class="lane-soc"><strong id="plan-soc">20%</strong> battery</span><span class="lane-charge-state"><i class="lane-state-icon" aria-hidden="true"></i><span id="plan-charge-state">Ready to replay</span></span></div>
+              <div class="lane-track"><div id="plan-bar" style="width:20%"></div><span id="plan-target" class="lane-target" style="left:80%" aria-hidden="true"></span></div>
+              <div class="lane-energy-row"><span id="plan-energy">0.0 kWh added</span><span id="plan-progress-label">Battery target</span></div>
+              <div class="lane-time-track" aria-hidden="true"><span class="lane-time-fill"></span><span class="lane-time-marker"></span></div>
+            </div>
+            <strong id="plan-cost">$0.00</strong>
+          </div>
+          <div class="race-clock-captions"><span>PLUG IN</span><span><i aria-hidden="true"></i> Time moves together · battery fills while charging</span><span>MORNING</span></div>
+        </section>
+
+        <section class="price-card" aria-labelledby="price-title"><div class="section-heading"><div><p class="eyebrow">READ THE NIGHT</p><h2 id="price-title">The price trail.</h2></div><div class="chart-legend"><span><i class="legend-price"></i> Supply price</span><span><i class="legend-charge"></i> Charging</span></div></div><div class="chart-container"><svg id="price-chart" viewBox="0 0 820 220" role="img" aria-label="Electricity prices and charging activity across the selected night"><text x="410" y="110" text-anchor="middle" fill="#748078" font-size="13">Your selected night will appear here.</text></svg></div><p class="chart-note">Dashed: the forecast available now. Solid: completed hours' settled prices. Green bars: energy charged. Future actual prices stay hidden.</p></section>
+      </div>
+    </div>
+
+    <div class="insights-grid">
+      <section class="leaderboard-card" aria-labelledby="leaderboard-title"><div class="section-heading"><div><p class="eyebrow">THE FINISHING ORDER</p><h2 id="leaderboard-title">Every strategy gets a lane.</h2></div><span class="heading-icon" aria-hidden="true">≋</span></div><div class="table-scroll"><table class="leaderboard-table"><thead><tr><th scope="col">Strategy</th><th scope="col">Bill estimate</th><th scope="col">Energy</th><th scope="col">Status</th></tr></thead><tbody id="leaderboard"><tr><td colspan="4" class="empty-cell">Start a replay to see how the strategies compare.</td></tr></tbody></table></div></section>
+      <section class="event-card" aria-labelledby="event-title"><div class="section-heading"><div><p class="eyebrow">AS IT HAPPENS</p><h2 id="event-title">Night notes.</h2></div><span class="small-pill"><span class="status-dot" aria-hidden="true"></span> Replay log</span></div><ol id="event-log" class="event-log"><li><span class="event-time">READY</span><span>The garage is yours. Let’s see what this night brings.</span></li></ol></section>
+    </div>
+
+    <section class="benchmark-section" aria-labelledby="benchmark-title"><div class="benchmark-intro"><span class="benchmark-symbol" aria-hidden="true">↗</span><div><p class="eyebrow">GO BEYOND A SINGLE NIGHT</p><h2 id="benchmark-title">Put it through 554 nights.</h2><p>A great night is interesting. A consistent advantage is better.<br>Test your driving preset and charging setup across the historical dataset.</p></div><button id="benchmark-button" class="button button-primary">Run the full test <span aria-hidden="true">↗</span></button></div><p id="benchmark-status" class="benchmark-status" role="status">Your vehicle, driving preset, charger, and schedule. Every strategy, on the same nights.</p><progress id="benchmark-progress" max="100" value="0" hidden aria-label="Historical benchmark progress"></progress><div id="benchmark-results" class="benchmark-results"></div><p id="benchmark-note" class="benchmark-note">Historical simulation of charging costs. Supply and delivery charges follow the selected rate. Results depend on the vehicle, charging window, and energy required.</p></section>
+
+    <section id="simulation-assumptions" class="under-the-hood" aria-label="Simulation assumptions"><details><summary><span><span aria-hidden="true">⊕</span> A little context behind the game</span><span class="details-plus" aria-hidden="true">+</span></summary><div class="assumptions-grid"><div><h3>Real nights. Simulated vehicles.</h3><p>The replay uses historical ComEd prices. Charging behavior, vehicle state of charge, and costs are simulated; this page does not control a real charger. The day-ahead plan uses published forecasts and replans when tomorrow's prices are released at 5 p.m. Live prices appear after their seven-minute delay. In-progress bills are posted-price estimates; final bills use settled hourly prices.</p></div><div><h3>Energy, with the losses included.</h3><p>Energy added is the difference between the arrival battery and your selected morning target, using the modeled pack capacity. Electricity at the meter includes charging losses at an assumed 90% efficiency. Cybertruck uses an assumed 123 kWh usable pack and Model X an assumed 95 kWh usable pack; these are study assumptions, not Tesla-published usable-pack claims. Passenger charging power follows <a href="https://www.tesla.com/support/charging/onboard-charger" target="_blank" rel="noopener noreferrer">Tesla onboard charging limits</a>.</p></div><div><h3>Buses &amp; commercial vehicles.</h3><p>These options assume hourly-priced supply and compare with immediate charging on those same prices. Delivery, demand charges and infrastructure are excluded. Regular and Heavy use modeled arrival battery levels of 50% and 20%, charging to your selected morning target. The illustrative bus has a 440 kWh nominal pack and the commercial vehicle a 200 kWh nominal pack, with 90% charging efficiency. The bus pack assumption draws on <a href="https://www.transitchicago.com/assets/1/6/Charging_Forward_Appendix_2-10-22_(FINAL).pdf" target="_blank" rel="noopener noreferrer">published transit planning inputs</a>. These scenarios are not measured operator maxima or winter guarantees. Fixed-rate supply alone has no energy-price timing saving.</p></div><div><h3>A fair finish line.</h3><p>Every strategy uses the same vehicle, arrival battery, morning target and charging window. Average (50% on arrival) and Heavy (20% on arrival) are illustrative battery presets, not measurements of an individual driver. The default 80% target is a balanced replay scenario; you can edit it from 55% to 100%. For personal vehicles, the standard-delivery immediate-charging baseline also shows the effect of changing the delivery rate. Buses and commercial vehicles compare against immediate charging on the same hourly supply prices. A lower cost only helps when the required energy is delivered by departure. A single replay is an example; use the full historical test to compare the entire set of eligible nights.</p></div></div></details></section>
+
+    <div class="next-night-row"><p>Every night has a different rhythm.</p><button id="next-night" class="button button-outline">Try another night <span aria-hidden="true">→</span></button></div>
+  </main>
+
+  <footer class="site-footer"><a class="footer-brand" href="simulation.html">SPARC <span>CHARGE WITH INTENTION.</span></a><p>Built on real ComEd prices. Made for a better morning.</p><a href="#simulation-assumptions">Data &amp; methodology <span aria-hidden="true">↗</span></a></footer>
+  <dialog id="yearly-savings-dialog" class="yearly-dialog" aria-labelledby="yearly-title" aria-describedby="yearly-basis">
+    <button id="yearly-close" class="yearly-close" type="button" aria-label="Close yearly savings">×</button>
+    <span class="yearly-icon" aria-hidden="true">↗</span>
+    <p class="eyebrow">ONE NIGHT. THE BIGGER PICTURE.</p>
+    <h2 id="yearly-title">Your estimated yearly savings.</h2>
+    <div class="yearly-total" role="status" aria-live="polite"><strong id="yearly-amount">—</strong><span id="yearly-unit">/ year</span></div>
+    <p id="yearly-percent" class="yearly-percent"></p>
+    <p id="yearly-night" class="yearly-night"></p>
+    <p id="yearly-basis" class="yearly-basis"></p>
+    <p id="yearly-disclaimer" class="yearly-disclaimer">Historical estimate, assuming daily charging. Supply + delivery only. Actual savings vary.</p>
+    <div class="yearly-actions"><button id="yearly-done" class="button button-primary" type="button">See the night’s results <span aria-hidden="true">↗</span></button><button id="yearly-next" class="button button-outline" type="button">Try another night</button></div>
+  </dialog>
+  <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
