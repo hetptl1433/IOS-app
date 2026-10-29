@@ -97,6 +97,9 @@
     if (cap) { c.capCents = Number(cap[1]); c.strategy = "cap"; }
     c.timerHour = Number(c.timerHour !== undefined ? c.timerHour : 0);
     c.capCents = Number(c.capCents !== undefined ? c.capCents : 3);
+    c.chargeStartHour = Number(c.chargeStartHour !== undefined ? c.chargeStartHour : 22);
+    c.chargeStopHour = Number(c.chargeStopHour !== undefined ? c.chargeStopHour : 6);
+    c.chargeWindowEnabled = c.chargeWindowEnabled === true;
     return c;
   }
   function buildSession(market, config) {
@@ -110,11 +113,18 @@
     else if (c.maxBatteryKwh !== undefined && (!finite(c.maxBatteryKwh) || c.maxBatteryKwh <= 0)) reason = "Available battery headroom must be greater than zero.";
     else if (!finite(c.arrive) || !finite(c.depart) || c.arrive < 0 || c.arrive >= 24 || c.depart < 0 || c.depart >= 24) reason = "Arrival and departure must be hours between0 and24.";
     else if (!finite(c.reserveMinutes) || c.reserveMinutes < 0) reason = "Departure reserve must be nonnegative.";
+    else if ((c.chargeWindowEnabled || c.strategy === "schedule") && (!finite(c.chargeStartHour) || !finite(c.chargeStopHour) || c.chargeStartHour < 0 || c.chargeStartHour >= 24 || c.chargeStopHour < 0 || c.chargeStopHour >= 24)) reason = "Choose valid charging start and stop times.";
+    else if ((c.chargeWindowEnabled || c.strategy === "schedule") && c.chargeStartHour === c.chargeStopHour) reason = "Charging start and stop times must be different.";
+    else if ((c.chargeWindowEnabled || c.strategy === "schedule") && [c.chargeStartHour, c.chargeStopHour].some(function (hour) { return Math.abs(hour * 12 - Math.round(hour * 12)) > EPS; })) reason = "Choose charging start and stop times in five-minute steps.";
     if (reason) return {valid: false, reason: reason, config: c};
     var vehicle = market.vehicles[c.vehicle], rate = Number(vehicle.batteryKwhPerMile);
     if (c.gridEnergyKwh === undefined && (!finite(rate) || rate <= 0)) return {valid: false, reason: "Vehicle energy consumption is unavailable.", config: c};
     var leaveDate = c.depart <= c.arrive ? addDate(c.date, 1) : c.date;
-    var arrival = market.at(c.date, c.arrive), departure = market.at(leaveDate, c.depart);
+    // Explicit boundaries preserve dated history windows, including repeated DST hours.
+    var explicit = c.startEpoch !== undefined || c.endEpoch !== undefined;
+    var arrival = explicit ? c.startEpoch : market.at(c.date, c.arrive);
+    var departure = explicit ? c.endEpoch : market.at(leaveDate, c.depart);
+    if (explicit && (!finite(arrival) || !finite(departure))) return {valid: false, reason: "Session boundaries must be finite epoch seconds.", config: c};
     if (arrival === null || departure === null || departure <= arrival) return {valid: false, reason: "This session falls outside the historical data.", config: c};
     if (arrival % SLOT || departure % SLOT) return {valid: false, reason: "Choose times on a five-minute boundary.", config: c};
     var hours = [];
@@ -126,10 +136,32 @@
       arrival: arrival, departure: departure, hours: hours, batteryKwh: batteryKwh,
       requiredGridKwh: gridKwh, gridKwh: gridKwh, energyKwh: gridKwh,
       powerKw: c.power, slotKwh: c.power * SLOT / HOUR, reserveSeconds: c.reserveMinutes * 60};
+    session.chargingStart = arrival;
+    session.chargingEnd = departure;
+    session.allowedSlots = null;
+    session.availableSeconds = departure - arrival;
     for (var i = 0; i < hours.length; i++) {
       h = hours[i];
       if (!market.hourly.has(h) || !market.dayAhead.has(h) || !market.dayAhead.has(h - DAY)) {
         session.valid = false; session.reason = "Incomplete historical prices for this window; choose another date or time."; break;
+      }
+    }
+    if (session.valid && (c.chargeWindowEnabled || c.strategy === "schedule")) {
+      var allowed = [];
+      for (var t = arrival; t < departure; t += SLOT) {
+        var wall = market.hours.get(hourStart(t)).localHour + (t - hourStart(t)) / HOUR;
+        var afterStart = wall + EPS >= c.chargeStartHour, beforeStop = wall < c.chargeStopHour - EPS;
+        if (c.chargeStartHour < c.chargeStopHour ? afterStart && beforeStop : afterStart || beforeStop) allowed.push(t);
+      }
+      if (!allowed.length) {
+        session.valid = false;
+        session.reason = "The charging window does not overlap the time the vehicle is plugged in.";
+      } else {
+        session.allowedSlots = new Set(allowed);
+        session.chargingSlotTimes = allowed;
+        session.chargingStart = allowed[0];
+        session.chargingEnd = allowed[allowed.length - 1] + SLOT;
+        session.availableSeconds = allowed.length * SLOT;
       }
     }
     return session;
@@ -146,7 +178,7 @@
       var split = soft <= first ? first : Math.min(end, first + Math.ceil((soft - first) / SLOT) * SLOT);
       [[false, first, split], [true, split, end]].forEach(function (part) {
         var slots = [];
-        for (var t = part[1]; t < part[2]; t += SLOT) slots.push(t);
+        for (var t = part[1]; t < part[2]; t += SLOT) if (!need.allowedSlots || need.allowedSlots.has(t)) slots.push(t);
         if (slots.length) blocks.push({key: [blocked.has(hour) ? 1 : 0, part[0] ? 1 : 0, price, hour], slots: slots});
       });
     }
@@ -185,7 +217,7 @@
     var session = buildSession(market, config);
     if (!session.valid) return invalidResult(session);
     var c = session.config, strategy = c.strategy;
-    if (["charge-now", "timer", "cap", "day-ahead", "live", "hindsight", "manual"].indexOf(strategy) < 0) return invalidResult(session, "Unknown charging strategy.");
+    if (["charge-now", "timer", "schedule", "cap", "day-ahead", "live", "hindsight", "manual"].indexOf(strategy) < 0) return invalidResult(session, "Unknown charging strategy.");
     if (strategy === "live" && !market.decay.length) return invalidResult(session, "Live-model calibration is unavailable.");
     var full = session.slotKwh, remaining = session.requiredGridKwh, charging = false;
     var blocked = new Set(), cents = new Map(), releases = [], changes = new Set();
@@ -198,7 +230,7 @@
     releases.sort(function (a, b) { return a - b; });
     changes = Array.from(changes).sort(function (a, b) { return a - b; });
     var known = new Map(), knownVersion = null, schedule = new Map(), version = null;
-    var begins = session.start;
+    var begins = session.chargingStart;
     if (strategy === "timer") {
       if (!finite(c.timerHour) || c.timerHour < 0 || c.timerHour >= 24) return invalidResult(session, "Timer hour must be between0 and24.");
       var day = market.hours.get(hourStart(session.start)).date;
@@ -208,9 +240,15 @@
       if (priorTarget === null) return invalidResult(session, "Timer history is unavailable.");
       target = session.start - priorTarget <= 6 * HOUR ? session.start : market.at(addDate(day, 1), c.timerHour);
       var duration = Math.ceil(remaining / full - EPS) * SLOT;
-      var latest = session.end - session.reserveSeconds - duration;
-      if (latest < session.start) latest = session.end - duration;
-      begins = Math.max(session.start, Math.min(target, latest));
+      var latest = session.chargingEnd - session.reserveSeconds - duration;
+      if (latest < session.chargingStart) latest = session.chargingEnd - duration;
+      if (session.allowedSlots) {
+        var count = Math.ceil(remaining / full - EPS), times = session.chargingSlotTimes;
+        var beforeReserve = upperBound(times, session.chargingEnd - session.reserveSeconds - SLOT);
+        var finishAt = beforeReserve >= count ? beforeReserve : times.length;
+        latest = times[Math.max(0, finishAt - count)];
+      }
+      begins = Math.max(session.chargingStart, Math.min(target, latest));
     }
     function costMap(now) {
       var expected = new Map(), changed = upperBound(changes, now);
@@ -248,12 +286,16 @@
     var forecast = null;
     for (var now = session.start; now < session.end; now += SLOT) {
       var hour = hourStart(now), kwh = 0, prices = null;
-      if (remaining > EPS) {
+      if (remaining > EPS && (!session.allowedSlots || session.allowedSlots.has(now))) {
         if (strategy === "charge-now") kwh = full;
         else if (strategy === "timer") kwh = now >= begins ? full : 0;
+        else if (strategy === "schedule") kwh = full;
         else if (strategy === "manual") kwh = manualEnergy(options.manual || c.manual || c.schedule, now, remaining, session);
         else if (strategy === "cap") {
-          if (now + Math.ceil(remaining / full - EPS) * SLOT >= session.end - session.reserveSeconds) kwh = full;
+          var urgent = session.allowedSlots ? Math.ceil(remaining / full - EPS) >=
+            upperBound(session.chargingSlotTimes, session.chargingEnd - session.reserveSeconds - SLOT) - upperBound(session.chargingSlotTimes, now - 1) :
+            now + Math.ceil(remaining / full - EPS) * SLOT >= session.end - session.reserveSeconds;
+          if (urgent) kwh = full;
           else {
             var posted = market.fiveMinute.get(latestVisible(now));
             kwh = posted === undefined ? (charging ? full : 0) : (posted <= c.capCents ? full : 0);
@@ -263,7 +305,7 @@
           prices = costMap(now);
           if (version !== nextVersion) {
             version = nextVersion;
-            schedule = plan({now: now, departure: session.end, energyKwh: remaining, powerKw: c.power,
+            schedule = plan({now: now, departure: session.chargingEnd, energyKwh: remaining, powerKw: c.power, allowedSlots: session.allowedSlots,
               reserveSeconds: strategy === "hindsight" ? 0 : session.reserveSeconds}, prices.costs, blocked, charging, strategy === "live" ? .5 : 0);
           }
           kwh = schedule.get(now) || 0;

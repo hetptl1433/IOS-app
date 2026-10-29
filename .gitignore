@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+!night-shift/dist/
+!night-shift/dist/*
 
 # SPARC's working database changes every time the app runs, and `python -m sparc load` rebuilds it
 # from comed-data/ in seconds, so git keeps the CSV copy of the prices instead. ai-forecasts/ caches

@@ -20,7 +20,7 @@
   const isFleet = (c) => !!FLEET[c.vehicleId];
   const baselineTariff = (c) => isFleet(c) ? "energy-only" : "standard";
   const billingScope = (c) => isFleet(c) ? "supply only" : "supply + delivery";
-  const comparison = (c) => isFleet(c) ? "Compared with immediate charging on the same hourly supply prices. Commercial delivery and demand charges are excluded." : "Compared with standard immediate charging; includes any delivery-rate change.";
+  const comparison = (c) => isFleet(c) ? `Compared with ${c.chargeWindowEnabled ? "charging when the window allows" : "immediate charging"} on the same hourly supply prices. Commercial delivery and demand charges are excluded.` : `Compared with standard delivery and ${c.chargeWindowEnabled ? "charging when the window allows" : "immediate charging"}; includes any delivery-rate change.`;
   const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
   const wholeMoney = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const clockFormat = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" });
@@ -50,12 +50,22 @@
   let lastDrawnSlot = -1, benchmarkResult = null, annualToken = 0, lastFlow = {};
   const annualCache = new Map();
   const rules = () => [
-    { id: "charge-now", label: "Plug in & charge", color: "#87968d" },
+    { id: "charge-now", label: $("charge-window").value === "custom" ? "Charge when allowed" : "Plug in & charge", color: "#87968d" },
     { id: "timer", label: `Timer · ${clock.format(market.at(selectedDate, Number($("timer-hour").value)))}`, color: "#ac8c5a" },
     { id: "cap", label: `Below ${Number($("cap-cents").value).toFixed(1)}¢`, color: "#de9754" },
     { id: "day-ahead", label: "SPARC plan", color: "#8cbb39" },
     { id: "live", label: "SPARC + live", color: "#1b9f94" },
   ];
+
+  function timeHour(value) {
+    if (!/^\d{2}:\d{2}$/.test(value)) return NaN;
+    const [hour, minute] = value.split(":").map(Number);
+    return hour + minute / 60;
+  }
+  function timeValue(hour) {
+    const minutes = Math.round(hour * 60);
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  }
 
   function configFromControls() {
     const profile = ChargeTarget.profile({capacityKwh:market.vehicles[$("vehicle").value].capacityKwh,
@@ -66,7 +76,9 @@
       arrivalHour: Number($("arrival").value), departureHour: Number($("departure").value),
       powerKw: Number($("power").value), efficiency: .9, reserveMin: 30,
       tariff: $("tariff").value, strategy: $("strategy").value,
-      timerHour: Number($("timer-hour").value), capCents: Number($("cap-cents").value) };
+      timerHour: Number($("timer-hour").value), capCents: Number($("cap-cents").value),
+      chargeWindowEnabled: $("charge-window").value === "custom",
+      chargeStartHour: timeHour($("charge-start").value), chargeStopHour: timeHour($("charge-stop").value) };
   }
   function updateVehicleControls(useDefaults = false) {
     const fleet = FLEET[$("vehicle").value], previousPower = $("power").value, previousTariff = $("tariff").value;
@@ -152,6 +164,9 @@
     text("target-soc", `${config.targetSoc}% target`);
     selection = config.strategy;
     if ($("timer-settings")) $("timer-settings").hidden = selection !== "timer";
+    $("schedule-settings").hidden = !config.chargeWindowEnabled;
+    text("schedule-note", config.chargeWindowEnabled ? "Choose times in 5-minute steps. A stop earlier than the start crosses midnight. Every strategy stays within these hours while plugged in; SPARC can choose cheaper hours inside the window." : "Charging is allowed throughout the time between plug-in and ready-by.");
+    text("baseline-description", config.chargeWindowEnabled ? isFleet(config) ? "Same hourly supply · starts when allowed" : "Standard delivery · starts when allowed" : isFleet(config) ? "Same hourly supply · immediate charging" : "Standard delivery · immediate charging");
     if ($("cap-settings")) $("cap-settings").hidden = selection !== "cap";
     text("cap-value", `${config.capCents.toFixed(1)}¢`);
     if (!session.valid) {
@@ -159,8 +174,8 @@
       baseline = null; tracks = []; human = null;
       $("play").disabled = true;
       $("finish").disabled = true;
-      text("car-status", "Choose another night");
-      text("decision-reason", "Every required hour needs a recorded price. Missing data is skipped, not invented.");
+      text("car-status", "Check your settings");
+      text("decision-reason", session.reason || "Every required hour needs a recorded price. Missing data is skipped, not invented.");
       ["cost-now", "saved-now", "baseline-cost", "plan-cost"].forEach((id) => text(id, "—"));
       text("sim-clock", "—");
       text("energy-now", "0.0 kWh");
@@ -184,11 +199,15 @@
     baseline = Engine.simulate(market, { ...config, strategy: "charge-now", tariff: baselineTariff(config) });
     tracks = rules().map((rule) => ({ ...rule, result: Engine.simulate(market, { ...config, strategy: rule.id }) }));
     human = Engine.simulate(market, { ...config, strategy: "manual" }, { manual: humanChoices });
-    const fit = session.requiredGridKwh <= (session.end - session.start) / 3600 * config.powerKw + 1e-7;
+    const fit = session.requiredGridKwh <= session.availableSeconds / 3600 * config.powerKw + 1e-7;
     const scenario = DATA.scenarios.find((s) => s.date === selectedDate);
     text("configuration-note", fit ? `${dateLabel(selectedDate)} · ${isFleet(config) ? "One vehicle on assumed hourly-priced supply. Preset workloads are modeled, not a measured operator maximum." : scenario?.description || "Real ComEd prices, replayed in Chicago time."}` :
       "This charger cannot deliver the target before departure. Try more power, a lighter preset, or a longer window. Unfinished runs never count as savings.");
+    if (config.chargeWindowEnabled) {
+      text("configuration-note", fit ? `Plugged in ${clock.format(session.start)} → ${clock.format(session.end)}. Charging hours ${clock.format(market.at(selectedDate, config.chargeStartHour))} → ${clock.format(market.at(selectedDate, config.chargeStopHour))}, with ${(session.availableSeconds / 3600).toFixed(1)} hours available while plugged in.` : "Your charging window cannot deliver the target while plugged in. Extend the start/stop times, increase power, or lower the target. Unfinished runs never count as savings.");
+    }
     pushEvent(`${vehicle.label || vehicle.name} plugged in at ${config.startSoc}%. Target ${config.targetSoc}%: ${session.batteryKwh.toFixed(1)} battery kWh to add.`);
+    if (config.chargeWindowEnabled) pushEvent(`Charging is allowed from ${clock.format(session.chargingStart)} until ${clock.format(session.chargingEnd)}. No strategy charges outside that window.`);
     pushEvent(challenge ? "Your move: switch charging on and off. Future actual prices stay hidden." : "The strategies share a target and departure time. SPARC waits for its forecast's cheapest hours.");
     updateManualButton();
     draw(true);
@@ -201,7 +220,9 @@
   function updateManualButton() {
     text("manual-charge", humanOn ? "Pause my charging" : "Turn my charging on");
     $("manual-charge").setAttribute("aria-pressed", String(humanOn));
-    text("manual-status", humanOn ? "ON · charging at the selected power" : "OFF · waiting for your command");
+    const now = session?.start + cursor * 300;
+    const allowed = !session?.allowedSlots || session.allowedSlots.has(now);
+    text("manual-status", humanOn ? allowed ? "ON · charging at the selected power" : "ON requested · outside allowed charging hours" : "OFF · waiting for your command");
     $("manual-charge").classList.toggle("charging", humanOn);
   }
   function advance(steps) {
@@ -266,7 +287,7 @@
     }
     const key = JSON.stringify({ ...captured, date: null, strategy });
     let annual = annualCache.get(key);
-    if (!annual && captured.arrivalHour === 20 && captured.departureHour === 7 && captured.powerKw === 11.5) {
+    if (!annual && !captured.chargeWindowEnabled && captured.arrivalHour === 20 && captured.departureHour === 7 && captured.powerKw === 11.5) {
       const row = savedBenchmark(strategy, captured);
       if (row) annual = { saving: row.savedDefaultAnnualUsd, baselineCost: row.defaultAnnualCostUsd, ready: row.readyFraction, nights: row.nights, skipped: row.skipped };
     }
@@ -303,6 +324,11 @@
     text("yearly-basis", `Average difference across ${annual.nights} historical nights × 365, assuming a ${captured.startSoc}% → ${captured.targetSoc}% charge every day with your vehicle, charger and schedule. ${comparison(captured)} ${annual.skipped} dates skipped for missing prices.`);
   }
   function reason(result, item) {
+    const now = session.start + cursor * 300;
+    if (config.chargeWindowEnabled && atCursor(result).cumulativeKwh < session.requiredGridKwh - 1e-7 && !session.allowedSlots.has(now)) {
+      const nextAllowed = session.chargingSlotTimes.find(time => time >= now);
+      return nextAllowed !== undefined ? `Plugged in. Charging is allowed from ${clock.format(nextAllowed)}.` : `Your charging window has closed. Charging stopped by ${clock.format(session.chargingEnd)}.`;
+    }
     if (!item) return challenge ? "You control the charger. Press C or use the charging button." : "Press Start replay to watch the plan work.";
     if (item.remaining <= 1e-7) return "Target reached. The vehicle is ready, so charging stops.";
     if (challenge) return humanOn ? "Your charger is on. You decide when to pause." : "Your charger is off. Keep an eye on the remaining time.";
@@ -329,7 +355,9 @@
   }
   function laneMotion(result, manual = false) {
     const completed = atCursor(result).cumulativeKwh;
-    const nextEnergy = manual ? humanOn ? Math.min(config.powerKw / 12, session.requiredGridKwh - completed) : 0 : result.slots[cursor]?.energy || 0;
+    const now = session.start + cursor * 300;
+    const allowed = !session.allowedSlots || session.allowedSlots.has(now);
+    const nextEnergy = manual ? humanOn && allowed ? Math.min(config.powerKw / 12, session.requiredGridKwh - completed) : 0 : result.slots[cursor]?.energy || 0;
     return View.laneState({completedKwh:completed, nextEnergyKwh:nextEnergy,
       requiredKwh:session.requiredGridKwh, capacityKwh:market.vehicles[config.vehicleId].capacityKwh,
       efficiency:config.efficiency, startSoc:config.startSoc, cursor, totalSlots:baseline.slots.length, fraction:manual ? 0 : accumulated, playing});
@@ -421,6 +449,7 @@
     }
     if (nextSlot && !complete) $("manual-charge").disabled = state.cumulativeKwh >= session.requiredGridKwh - 1e-7;
     else $("manual-charge").disabled = true;
+    if (challenge) updateManualButton();
     drawMotion();
   }
   function drawLeaderboard(now, complete) {
@@ -486,13 +515,14 @@
     return id === "timer" ? `timer-${String(c.timerHour).padStart(2, "0")}00` : id === "cap" ? `cap-${c.capCents}` : id;
   }
   function savedBenchmark(id, c = config) {
+    if (c.chargeWindowEnabled) return null;
     const vehicle = market.vehicles[c.vehicleId];
     return DATA.benchmarks.find((row) => row.vehicleId === c.vehicleId && row.tariff === c.tariff && row.strategy === savedId(id, c) &&
       Math.abs(row.milesPerDay * vehicle.batteryKwhPerMile - c.gridEnergyKwh * c.efficiency) < 1e-7);
   }
   function showSavedBenchmark() {
     benchmarkResult = null;
-    const preset = config.arrivalHour === 20 && config.departureHour === 7 && config.powerKw === 11.5;
+    const preset = !config.chargeWindowEnabled && config.arrivalHour === 20 && config.departureHour === 7 && config.powerKw === 11.5;
     const rows = preset ? rules().map((rule) => {
       const b = savedBenchmark(rule.id);
       return b ? { label: rule.label, cost: b.annualCostUsd, saving: b.savedDefaultAnnualUsd, baselineCost:b.defaultAnnualCostUsd, ready: b.readyFraction, nights: b.nights, skipped: b.skipped } : null;
@@ -567,10 +597,16 @@
       const currentPreferences = targetPreferences || localStorage.getItem("sparc.simulation.v2");
       const stored = JSON.parse(currentPreferences || localStorage.getItem("sparc.simulation") || "null");
       if (stored && market.vehicles[stored.vehicleId]) {
+        // Move the former schedule strategy into the independent charging window.
+        if (stored.strategy === "schedule") { stored.strategy = "day-ahead"; stored.chargeWindowEnabled = true; }
+        $("charge-window").value = stored.chargeWindowEnabled ? "custom" : "connected";
         $("usage").value = targetPreferences && stored.usageId === "average" ? "average" : "heavy";
         if (targetPreferences && Number.isFinite(stored.targetSoc) && stored.targetSoc >= 55 && stored.targetSoc <= 100 && stored.targetSoc % 5 === 0) $("charge-target").value = stored.targetSoc;
         [["vehicle", "vehicleId"], ["arrival", "arrivalHour"], ["departure", "departureHour"], ["power", "powerKw"], ["tariff", "tariff"], ["strategy", "strategy"], ["timer-hour", "timerHour"], ["cap-cents", "capCents"]].forEach(([id, key]) => {
           if (stored[key] !== undefined && (id !== "vehicle" || currentPreferences)) { const el = $(id), old = el.value; el.value = stored[key]; if (!el.value) el.value = old; if (id === "vehicle") updateVehicleControls(true); }
+        });
+        [["charge-start", "chargeStartHour"], ["charge-stop", "chargeStopHour"]].forEach(([id, key]) => {
+          if (Number.isFinite(stored[key]) && stored[key] >= 0 && stored[key] < 24) $(id).value = timeValue(stored[key]);
         });
         if (DATA.days.includes(stored.date)) { selectedDate = stored.date; scenario.value = selectedDate; }
       }
@@ -581,7 +617,7 @@
       if ($("usage").value === value) return;
       $("usage").value = value; updateUsageSwitch(); reset();
     }));
-    ["arrival", "departure", "power", "tariff", "strategy", "timer-hour", "cap-cents", "charge-target"].forEach((id) => $(id).addEventListener("change", reset));
+    ["arrival", "departure", "power", "tariff", "strategy", "timer-hour", "cap-cents", "charge-target", "charge-window", "charge-start", "charge-stop"].forEach((id) => $(id).addEventListener("change", reset));
     $("charge-target").addEventListener("input", () => {
       const target = Number($("charge-target").value);
       text("target-value", `${target}%`);

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f4ec">
+  <meta name="description" content="Replay your recorded home charging sessions with SPARC and historical ComEd prices. Compare schedules, explore morning flexibility, and export the results.">
+  <title>Charging history · SPARC Night Shift</title>
+  <link rel="stylesheet" href="simulation.css">
+  <link rel="stylesheet" href="charging-history.css">
+  <script src="simulation-data.js" defer></script>
+  <script src="simulation-engine.js" defer></script>
+  <script src="charging-history-data.js" defer></script>
+  <script src="charging-history-engine.js" defer></script>
+  <script src="charging-history.js" defer></script>
+</head>
+<body class="history-page">
+  <header class="site-header">
+    <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
+    <nav aria-label="Main navigation"><a href="simulation.html">Play the simulation</a><a class="nav-current" href="charging-history.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span>Charging history</a><a href="#history-method">How it works</a></nav>
+  </header>
+
+  <main class="page-shell history-shell">
+    <section class="intro history-intro" aria-labelledby="history-title">
+      <div><p class="eyebrow"><span class="mini-bolt" aria-hidden="true">ϟ</span> YOUR REAL CHARGING DATA</p><h1 id="history-title">Your history.<br><span>A smarter charge.</span></h1><p class="intro-copy">What would SPARC have done with your charging sessions?<br>Replay your energy needs against real ComEd prices and see the difference.</p></div>
+      <div class="history-source"><span class="replay-tag"><span class="status-dot" aria-hidden="true"></span> LOCAL DATA · HISTORICAL REPLAY</span><strong id="source-count">Loading sessions…</strong><span id="source-period"></span><a href="#history-method">From charging_sessions_tm1.csv <span aria-hidden="true">↘</span></a></div>
+    </section>
+
+    <p id="history-error" class="history-message error" role="alert" hidden></p>
+    <noscript><p class="history-message error">Enable JavaScript to run the charging-history simulation.</p></noscript>
+    <section class="telemetry" aria-label="Filtered history results">
+      <div class="stat"><span class="stat-label">SESSIONS IN RANGE</span><strong id="summary-sessions">—</strong><span class="stat-foot" id="summary-coverage">Recorded home AC charging</span></div>
+      <div class="stat"><span class="stat-label">GRID ENERGY</span><strong id="summary-energy">—</strong><span class="stat-foot" id="summary-energy-note">Meter energy, including charging losses</span></div>
+      <div class="stat"><span class="stat-label">SPARC SIMULATED COST</span><strong id="summary-cost">—</strong><span class="stat-foot" id="summary-baseline">Run the history to compare costs</span></div>
+      <div class="stat stat-savings"><span class="stat-label">ESTIMATED SAVINGS</span><strong id="summary-saving">—</strong><span class="stat-foot" id="summary-saving-note">Same grid energy. Same delivery rate.</span><span class="stat-decoration" aria-hidden="true">↗</span></div>
+    </section>
+
+    <div class="history-layout">
+      <aside class="configuration history-config" aria-labelledby="filter-title">
+        <div class="panel-heading"><div><p class="eyebrow">BUILD YOUR REPLAY</p><h2 id="filter-title">Your history.</h2></div><span class="heading-icon" aria-hidden="true">☷</span></div>
+        <form id="history-form">
+          <div class="field"><label for="history-start">From</label><input id="history-start" type="date" required></div>
+          <div class="field"><label for="history-end">Through</label><input id="history-end" type="date" required></div>
+          <div class="field"><label for="history-min-energy">Session size</label><select id="history-min-energy"><option value="0">All sessions</option><option value="5">At least 5 kWh</option><option value="10">At least 10 kWh</option><option value="20">At least 20 kWh</option></select></div>
+          <div class="field history-divider"><label for="history-window">Available charging window</label><select id="history-window" aria-describedby="window-note"><option value="recorded">Recorded start → finish</option><option value="morning">Stay connected until morning</option></select><p id="window-note" class="history-hint">Uses only the recorded charging window, rounded outward to 5 minutes.</p></div>
+          <div class="field" id="departure-field" hidden><label for="history-departure">Assumed departure</label><select id="history-departure"><option value="5">5:00 AM</option><option value="6">6:00 AM</option><option value="7" selected>7:00 AM</option><option value="8">8:00 AM</option><option value="9">9:00 AM</option></select></div>
+          <div class="field"><label for="history-power">Charging power</label><select id="history-power"><option value="recorded">Recorded peak power</option><option value="3.6">What if: 3.6 kW</option><option value="7.7">What if: 7.7 kW</option><option value="11.5">What if: 11.5 kW</option></select></div>
+          <div class="field"><label for="history-tariff">Delivery rate · all strategies</label><select id="history-tariff"><option value="standard">Standard delivery</option><option value="time-of-day">Time-of-day delivery</option></select></div>
+          <button class="history-button primary" id="run-history" type="submit"><span aria-hidden="true">▶</span> Run filtered sessions</button>
+          <p class="history-hint">Calculations run in your browser using the shared SPARC simulator.</p>
+        </form>
+      </aside>
+
+      <div class="history-content">
+        <section class="history-panel replay-panel" aria-labelledby="replay-title">
+          <div class="history-panel-head"><div><p class="eyebrow">01 / REPLAY A SESSION</p><h2 id="replay-title">One charge. Five possibilities.</h2></div><span class="history-badge" id="session-id">RECORDED SESSION</span></div>
+          <div class="field session-picker"><label for="history-session">Choose a session from your filtered history</label><select id="history-session"></select></div>
+          <div class="session-facts" id="session-facts"></div>
+          <p id="session-note" class="history-hint"></p>
+          <p id="session-warning" class="history-message" role="status" hidden></p>
+          <div class="replay-controls"><button id="replay-play" class="history-button primary" type="button">▶ Play replay</button><button id="replay-reset" class="history-button" type="button">Reset</button><label for="replay-speed">Speed <select id="replay-speed"><option value="8">8×</option><option value="24" selected>24×</option><option value="72">72×</option></select></label><output id="replay-clock">—</output></div>
+          <label class="sr-only" for="replay-scrub">Replay progress</label><input id="replay-scrub" type="range" min="0" max="100" step="1" value="0">
+          <div class="history-tracks" id="history-tracks"></div>
+          <div class="replay-outcome" id="replay-outcome" aria-live="polite">Choose a session to compare charging strategies.</div>
+          <div class="history-chart-heading"><h3>When the energy flows</h3><span><i class="legend-price"></i>Settled supply + delivery <i class="legend-energy"></i>SPARC grid energy</span></div>
+          <svg id="history-chart" viewBox="0 0 760 195" role="img" aria-label="Historical prices and the SPARC charging schedule"></svg>
+          <p class="history-hint chart-note">The chart shows final billed prices. SPARC schedules from day-ahead prices available at the time; perfect hindsight is a reference.</p>
+        </section>
+
+        <section class="history-panel" aria-labelledby="batch-title">
+          <div class="history-panel-head"><div><p class="eyebrow">02 / THE WHOLE PICTURE</p><h2 id="batch-title">Put your history to the test.</h2></div><button id="export-history" class="history-button" type="button" disabled>Export CSV <span aria-hidden="true">↗</span></button></div>
+          <div class="history-progress" id="batch-progress" hidden><progress id="batch-meter" value="0" max="100"></progress></div>
+          <p id="batch-status" class="history-hint" role="status" aria-live="polite">Run filtered sessions to compare your history. Sessions without complete prices or enough time are reported separately.</p>
+          <div class="history-table-wrap"><table class="history-table"><caption class="sr-only">Recorded sessions and simulated costs</caption><thead><tr><th scope="col">Session · Chicago time</th><th scope="col">Grid kWh</th><th scope="col">Immediate</th><th scope="col">SPARC</th><th scope="col">Savings</th><th scope="col">Status</th></tr></thead><tbody id="history-table-body"></tbody></table></div>
+          <div class="history-pagination"><span id="table-count"></span><div><button id="table-previous" class="history-button" type="button" aria-label="Previous page">←</button><button id="table-next" class="history-button" type="button" aria-label="Next page">→</button></div></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="history-method" id="history-method" aria-labelledby="method-title"><p class="eyebrow">THE ASSUMPTIONS, IN THE OPEN</p><h2 id="method-title">Real sessions. A modeled alternative.</h2><div class="method-grid">
+      <div><span>01</span><h3>Your energy stays your energy.</h3><p>Each row uses <code>kwh_used</code> as grid energy. <code>kwh_added</code> and battery percentages are shown as recorded. No vehicle capacity or extra efficiency loss is assumed.</p></div>
+      <div><span>02</span><h3>The window matters.</h3><p>Each row is replayed independently. Charging timestamps are interpreted in America/Chicago and rounded outward to five-minute boundaries. They are charging events, not verified plug-in or unplug times. The morning scenario extends availability to the chosen hour, caps the extension at the next recorded session, and always keeps the original window.</p></div>
+      <div><span>03</span><h3>One fair cost comparison.</h3><p>Immediate charging and SPARC use the same grid energy, power, window, and delivery rate. Savings count only when both finish. Prices settle hourly. The study’s fixed standard or time-of-day delivery rates apply across all dates; flat bill charges and capacity charges are excluded.</p></div>
+      <div><span>04</span><h3>Recorded does not mean metered detail.</h3><p>The recorded-pattern estimate spreads grid energy evenly over each recorded window; the CSV has no interval power trace. Logged CSV cost is shown separately and is not the savings baseline. Peak power below the energy-implied average is raised and flagged. Missing prices and ambiguous daylight-saving timestamps are skipped.</p></div>
+    </div></section>
+    <footer class="history-footer"><span>SPARC / NIGHT SHIFT · CHARGING HISTORY LAB</span><a href="simulation.html">Back to the night simulator ↗</a></footer>
+  </main>
+</body>
+</html>

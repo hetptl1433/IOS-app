@@ -94,6 +94,22 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/nothing")[0], 404)
         self.assertEqual(self.request("DELETE", "/api/state")[0], 405)
 
+    def test_simulation_and_charging_history(self):
+        status, _, response = self.request("GET", "/simulation")
+        self.assertEqual(status, 307)
+        self.assertEqual(response.getheader("Location"), "/simulation/")
+        for path in ("/simulation/", "/simulation/simulation.html", "/simulation/charging-history.html",
+                     "/simulation/simulation-engine.js", "/simulation/charging-history-engine.js",
+                     "/simulation/charging-history-data.js", "/simulation/charging-history.js",
+                     "/simulation/charging-history.css"):
+            status, content, response = self.request("GET", path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(content, path)
+            self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
+        for path in ("/simulation/../README.md", "/simulation/%2e%2e/README.md",
+                     "/simulation/missing.html", "/simulation/.openai/hosting.json"):
+            self.assertEqual(self.request("GET", path)[0], 404, path)
+
     def test_home_page_and_results_pages(self):
         status, page, _ = self.request("GET", "/")
         self.assertEqual(status, 200)
