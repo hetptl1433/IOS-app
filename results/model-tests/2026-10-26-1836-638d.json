@@ -1,0 +1,122 @@
+{
+ "id": "2026-10-26-1836-638d",
+ "created": "2026-10-26T23:36:05+00:00",
+ "period": "all",
+ "first": "2013-01-24",
+ "last": "2026-10-16",
+ "nights": {
+  "Average": 1474,
+  "Moderate": 1474,
+  "Heavy": 1474
+ },
+ "skipped": {
+  "Average": 3540,
+  "Moderate": 3540,
+  "Heavy": 3540
+ },
+ "decisions": 25451,
+ "hourly_forecasts": 228542,
+ "drivers": [
+  {
+   "name": "Average",
+   "kwh": 15,
+   "description": "plug in 20:00, leave 07:00, +15 kWh at 11.5 kW"
+  },
+  {
+   "name": "Moderate",
+   "kwh": 30,
+   "description": "plug in 20:00, leave 07:00, +30 kWh at 11.5 kW"
+  },
+  {
+   "name": "Heavy",
+   "kwh": 80,
+   "description": "plug in 20:00, leave 07:00, +80 kWh at 11.5 kW"
+  }
+ ],
+ "default_cost_per_year": {
+  "Average": 618.7621297866725,
+  "Moderate": 1186.292694764813,
+  "Heavy": 2911.8269287344283
+ },
+ "hindsight": {
+  "Average": 350.040604115442,
+  "Moderate": 623.6137449745078,
+  "Heavy": 1222.964948204686
+ },
+ "rows": [
+  {
+   "id": "day-ahead",
+   "name": "Day-ahead price",
+   "maker": "PJM, published by ComEd",
+   "uses_day_ahead": false,
+   "in_report": true,
+   "mae": 1.3643205771076359,
+   "rmse": 4.67604201024074,
+   "day_ahead_mae": 1.3643205771076359,
+   "day_ahead_rmse": 4.67604201024074,
+   "rmse_change": 0.0,
+   "seconds": 8,
+   "saved": {
+    "Average": 314.6081770640598,
+    "Moderate": 574.4945951045395,
+    "Heavy": 1169.9049257415597
+   },
+   "vs_plan": {
+    "Average": {
+     "per_year": 0.0,
+     "error_per_year": 0.0,
+     "nights": 1474
+    },
+    "Moderate": {
+     "per_year": 0.0,
+     "error_per_year": 0.0,
+     "nights": 1474
+    },
+    "Heavy": {
+     "per_year": 0.0,
+     "error_per_year": 0.0,
+     "nights": 1474
+    }
+   }
+  },
+  {
+   "id": "seasonal-naive",
+   "name": "Same hour yesterday",
+   "maker": "Simple rule",
+   "uses_day_ahead": false,
+   "in_report": true,
+   "mae": 1.8639252724558488,
+   "rmse": 5.656462404948565,
+   "day_ahead_mae": 1.3643205771076359,
+   "day_ahead_rmse": 4.67604201024074,
+   "rmse_change": 0.2096688593816438,
+   "seconds": 8,
+   "saved": {
+    "Average": 296.3430423743026,
+    "Moderate": 551.1577525356175,
+    "Heavy": 1141.0602737577915
+   },
+   "vs_plan": {
+    "Average": {
+     "per_year": -18.265134689757136,
+     "error_per_year": 2.138909779485297,
+     "nights": 1474
+    },
+    "Moderate": {
+     "per_year": -23.336842568921952,
+     "error_per_year": 2.9659493201827565,
+     "nights": 1474
+    },
+    "Heavy": {
+     "per_year": -28.84465198376831,
+     "error_per_year": 4.1037072226294535,
+     "nights": 1474
+    }
+   }
+  }
+ ],
+ "device": "cpu",
+ "context_hours": 2048,
+ "elapsed_s": 19,
+ "verdict": "No model beat the day-ahead price, on accuracy or on savings. The closest on savings was Same hour yesterday: saved $18 a year less for the Average driver."
+}

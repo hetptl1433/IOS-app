@@ -1,0 +1,48 @@
+id,car,start_local,location,fc_brand,start_battery_level,end_battery_level,kwh_added,duration_min,avg_kw,peak_kw,soc_at_peak,kw_0_10,kw_10_20,kw_20_30,kw_30_40,kw_40_50,kw_50_60,kw_60_70,kw_70_80,kw_80_90,kw_90_100,min_20_to_80,outside_temp_avg
+8,多啦A夢,2024-09-22 14:01:41.605,"Michigan City, IN Supercharger, 5150, Franklin Street, Michigan City, LaPorte County, Indiana, 46391, United States",Tesla,4,30,19.72,7,169.0,250,6,202,237,201,180,,,,,,,,20.0
+56,多啦A夢,2024-10-25 12:51:21.659,South Loop Service Center,Tesla,33,60,20.62,13,95.2,154,33,,,,114,102,95,0,,,,,21.0
+139,多啦A夢,2024-12-27 11:29:53.69,"Tesla Supercharger, West Mazon Avenue, Dwight, Livingston County, Illinois, 60420, United States",Tesla,66,72,4.38,9,29.2,47,72,,,,,,,41,43,,,,8.0
+140,多啦A夢,2024-12-27 13:33:29.379,"South Shackelford Drive, Springfield, Sangamon County, Illinois, 62723, United States",Tesla,12,80,52.52,30,105.0,257,15,,223,218,163,120,100,84,63,41,,27.8,12.0
+141,多啦A夢,2024-12-27 17:41:00.435,"Tesla Supercharger, McRee Avenue, Forest Park Southeast, Tower Grove, St. Louis, Missouri, 63110, United States",Tesla,32,81,37.66,24,94.2,207,34,,,,171,135,104,86,65,48,,,12.9
+142,多啦A夢,2024-12-28 18:43:18.387,"Tesla Supercharger, McRee Avenue, Forest Park Southeast, Tower Grove, St. Louis, Missouri, 63110, United States",Tesla,45,80,27.16,22,74.1,108,46,,,,,96,93,83,66,0,,,12.5
+143,多啦A夢,2024-12-29 17:58:58.082,"Walmart Supercenter, 1204, Avenue of Mid-America, Effingham, Effingham County, Illinois, 62401, United States",Tesla,16,62,35.38,16,132.7,250,17,,202,224,163,123,101,86,,,,,8.5
+144,多啦A夢,2024-12-29 20:45:41.476,"Tesla Supercharger, Meijer Drive, Champaign, Champaign County, Illinois, 61821, United States",Tesla,24,27,2.54,3,50.8,73,24,,,59,,,,,,,,,6.0
+145,多啦A夢,2024-12-29 20:49:48.43,"Tesla Supercharger, Meijer Drive, Champaign, Champaign County, Illinois, 61821, United States",Tesla,27,33,3.98,3,79.6,111,28,,,81,103,,,,,,,,6.0
+146,多啦A夢,2024-12-29 21:34:48.168,"701, South Crescent Street, Gilman, Iroquois County, Illinois, 60938, United States",Tesla,7,55,36.76,16,137.9,254,11,168,245,206,150,115,97,,,,,,4.5
+180,多啦A夢,2025-01-21 14:06:22.31,"Tesla Supercharger, West Town Square Way, Drexel Town Square, Oak Creek, Milwaukee County, Wisconsin, 53154, United States",Tesla,13,22,6.86,4,102.9,144,15,,129,127,,,,,,,,,-17.0
+181,多啦A夢,2025-01-21 14:40:18.935,"74th Place, River Crossing, Kenosha, Kenosha County, Wisconsin, 53142, United States",Tesla,7,39,24.80,9,165.3,248,12,156,233,201,152,,,,,,,,-16.9
+584,多啦A夢,2025-05-03 20:51:25.19,"Ring Road, Benton Charter Township, Berrien County, Michigan, 49022, United States",Tesla,8,46,29.80,11,162.5,256,11,153,246,203,147,112,,,,,,,6.5
+1521,多啦A夢,2026-02-06 13:45:37.774,"Tesla Supercharger, 2920, Fitchrona Road, Fitchburg, Dane County, Wisconsin, 53719, United States",Tesla,23,55,23.92,13,110.4,179,25,,,154,134,108,92,,,,,,3.0
+1522,多啦A夢,2026-02-06 16:05:31.042,"Tesla Macau, 10000, West Higgins Road, O'Hare, Chicago, Jefferson Township, Cook County, Illinois, 60666, United States",Tesla,6,9,1.58,2,47.4,74,7,58,,,,,,,,,,,3.5
+1523,多啦A夢,2026-02-06 16:08:30.052,"Patton Drive, O'Hare, Chicago, Jefferson Township, Cook County, Illinois, 60018, United States",Tesla,9,21,8.92,5,107.0,146,17,38,144,87,,,,,,,,,3.5
+1579,多啦A夢,2026-02-20 14:49:28.874,"Tesla Supercharger, 15900, West Michigan Avenue, Marshall, Calhoun County, Michigan, 49068, United States",Tesla,8,55,34.18,15,136.7,256,13,136,235,191,141,107,93,,,,,,0.5
+1580,多啦A夢,2026-02-20 16:34:07.77,"Livonia, MI Supercharger, 13000, Middlebelt Road, Elm, Livonia, Wayne County, Michigan, 48150, United States",Tesla,19,35,11.68,11,63.7,69,19,,44,69,65,,,,,,,,1.0
+1581,多啦A夢,2026-02-20 18:00:37.352,"Walker Road, Devonshire, Windsor, Southwestern Ontario, Ontario, N8W 3T5, Canada",Tesla,21,53,23.40,11,127.6,235,22,,,189,149,110,92,,,,,,1.0
+1582,多啦A夢,2026-02-20 20:10:53.884,"146, Culloden Road, Ingersoll, Oxford County, Ontario, N5C 3J7, Canada",Tesla,2,74,52.46,29,108.5,221,15,189,218,176,131,105,92,74,61,,,,0.0
+1583,多啦A夢,2026-02-20 22:20:23.389,"Highway 7, Brown's Corners, Markham, York Region, Golden Horseshoe, Ontario, L3R 0J5, Canada",Tesla,36,44,6.32,5,75.8,116,36,,,,83,80,,,,,,,0.5
+1584,多啦A夢,2026-02-21 13:05:35.135,"Vantage Lane, Yorkdale-Glen Park, Eglinton—Lawrence, North York, Toronto, Golden Horseshoe, Ontario, M6A 3B4, Canada",Tesla,16,42,19.14,8,143.6,229,20,,169,197,144,109,,,,,,,1.5
+1585,多啦A夢,2026-02-21 15:24:02.593,"Tesla, Sheppard Avenue East, Don Valley Village, Don Valley North, North York, Toronto, Golden Horseshoe, Ontario, M2J 0A9, Canada",Tesla,38,85,34.46,39,53.0,74,61,,,,52,56,63,63,58,48,,,2.5
+1586,多啦A夢,2026-02-21 18:58:58.909,"Lone Oak Court, Eringate-Centennial-West Deane, Etobicoke Centre, Etobicoke, Toronto, Golden Horseshoe, Ontario, M9C 5M1, Canada",Tesla,68,95,20.48,42,29.3,49,82,,,,,,,27,39,43,29,,1.5
+1587,多啦A夢,2026-02-23 14:22:12.608,"Britannia Road West, Meadowvale South, Mississauga, Peel Region, Golden Horseshoe, Ontario, L5V 2A8, Canada",Tesla,9,50,29.66,13,136.9,250,13,85,228,182,137,107,0,,,,,,-3.0
+1588,多啦A夢,2026-02-23 16:03:00.949,"146, Culloden Road, Ingersoll, Oxford County, Ontario, N5C 3J7, Canada",Tesla,15,85,51.80,39,79.7,163,16,,114,,119,104,86,75,58,48,,27.1,-8.0
+1589,多啦A夢,2026-02-23 18:52:44.816,"Walker Road, Devonshire, Windsor, Southwestern Ontario, Ontario, N8W 3T5, Canada",Tesla,15,73,42.62,25,102.3,251,17,,222,198,145,108,93,76,62,,,,-4.0
+1590,多啦A夢,2026-02-23 21:06:45.824,"Tesla Supercharger, 15252, Sam Hill Drive, Marshall, Calhoun County, Michigan, 49068, United States",Tesla,13,79,48.00,32,90.0,132,15,,122,131,131,114,93,74,57,,,,-7.0
+1591,多啦A夢,2026-02-23 23:29:57.787,"Tesla Supercharger, 704, Plaza Drive, Chesterton, Porter County, Indiana, 46304, United States",Tesla,10,38,20.94,8,157.1,256,14,,213,184,133,,,,,,,,-8.0
+1761,多啦A夢,2026-04-08 18:31:05.722,"Lebanon Supercharger, 1377, South Lebanon Street, Lebanon, Boone County, Indiana, 46052, United States",Tesla,6,49,31.34,13,144.6,255,10,180,227,192,147,110,,,,,,,19.6
+1762,多啦A夢,2026-04-08 20:01:59.448,"North 600 East;South 1200 West, Newton County, Indiana, 47943, United States",Tesla,17,34,11.86,5,142.3,238,19,,183,194,155,,,,,,,,17.0
+2003,多啦A夢,2026-05-29 15:55:01.078,"WI 13, Wisconsin Dells, Sauk County, Wisconsin, 53965, United States",Tesla,19,66,34.40,17,121.4,249,20,,4,200,156,123,99,81,,,,,28.5
+2004,多啦A夢,2026-05-29 18:18:15.357,"Tesla Supercharger, 207, Pine Avenue West, North Menomonie, Menomonie, Dunn County, Wisconsin, 54751, United States",Tesla,11,45,24.46,9,163.1,217,16,,193,197,156,130,,,,,,,29.0
+2013,多啦A夢,2026-06-01 17:42:42.708,"WI 13, Wisconsin Dells, Sauk County, Wisconsin, 53965, United States",Tesla,9,84,55.26,34,97.5,255,12,149,236,197,157,124,98,79,59,47,,26.5,24.5
+2320,多啦A夢,2026-08-26 14:12:50.945,"Tesla Supercharger, 3825, Carpenter Road, Ypsilanti, Washtenaw County, Michigan, 48197, United States",Tesla,5,67,44.78,21,127.9,251,10,188,233,194,161,120,96,77,,,,,26.5
+2321,多啦A夢,2026-08-26 17:19:40.97,"Tesla Supercharger, Wellington Road South, London, Southwestern Ontario, Ontario, N6E 2Z8, Canada",Tesla,8,58,36.06,16,135.2,206,22,145,204,197,155,119,95,,,,,,24.5
+2322,多啦A夢,2026-08-26 17:36:14.038,"Tesla Supercharger, Wellington Road South, London, Southwestern Ontario, Ontario, N6E 2Z8, Canada",Tesla,58,78,14.40,13,66.5,99,58,,,,,,81,79,60,,,,24.5
+2323,多啦A夢,2026-08-26 22:01:16.705,"Highway 7, Brown's Corners, Markham, York Region, Golden Horseshoe, Ontario, L3R 0J5, Canada",Tesla,31,33,1.18,2,35.4,69,31,,,,48,,,,,,,,20.0
+2324,多啦A夢,2026-08-26 22:04:10.577,"Highway 7, Brown's Corners, Buttonville, Markham, York Region, Golden Horseshoe, Ontario, L3R 0J5, Canada",Tesla,33,58,18.08,11,98.6,142,33,,,,119,114,96,,,,,,20.0
+2325,多啦A夢,2026-08-27 16:15:04.163,"Highway 7, Unionville, Markham, York Region, Golden Horseshoe, Ontario, L3R 1N3, Canada",Tesla,34,89,39.50,32,74.1,133,37,,,,132,119,99,78,61,46,,,26.5
+2326,多啦A夢,2026-08-30 17:00:45.033,"Maple Avenue, Milton, Halton Region, Golden Horseshoe, Ontario, L9T 5P5, Canada",Tesla,8,72,46.58,24,116.4,255,10,154,233,194,154,118,96,76,61,,,,20.0
+2327,多啦A夢,2026-08-30 17:27:41.894,"Maple Avenue, Milton, Halton Region, Golden Horseshoe, Ontario, L9T 5P5, Canada",Tesla,72,72,0.38,1,22.8,69,72,,,,,,,,48,,,,20.0
+2328,多啦A夢,2026-08-30 18:59:17.775,"Ingersoll Supercharger, Culloden Road, Ingersoll, Oxford County, Southwestern Ontario, Ontario, N5C 3J7, Canada",Tesla,48,84,26.06,22,71.1,121,49,,,,,100,104,82,60,47,,,18.5
+2329,多啦A夢,2026-08-30 19:22:16.045,"Ingersoll Supercharger, Culloden Road, Ingersoll, Oxford County, Southwestern Ontario, Ontario, N5C 3J7, Canada",Tesla,84,95,7.92,14,33.9,53,84,,,,,,,,,44,30,,18.5
+2330,多啦A夢,2026-08-30 21:36:06.331,"Walker Road, Devonshire, Windsor, Southwestern Ontario, Ontario, N8W 3T5, Canada",Tesla,42,67,17.96,11,98.0,135,43,,,,,118,103,85,,,,,23.9
+2331,多啦A夢,2026-08-30 21:47:54.341,"Walker Road, Devonshire, Windsor, Southwestern Ontario, Ontario, N8W 3T5, Canada",Tesla,67,78,8.56,8,64.2,85,67,,,,,,,73,62,,,,24.5
+2332,多啦A夢,2026-08-31 00:45:51.56,"Tesla Supercharger, 5121, South Westnedge Avenue, Portage, Kalamazoo County, Michigan, 49002, United States",Tesla,16,68,38.12,20,114.4,256,18,,198,201,156,121,98,80,,,,,22.5
