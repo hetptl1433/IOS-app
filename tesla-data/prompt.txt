@@ -1,0 +1,35 @@
+Prompts given to the LLM to generate tesla_charge_stats.py, in order (verbatim).
+
+1. I have screenshots of my Tesla app on iOS of the kWh I charged every day. Can you write me a Python program that reads a directory of images (like the attached screenshots) and it should extract for every day the kWh I charged at home, at a supercharger, and elsewhere. Since it also shows the miles driven over the entire duration, aproximate how many miles were driven per day based on the consumed kWh, for home, supercharger, and elsewhere. Let’s also compute the kWh per mile ratio for the day. I want the data to  be saved as a csv file, comma-delimited, with 1 row per day. Make sure to put column headings on each column.
+
+2. can you double check this code that it works, and add a CLI --data to allow me to specify which directory the image data is in? Also add a CLI --out to specify the output filename of the csv data.
+
+3. can you add a requirements file and a README.md file that gives instructions how to compile and run? Also summarize in the readme file what the program does and what libraries it uses.
+
+4. can you add parallelism to the processing of the image data using multi-processes and add CLI --parallel to specify how many processes it should use?
+
+5. show me an example how to run the program with 16 threads and data being in data/ folder
+
+6. can you add a progress bar that shows how many images have been processed so far, and includes an ETA on how much longer it will likely take at the current rate.
+
+7. i only want all the current output if i use the --debug CLI. Otherwise, keep it to just the progress bar, and a short summary at the end of the computation runtime and how manyimages were processed, in how much time, and how many data data points were generated, along with how many total kwh consummed and how many miles driven.
+
+8. since kwh/mile doesn't seem to give us meaninful data, lets remove it from computation and storing in CSV file.
+
+9. can you add a CLI --plot that specifies a filename to generate a plotly interactive bar plot of the data, showing kwh hours charged each day across the entire dataset? If CLI --plot is used, automaticaly open the browser to show the plot once its created.
+
+10. lets use the same colors the tesla app used
+
+11. can you combine work and other into a single category, called other? Do this in the CSV and in the plot?
+
+12. can you print some general stats in the console, and also on the plotly chart. Lets include average miles/day, average kwh/day, also average per month, and average per year.
+
+13. can you update the prompt.txt with all the prompts given to the LLM to generate this code?
+
+14. can you also add some summaries about how many kwh and miles are charged at home, vs supercharger, vs other. Do this both in console and plotly. Also update readme and prompt file.
+
+15. when i tried google image search on some screen shots like those in the data folder, it returned many screenshots from other tesla apps from the internet. Can you build me a new program called download_tesla_data_web.py that takes one of the images from the data folder, and queries google image search, and then follows each of the results, and downloads the image screenshot. The program should take a CLI --input to specify where to grab the query image. Another CLI should be --output to specify the directory where it will store all screen shot output files. Screen shots should be analyzed and some filters should be applied. If the screenshots don't have a bar graph with kwh shown, they should be discarded. If the bar graph exists, but it does not represent daily values, they should be discarded. So basically, it should only store image files that have a bar graph in kwh and which represent daily data. Files should be named imageNNNN, where NNNN is a number from 0000 to 9999, in increasing order. Once 10000 images are downloaded and saved, the program can stop. Actually, lets make the 10000 images to save a CLI, using --size to specify how many images we want to download, and the NNNN should be sufficient to cover the number of images downloaded. Make sure to use a bar graph to show progress towards the 10K image dataset download, as well as an ETA on how long it would take to get the entire dataset. Also, build in some throttling logic in case google complains about too many reuqests too quickly, add some sleep time between each request that fails.
+
+16. when i search using google image search, it works and i don't have any API KEY. Can this be done without an API key?
+
+17. ok, i downloaded the html file of the manual search i did, they are stored in google-search. There are two searches, might have overlaping results. Can you adapt the download program to use these input search results by CLI --search and specifying the directory where these search results are stored? In this mode, it should download all the data found, and ignore the max number of images to download. Make sure all images are saved in the same format (eg. JPG, PNG).

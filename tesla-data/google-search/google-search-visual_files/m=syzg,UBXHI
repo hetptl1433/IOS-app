@@ -1,0 +1,8 @@
+loaded_h_0(function(_){var window=this;
+_.T1b=_.x("UBXHI",[]);
+_.v("UBXHI");
+var V1b=function(a){var b=Array.from(a.ka.values());b.sort((c,d)=>c.distance-d.distance);for(let c of b)U1b(a,c.TOc,c.src)},U1b=function(a,b,c){a.Fh&&(a.Fh.unobserve(b),a.ka.delete(b));_.S1b(_.Q1b(),b,c,(d,e)=>{d.src=e})},W1b=class{constructor(){this.ka=new Map;this.Fh=null;if(_.O1b)try{this.Fh=new IntersectionObserver(a=>{for(let c of a){let d=this.ka.get(c.target);if(d){a=c.boundingClientRect;var b=c.rootBounds;let e=b?b.top:0;b=b?b.bottom:window.innerHeight||0;d.distance=a.bottom<e?(e-a.bottom)*
+2:a.top>b?a.top-b:0}}V1b(this)},{rootMargin:"0px",threshold:[0]})}catch(a){}}};_.X1b=class extends _.zs{constructor(a){super(a.Ma);this.loaded=!1;this.root=this.getRoot()}ka(){if(!this.loaded){var a=this.root.getData("src").ka();if(a){if(a!==this.root.kd("src")){var b=this.root.el();W1b.instance||(W1b.instance=new W1b);var c=W1b.instance;c.Fh?c.ka.has(b)?c.ka.get(b).src=a:(c.ka.set(b,{TOc:b,src:a,distance:Infinity}),c.Fh.observe(b)):U1b(c,b,a)}this.root.setData("src",null)}this.loaded=!0}}};_.X1b.prototype.$wa$QT8fkf=function(){return this.ka};_.Bs(_.T1b,_.X1b);
+_.w();
+});
+// Google Inc.
