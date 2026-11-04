@@ -101,6 +101,7 @@ class ServerTests(unittest.TestCase):
         for path in ("/simulation/", "/simulation/simulation.html", "/simulation/charging-history.html",
                      "/simulation/simulation-engine.js", "/simulation/charging-history-engine.js",
                      "/simulation/charging-history-data.js", "/simulation/charging-history.js",
+                     "/simulation/residential-data.js", "/simulation/residential-engine.js",
                      "/simulation/charging-history.css"):
             status, content, response = self.request("GET", path)
             self.assertEqual(status, 200, path)

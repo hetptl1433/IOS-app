@@ -127,6 +127,11 @@
     if (explicit && (!finite(arrival) || !finite(departure))) return {valid: false, reason: "Session boundaries must be finite epoch seconds.", config: c};
     if (arrival === null || departure === null || departure <= arrival) return {valid: false, reason: "This session falls outside the historical data.", config: c};
     if (arrival % SLOT || departure % SLOT) return {valid: false, reason: "Choose times on a five-minute boundary.", config: c};
+    var exactAvailability = c.availabilityStartEpoch !== undefined || c.availabilityEndEpoch !== undefined;
+    if (exactAvailability && (!finite(c.availabilityStartEpoch) || !finite(c.availabilityEndEpoch) ||
+        c.availabilityStartEpoch < arrival || c.availabilityEndEpoch > departure || c.availabilityEndEpoch <= c.availabilityStartEpoch)) {
+      return {valid: false, reason: "Exact connection boundaries must lie inside the replay window.", config: c};
+    }
     var hours = [];
     for (var h = hourStart(arrival); h < departure; h += HOUR) hours.push(h);
     var gridKwh = c.gridEnergyKwh !== undefined ? c.gridEnergyKwh : c.miles * rate / c.efficiency;
@@ -140,6 +145,15 @@
     session.chargingEnd = departure;
     session.allowedSlots = null;
     session.availableSeconds = departure - arrival;
+    session.slotLimits = null;
+    if (exactAvailability) {
+      session.slotLimits = new Map();
+      for (var edge = arrival; edge < departure; edge += SLOT) {
+        var seconds = Math.max(0, Math.min(edge + SLOT, c.availabilityEndEpoch) - Math.max(edge, c.availabilityStartEpoch));
+        if (seconds < SLOT) session.slotLimits.set(edge, c.power * seconds / HOUR);
+      }
+      session.availableSeconds = c.availabilityEndEpoch - c.availabilityStartEpoch;
+    }
     for (var i = 0; i < hours.length; i++) {
       h = hours[i];
       if (!market.hourly.has(h) || !market.dayAhead.has(h) || !market.dayAhead.has(h - DAY)) {
@@ -161,7 +175,9 @@
         session.chargingSlotTimes = allowed;
         session.chargingStart = allowed[0];
         session.chargingEnd = allowed[allowed.length - 1] + SLOT;
-        session.availableSeconds = allowed.length * SLOT;
+        session.availableSeconds = exactAvailability ? allowed.reduce(function (sum, t) {
+          return sum + Math.max(0, Math.min(t + SLOT, c.availabilityEndEpoch) - Math.max(t, c.availabilityStartEpoch));
+        }, 0) : allowed.length * SLOT;
       }
     }
     return session;
@@ -170,6 +186,7 @@
     var schedule = new Map();
     if (need.energyKwh <= EPS || need.now >= need.departure) return schedule;
     var full = need.powerKw * SLOT / HOUR, soft = need.departure - need.reserveSeconds;
+    function capacity(t) { return need.slotLimits && need.slotLimits.has(t) ? need.slotLimits.get(t) : full; }
     var current = hourStart(need.now), blocks = [];
     for (var hour = current; hour < need.departure; hour += HOUR) {
       var price = costs.get(hour);
@@ -185,14 +202,23 @@
     blocks.sort(function (a, b) { for (var k = 0; k < 4; k++) if (a.key[k] !== b.key[k]) return a.key[k] - b.key[k]; return 0; });
     var chosen = [], left = need.energyKwh;
     for (var i = 0; i < blocks.length; i++) {
-      var energy = Math.min(left, blocks[i].slots.length * full);
+      var energy = Math.min(left, need.slotLimits ? blocks[i].slots.reduce(function (sum, t) { return sum + capacity(t); }, 0) : blocks[i].slots.length * full);
       chosen.push({slots: blocks[i].slots, energy: energy}); left -= energy;
       if (left <= EPS) break;
     }
     if (!chosen.length) return schedule;
-    for (i = 0; i < chosen.length - 1; i++) chosen[i].slots.forEach(function (t) { schedule.set(t, full); });
+    for (i = 0; i < chosen.length - 1; i++) chosen[i].slots.forEach(function (t) { schedule.set(t, capacity(t)); });
     var last = chosen[chosen.length - 1], count = Math.max(1, Math.min(last.slots.length, Math.ceil(last.energy / full - EPS)));
     var continued = schedule.has(last.slots[0] - SLOT) || (last.slots[0] === need.now && charging);
+    if (need.slotLimits) {
+      var order = continued ? last.slots : last.slots.slice().reverse(), unassigned = last.energy;
+      for (var j = 0; j < order.length && unassigned > EPS; j++) {
+        var amount = Math.min(unassigned, capacity(order[j]));
+        if (amount > EPS) schedule.set(order[j], amount);
+        unassigned -= amount;
+      }
+      return schedule;
+    }
     var slots = continued ? last.slots.slice(0, count) : last.slots.slice(-count);
     var partial = continued ? slots[slots.length - 1] : slots[0];
     slots.forEach(function (t) { schedule.set(t, full); });
@@ -247,6 +273,15 @@
         var beforeReserve = upperBound(times, session.chargingEnd - session.reserveSeconds - SLOT);
         var finishAt = beforeReserve >= count ? beforeReserve : times.length;
         latest = times[Math.max(0, finishAt - count)];
+      }
+      if (session.slotLimits) {
+        var capacityLeft = 0;
+        latest = session.chargingStart;
+        for (var candidate = session.chargingEnd - SLOT; candidate >= session.chargingStart; candidate -= SLOT) {
+          if (session.allowedSlots && !session.allowedSlots.has(candidate)) continue;
+          capacityLeft += session.slotLimits.has(candidate) ? session.slotLimits.get(candidate) : full;
+          if (capacityLeft >= remaining - EPS) { latest = candidate; break; }
+        }
       }
       begins = Math.max(session.chargingStart, Math.min(target, latest));
     }
@@ -306,11 +341,13 @@
           if (version !== nextVersion) {
             version = nextVersion;
             schedule = plan({now: now, departure: session.chargingEnd, energyKwh: remaining, powerKw: c.power, allowedSlots: session.allowedSlots,
+              slotLimits: session.slotLimits,
               reserveSeconds: strategy === "hindsight" ? 0 : session.reserveSeconds}, prices.costs, blocked, charging, strategy === "live" ? .5 : 0);
           }
           kwh = schedule.get(now) || 0;
         }
-        kwh = Math.max(0, Math.min(kwh, full, remaining));
+        var slotFull = session.slotLimits && session.slotLimits.has(now) ? session.slotLimits.get(now) : full;
+        kwh = Math.max(0, Math.min(kwh, slotFull, remaining));
       }
       forecast = prices ? prices.expected.get(hour) : knownDayAhead(market, hour, now);
       var on = kwh > EPS;
@@ -320,11 +357,12 @@
       result.supplyUsd += supply; result.deliveryUsd += delivery;
       result.energyKwh += kwh; if (blocked.has(hour)) result.riskKwh += kwh;
       remaining -= kwh;
-      charging = on && kwh >= full - EPS && remaining > EPS;
+      charging = on && kwh >= (session.slotLimits && session.slotLimits.has(now) ? session.slotLimits.get(now) : full) - EPS && remaining > EPS;
       if (on && !charging && remaining > EPS) result.pauses++;
       result.totalCost = result.supplyUsd + result.deliveryUsd;
       var meta = market.hours.get(hour), visible = market.fiveMinute.get(latestVisible(now));
       result.slots.push({time: now, hour: hour, date: meta.date, wallHour: meta.localHour,
+        availableStart: exactAvailabilityStart(session, now), availableEnd: exactAvailabilityEnd(session, now),
         energy: kwh, energyKwh: kwh, supply: supply, delivery: delivery, cost: supply + delivery,
         cumulativeCost: result.totalCost, cumulativeKwh: result.energyKwh, remaining: Math.max(0, remaining),
         charging: on, forecast: forecast, visiblePrice: visible === undefined ? null : visible,
@@ -334,6 +372,12 @@
     result.ready = remaining <= 1e-6;
     result.costUsd = result.totalCost;
     return result;
+  }
+  function exactAvailabilityStart(session, now) {
+    return session.config.availabilityStartEpoch === undefined ? now : Math.max(now, session.config.availabilityStartEpoch);
+  }
+  function exactAvailabilityEnd(session, now) {
+    return session.config.availabilityEndEpoch === undefined ? now + SLOT : Math.min(now + SLOT, session.config.availabilityEndEpoch);
   }
   function compare(market, config, strategies) {
     return (strategies || ["charge-now", "timer-0000", "day-ahead", "live"]).map(function (strategy) {

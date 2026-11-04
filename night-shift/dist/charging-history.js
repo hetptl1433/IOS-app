@@ -2,27 +2,30 @@
 (() => {
   const $ = id => document.getElementById(id);
   const put = (id, value) => { $(id).textContent = value; };
-  const DATA = window.SPARC_SIM_DATA, HISTORY = window.SPARC_CHARGING_HISTORY;
+  const DATA = window.SPARC_SIM_DATA, TESLAMATE = window.SPARC_CHARGING_HISTORY;
+  const RESIDENTIAL = window.SPARC_RESIDENTIAL_DATA, Residential = window.SparcResidential;
+  let HISTORY = RESIDENTIAL;
   const Lab = window.SparcChargingHistory;
-  if (!DATA || !HISTORY || !Lab || !window.SparcSimulation) {
+  if (!DATA || !TESLAMATE || !HISTORY || !Residential || !Lab || !window.SparcSimulation) {
     put("history-error", "The replay files could not load. Serve the complete night-shift/dist folder, then reload this page.");
     $("history-error").hidden = false;
     $("run-history").disabled = true;
     return;
   }
-  const market = Lab.createMarket(DATA, HISTORY);
-  const rows = HISTORY.rows;
-  const byId = new Map(rows.map(row => [String(row.id), row]));
-  const nextRows = new Map(rows.map((row, i) => [row.id, rows[i + 1]]));
+  const market = Lab.createMarket(DATA, TESLAMATE);
+  let rows = [];
+  const sourceRows = Residential.decode(RESIDENTIAL);
+  const byId = new Map(), nextRows = new Map();
   const moneyFormat = new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"});
   const numberFormat = new Intl.NumberFormat("en-US", {maximumFractionDigits: 1});
   const clockFormat = new Intl.DateTimeFormat("en-US", {timeZone: HISTORY.timezone, hour: "numeric", minute: "2-digit"});
   const dateFormat = new Intl.DateTimeFormat("en-US", {timeZone: "UTC", month: "short", day: "numeric", year: "numeric"});
   const money = n => moneyFormat.format(Math.abs(n) < .005 ? 0 : n);
-  const num = n => numberFormat.format(n);
-  const clock = t => clockFormat.format(new Date(t * 1000));
+  const num = n => Number.isFinite(n) ? numberFormat.format(n) : "—";
+  const clock = t => Number.isFinite(t) ? clockFormat.format(new Date(t * 1000)) : "—";
   const date = day => dateFormat.format(new Date(day + "T12:00:00Z"));
-  const dateTime = row => `${date(row.startLocal.slice(0, 10))} · ${clock(row.start)}`;
+  const dateTime = row => `${date(row.startLocal.slice(0, 10))} · ${row.startLocal.slice(11, 16)}`;
+  const isResidential = () => $("history-source").value === "residential";
   const rateName = tariff => tariff === "standard" ? "standard delivery" : "time-of-day delivery";
   const element = (tag, className, value) => {
     const el = document.createElement(tag);
@@ -42,7 +45,62 @@
 
   function options() {
     return {window: $("history-window").value, departureHour: Number($("history-departure").value),
-      tariff: $("history-tariff").value, powerKw: $("history-power").value};
+      tariff: $("history-tariff").value, powerKw: $("history-power").value,
+      priceYear: Number($("history-price-year").value)};
+  }
+  function selectSource(reset = true) {
+    stop();
+    HISTORY = isResidential() ? RESIDENTIAL : TESLAMATE;
+    rows = isResidential() ? sourceRows.map(row => Residential.adapt(market, row, Number($("history-price-year").value))) : TESLAMATE.rows;
+    byId.clear(); nextRows.clear();
+    const following = new Map();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i], user = row.userId || "teslamate";
+      byId.set(String(row.id), row);
+      nextRows.set(row.id, following.get(user));
+      following.set(user, row);
+    }
+    for (const [id, values, label] of [
+      ["history-location", Array.from(new Set(rows.map(row => row.site || row.location))).sort(), "All locations"],
+      ["history-user", Array.from(new Set(rows.map(row => row.userId).filter(Boolean))).sort(), "All users"],
+    ]) {
+      const old = reset ? "" : $(id).value;
+      $(id).replaceChildren(...["", ...values].map(value => {
+        const option = element("option", "", value || label); option.value = value; return option;
+      }));
+      $(id).value = old;
+      $(id).disabled = !isResidential();
+    }
+    $("price-year-field").hidden = !isResidential();
+    $("residential-method").hidden = !isResidential();
+    $("teslamate-method").hidden = isResidential();
+    $("history-window").disabled = isResidential();
+    $("history-window").options[0].textContent = isResidential() ? "Reported plug-in → unplug" : "Recorded start → finish";
+    $("history-power").options[0].textContent = isResidential() ? "Dataset 2 · estimated user power" : "Recorded peak power";
+    if (reset) {
+      selected = undefined;
+      $("history-window").value = "recorded";
+      $("history-power").value = "recorded";
+      $("history-tariff").value = isResidential() ? "standard" : "time-of-day";
+    }
+    put("source-count", `${num(rows.length)} residential sessions`);
+    put("source-period", `${date(rows[0].startLocal.slice(0, 10))} — ${date(rows.at(-1).startLocal.slice(0, 10))}`);
+    put("source-link", isResidential() ? "Dataset 1 · Norwegian residential reports ↘" : "TeslaMate · previous history ↘");
+    put("source-scenario-note", isResidential() ? `Norway connection reports → ${$("history-price-year").value} ComEd price scenario. Source dates below are Norwegian dates. Power and battery values are estimates; costs are modeled Chicago costs.` : "Recorded TeslaMate charging events replayed against ComEd prices on their original Chicago dates.");
+    put("session-date-heading", isResidential() ? "Session · Norway source date" : "Session · Chicago time");
+    if (isResidential()) {
+      const s = RESIDENTIAL.stats;
+      put("source-quality", `${num(s.sessions)} reports · ${num(s.users)} users · ${num(s.usersWithPower)} users with power estimates · ${num(s.sessionPredictions)} session estimates. ${num(s.hourlySessions - (s.flags.hourly_energy_mismatch || 0))} of ${num(s.hourlySessions)} supplied hourly session totals reconcile within 0.01 kWh. ${num(s.hourly.unkeyedRows)} unkeyed hourly rows are excluded from joins.`);
+    }
+    for (const id of ["history-start", "history-end"]) {
+      $(id).min = rows[0].startLocal.slice(0, 10);
+      $(id).max = rows.at(-1).startLocal.slice(0, 10);
+    }
+    if (reset) {
+      $("history-start").value = rows[0].startLocal.slice(0, 10);
+      $("history-end").value = rows.at(-1).startLocal.slice(0, 10);
+    }
+    updateFilters();
   }
   function stop() {
     playing = false;
@@ -59,17 +117,19 @@
     $("run-history").disabled = false;
     $("export-history").disabled = true;
     $("export-daily-history").disabled = true;
-    put("savings-math", "Overall savings % = total dollars saved ÷ total standard-delivery cost × 100. Daily CSV groups sessions by their Chicago start date and includes cumulative totals.");
+    put("savings-math", `Overall savings % = total dollars saved ÷ total standard-delivery cost × 100. Daily CSV groups by ${isResidential() ? "original Norway plug-in date; costs use the mapped ComEd scenario" : "Chicago start date"} and includes cumulative totals.`);
     $("batch-progress").hidden = true;
     const start = $("history-start").value, end = $("history-end").value;
     const invalid = !start || !end || start > end;
     $("history-error").hidden = !invalid;
     if (invalid) put("history-error", "Choose a valid date range with the start on or before the end.");
-    filtered = invalid ? [] : rows.filter(row => row.startLocal.slice(0, 10) >= start && row.startLocal.slice(0, 10) <= end && row.gridKwh >= Number($("history-min-energy").value));
+    filtered = invalid ? [] : rows.filter(row => row.startLocal.slice(0, 10) >= start && row.startLocal.slice(0, 10) <= end && row.gridKwh >= Number($("history-min-energy").value) &&
+      (!$("history-location").value || (row.site || row.location) === $("history-location").value) &&
+      (!$("history-user").value || row.userId === $("history-user").value));
     put("summary-sessions", num(filtered.length));
-    put("summary-coverage", "Recorded home AC sessions in range");
+    put("summary-coverage", isResidential() ? "Reported residential connections in range" : "Recorded home AC sessions in range");
     put("summary-energy", `${num(filtered.reduce((sum, row) => sum + row.gridKwh, 0))} kWh`);
-    put("summary-energy-note", "All filtered grid energy, including losses");
+    put("summary-energy-note", "All filtered charger energy; no added loss factor");
     put("summary-cost", "—");
     put("summary-saving", "—");
     put("summary-baseline", "Run the history to compare costs");
@@ -80,17 +140,20 @@
     put("batch-status", filtered.length ? "Ready to compare these sessions. Run filtered sessions to calculate the totals." : "No sessions match these filters. Choose another date range or session size.");
     const morning = $("history-window").value === "morning";
     $("departure-field").hidden = !morning;
-    put("window-note", morning ? "Assumes the car stays connected until departure. Extensions stop at the next recorded session; the original window is kept." : "Uses only the recorded charging window, rounded outward to 5 minutes.");
+    put("window-note", isResidential() ? "Uses reported plug-in and unplug boundaries. The first and last five-minute intervals have only the capacity available during the exact connection." : morning ? "Assumes the car stays connected until departure. Extensions stop at the next recorded session; the original window is kept." : "Uses only the recorded charging window, rounded outward to 5 minutes.");
     $("run-history").disabled = !filtered.length;
     const picker = $("history-session");
-    picker.replaceChildren(...filtered.slice().reverse().map(row => {
+    if (!filtered.some(row => String(row.id) === String(selected))) {
+      selected = filtered.slice().reverse().find(row => !row.issue && row.gridKwh >= 10)?.id || filtered.at(-1)?.id;
+    }
+    const choices = filtered.slice(-300).reverse();
+    const selectedRow = byId.get(String(selected));
+    if (selectedRow && filtered.includes(selectedRow) && !choices.includes(selectedRow)) choices.unshift(selectedRow);
+    picker.replaceChildren(...choices.map(row => {
       const option = element("option", "", `#${row.id} · ${dateTime(row)} · ${num(row.gridKwh)} kWh`);
       option.value = row.id;
       return option;
     }));
-    if (!filtered.some(row => String(row.id) === String(selected))) {
-      selected = filtered.slice().reverse().find(row => !row.issue && row.gridKwh >= 10)?.id || filtered.at(-1)?.id;
-    }
     picker.disabled = !filtered.length;
     if (selected !== undefined) picker.value = selected;
     updateReplay();
@@ -119,7 +182,12 @@
     run = Lab.simulate(market, row, options(), nextRows.get(row.id));
     put("session-id", `SESSION #${row.id}`);
     const power = run.config?.power;
-    const facts = [
+    const facts = isResidential() ? [
+      ["REPORTED GRID ENERGY", `${num(row.gridKwh)} kWh`, `${row.userId} · ${row.site}`],
+      ["ESTIMATED BATTERY", row.predictedStartSoc === null ? "Unavailable" : `${num(row.predictedStartSoc)}% → 95%`, `${num(row.capacityKwh)} kWh estimated capacity · not measured`],
+      ["MODELED POWER", power ? `${num(power)} kW` : "—", options().powerKw === "recorded" ? "Dataset 2 user estimate" : "Selected what-if power"],
+      ["ESTIMATED IDLE TIME", `${num(row.idleHours)} hours`, "Dataset 3 estimate · not a forecast"],
+    ] : [
       ["GRID ENERGY", `${num(row.gridKwh)} kWh`, `${num(row.batteryKwh)} kWh added to battery`],
       ["RECORDED BATTERY", `${num(row.startSoc)} → ${num(row.endSoc)}%`, "State of charge from the CSV"],
       ["MODELED POWER", power ? `${num(power)} kW` : "—", `CSV peak: ${num(row.powerKw)} kW`],
@@ -130,8 +198,9 @@
       block.append(element("span", "", label), element("strong", "", value), element("small", "", note));
       return block;
     }));
-    let note = `Recorded ${dateTime(row)} → ${date(row.endLocal.slice(0, 10))} ${clock(row.end)}. `;
-    if (run.valid) note += `Simulation window: ${clock(run.session.start)} → ${clock(run.session.end)}${run.session.end - run.session.start >= 86400 ? " (+1 day)" : ""} · ${num((run.session.end - run.session.start) / 3600)} hours · Chicago time.`;
+    let note = isResidential() ? `Source: ${row.startLocal} → ${row.endLocal || "unplug time missing"} · Europe/Oslo. ` : `Recorded ${dateTime(row)} → ${date(row.endLocal.slice(0, 10))} ${clock(row.end)}. `;
+    if (run.valid) note += `${isResidential() ? `ComEd scenario: ${date(row.modeledDate)} · ` : "Simulation window: "}${clock(isResidential() ? row.start : run.session.start)} → ${clock(isResidential() ? row.end : run.session.end)} · ${num((isResidential() ? row.end-row.start : run.session.end-run.session.start) / 3600)} hours · Chicago time.`;
+    if (isResidential() && row.hourlyKwh !== null) note += ` Dataset 4 hourly total: ${num(row.hourlyKwh)} kWh (${Math.abs(row.hourlyKwh-row.gridKwh) <= .01 ? "reconciled" : "does not reconcile"}).`;
     put("session-note", note);
     const warnings = [];
     if (!run.valid) warnings.push(run.reason);
@@ -141,6 +210,7 @@
       if (run.prepared.capped) warnings.push("The morning extension is capped at the next recorded charging session.");
       if (!run.eligible) warnings.push("The selected power cannot deliver the recorded energy in this window. This session is excluded from savings totals.");
     }
+    if (isResidential() && row.qualityFlags.includes("reported_duration_differs_from_elapsed")) warnings.push("The CSV connection-time field differs from timestamp elapsed time. The source timestamps determine this scenario's duration.");
     if (warnings.length) { put("session-warning", warnings.join(" ")); $("session-warning").hidden = false; }
     $("replay-play").disabled = !run.valid;
     $("replay-scrub").disabled = !run.valid;
@@ -265,11 +335,15 @@
       button.setAttribute("aria-label", `Replay session ${row.id} on ${dateTime(row)}`);
       button.addEventListener("click", () => {
         selected = row.id;
+        if (!Array.from($("history-session").options).some(option => option.value === String(selected))) {
+          const option = element("option", "", `#${row.id} · ${dateTime(row)} · ${num(row.gridKwh)} kWh`);
+          option.value = row.id; $("history-session").prepend(option);
+        }
         $("history-session").value = selected;
         updateReplay(); renderTable();
         $("replay-title").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block:"start"});
       });
-      first.append(button, element("small", "", `#${row.id} · ${clock(row.start)} → ${clock(row.end)}`));
+      first.append(button, element("small", "", `#${row.id}${row.userId ? ` · ${row.userId}` : ""} · ${row.startLocal.slice(11,16)} → ${row.endLocal?.slice(11,16) || "unknown"}`));
       tr.append(first, element("td", "", num(row.gridKwh)));
       const result = resultById.get(row.id);
       const baseline = result?.tracks.find(track => track.id === "charge-now")?.result;
@@ -330,7 +404,10 @@
       const ratio = summary.baselineCost > 0 ? Math.abs(summary.saving) / summary.baselineCost * 100 : null;
       put("savings-math", summary.comparable && ratio !== null ? `${money(summary.saving)} total saved ÷ ${money(summary.baselineCost)} total standard-delivery cost × 100 = ${(summary.saving / summary.baselineCost * 100).toFixed(3)}%. Calculated from unrounded costs. This is weighted by cost, not a simple average of daily percentages. Daily CSV includes every date and cumulative totals.` : "Overall savings % requires a positive standard-delivery cost across comparable sessions. Daily CSV identifies dates without comparable sessions.");
       put("summary-saving-note", summary.comparable ? `${ratio === null ? "" : `${ratio.toFixed(1)}% ${summary.saving >= 0 ? "saved" : "extra cost"} · `}${settings.tariff === "time-of-day" ? "rate + timing" : "timing only"}` : "Savings require complete, equal-energy comparisons");
-      put("batch-status", `${num(summary.comparable)} sessions compared: standard immediate charging versus SPARC on ${rateName(settings.tariff)}. ${settings.tariff === "time-of-day" ? "Savings include delivery-rate and timing changes." : "Savings reflect timing changes only."} ${num(summary.skipped)} skipped for data or price gaps; ${num(summary.shortfall)} excluded for energy shortfall. ${settings.window === "morning" ? "Morning availability is modeled, with extensions capped at the next session." : "Only recorded charging windows are used."} Totals cover this selected history; they are not annualized.`);
+      const reasons = new Map();
+      results.filter(result => !result.valid).forEach(result => reasons.set(result.reason, (reasons.get(result.reason) || 0) + 1));
+      const exclusions = Array.from(reasons, ([reason, count]) => `${num(count)}: ${reason}`).join(" ");
+      put("batch-status", `${num(summary.comparable)} sessions compared: standard immediate charging versus SPARC on ${rateName(settings.tariff)}. ${settings.tariff === "time-of-day" ? "Savings include delivery-rate and timing changes." : "Savings reflect timing changes only."} ${num(summary.skipped)} skipped for data or price gaps; ${num(summary.shortfall)} excluded for energy shortfall. ${isResidential() ? `${settings.priceYear} ComEd scenario with reported connection duration. Sessions are independent; totals are not a simultaneous fleet or an annual forecast.` : settings.window === "morning" ? "Morning availability is modeled, with extensions capped at the next session." : "Only recorded charging windows are used."} Totals are not annualized. ${exclusions}`);
       $("export-history").disabled = false;
       $("export-daily-history").disabled = false;
       renderTable();
@@ -352,16 +429,10 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  put("source-count", `${num(rows.length)} home AC sessions`);
-  put("source-period", `${date(rows[0].startLocal.slice(0, 10))} — ${date(rows.at(-1).startLocal.slice(0, 10))}`);
-  for (const id of ["history-start","history-end"]) {
-    $(id).min = rows[0].startLocal.slice(0,10);
-    $(id).max = rows.at(-1).startLocal.slice(0,10);
-  }
-  $("history-start").value = rows[0].startLocal.slice(0,10);
-  $("history-end").value = rows.at(-1).startLocal.slice(0,10);
   $("history-form").addEventListener("submit", runBatch);
-  ["history-start","history-end","history-min-energy","history-window","history-departure","history-power","history-tariff"].forEach(id => $(id).addEventListener("change", updateFilters));
+  $("history-source").addEventListener("change", () => selectSource());
+  $("history-price-year").addEventListener("change", () => selectSource(false));
+  ["history-start","history-end","history-min-energy","history-window","history-departure","history-power","history-tariff","history-location","history-user"].forEach(id => $(id).addEventListener("change", updateFilters));
   $("history-session").addEventListener("change", () => { selected = $("history-session").value; updateReplay(); renderTable(); });
   $("replay-play").addEventListener("click", () => {
     if (playing) { stop(); return; }
@@ -377,5 +448,5 @@
   $("table-next").addEventListener("click", () => { page++; renderTable(); });
   $("export-history").addEventListener("click", () => exportCsv());
   $("export-daily-history").addEventListener("click", () => exportCsv(true));
-  updateFilters();
+  selectSource();
 })();

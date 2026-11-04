@@ -11,6 +11,8 @@
   <script src="simulation-data.js" defer></script>
   <script src="simulation-engine.js" defer></script>
   <script src="charging-history-data.js" defer></script>
+  <script src="residential-data.js" defer></script>
+  <script src="residential-engine.js" defer></script>
   <script src="charging-history-engine.js" defer></script>
   <script src="charging-history.js" defer></script>
 </head>
@@ -22,9 +24,10 @@
 
   <main class="page-shell history-shell">
     <section class="intro history-intro" aria-labelledby="history-title">
-      <div><p class="eyebrow"><span class="mini-bolt" aria-hidden="true">ϟ</span> YOUR REAL CHARGING DATA</p><h1 id="history-title">Your history.<br><span>A smarter charge.</span></h1><p class="intro-copy">What would SPARC have done with your charging sessions?<br>Compare standard immediate charging with a SPARC plan on time-of-day delivery.</p></div>
-      <div class="history-source"><span class="replay-tag"><span class="status-dot" aria-hidden="true"></span> LOCAL DATA · HISTORICAL REPLAY</span><strong id="source-count">Loading sessions…</strong><span id="source-period"></span><a href="#history-method">From charging_sessions_tm1.csv <span aria-hidden="true">↘</span></a></div>
+      <div><p class="eyebrow"><span class="mini-bolt" aria-hidden="true">ϟ</span> REAL CHARGING SESSIONS</p><h1 id="history-title">Real habits.<br><span>A smarter charge.</span></h1><p class="intro-copy">What would SPARC do with these charging sessions?<br>Compare immediate charging, a timer, and a SPARC plan.</p></div>
+      <div class="history-source"><span class="replay-tag"><span class="status-dot" aria-hidden="true"></span> LOCAL DATA · MODELED REPLAY</span><strong id="source-count">Loading sessions…</strong><span id="source-period"></span><a id="source-link" href="#history-method">Dataset 1 · Norwegian residential reports ↘</a></div>
     </section>
+    <p id="source-scenario-note" class="history-message" role="status"></p>
 
     <p id="history-error" class="history-message error" role="alert" hidden></p>
     <noscript><p class="history-message error">Enable JavaScript to run the charging-history simulation.</p></noscript>
@@ -39,12 +42,16 @@
       <aside class="configuration history-config" aria-labelledby="filter-title">
         <div class="panel-heading"><div><p class="eyebrow">BUILD YOUR REPLAY</p><h2 id="filter-title">Your history.</h2></div><span class="heading-icon" aria-hidden="true">☷</span></div>
         <form id="history-form">
+          <div class="field"><label for="history-source">Charging dataset</label><select id="history-source"><option value="residential" selected>Dataset 1 · Norwegian residential</option><option value="teslamate">TeslaMate · previous history</option></select></div>
+          <div class="field" id="price-year-field"><label for="history-price-year">ComEd scenario year</label><select id="history-price-year"><option value="2025" selected>2025</option><option value="2026">2026 · partial price coverage</option></select><p class="history-hint">Keeps the source month, nearest matching weekday, local plug-in clock, and elapsed connection duration. These are modeled Chicago sessions.</p></div>
+          <div class="field"><label for="history-location">Location</label><select id="history-location"><option value="">All locations</option></select></div>
+          <div class="field"><label for="history-user">User</label><select id="history-user"><option value="">All users</option></select></div>
           <div class="field"><label for="history-start">From</label><input id="history-start" type="date" required></div>
           <div class="field"><label for="history-end">Through</label><input id="history-end" type="date" required></div>
           <div class="field"><label for="history-min-energy">Session size</label><select id="history-min-energy"><option value="0">All sessions</option><option value="5">At least 5 kWh</option><option value="10">At least 10 kWh</option><option value="20">At least 20 kWh</option></select></div>
           <div class="field history-divider"><label for="history-window">Available charging window</label><select id="history-window" aria-describedby="window-note"><option value="recorded">Recorded start → finish</option><option value="morning">Stay connected until morning</option></select><p id="window-note" class="history-hint">Uses only the recorded charging window, rounded outward to 5 minutes.</p></div>
           <div class="field" id="departure-field" hidden><label for="history-departure">Assumed departure</label><select id="history-departure"><option value="5">5:00 AM</option><option value="6">6:00 AM</option><option value="7" selected>7:00 AM</option><option value="8">8:00 AM</option><option value="9">9:00 AM</option></select></div>
-          <div class="field"><label for="history-power">Charging power</label><select id="history-power"><option value="recorded">Recorded peak power</option><option value="3.6">What if: 3.6 kW</option><option value="7.7">What if: 7.7 kW</option><option value="11.5">What if: 11.5 kW</option></select></div>
+          <div class="field"><label for="history-power">Charging power</label><select id="history-power"><option value="recorded">Dataset 2 · estimated user power</option><option value="3.6">What if: 3.6 kW</option><option value="7.7">What if: 7.7 kW</option><option value="11.5">What if: 11.5 kW</option></select></div>
           <div class="field"><label for="history-tariff">Planned delivery rate</label><select id="history-tariff" aria-describedby="comparison-note"><option value="time-of-day" selected>Time-of-day delivery</option><option value="standard">Standard · timing-only comparison</option></select><p id="comparison-note" class="history-hint"><strong>Baseline: immediate charging on standard delivery.</strong> SPARC and the alternative plans use the selected rate. Savings include the rate and timing changes.</p></div>
           <button class="history-button primary" id="run-history" type="submit"><span aria-hidden="true">▶</span> Run filtered sessions</button>
           <p class="history-hint">Calculations run in your browser using the shared SPARC simulator.</p>
@@ -55,6 +62,7 @@
         <section class="history-panel replay-panel" aria-labelledby="replay-title">
           <div class="history-panel-head"><div><p class="eyebrow">01 / REPLAY A SESSION</p><h2 id="replay-title">One charge. Five possibilities.</h2></div><span class="history-badge" id="session-id">RECORDED SESSION</span></div>
           <div class="field session-picker"><label for="history-session">Choose a session from your filtered history</label><select id="history-session"></select></div>
+          <p class="history-hint">The picker shows the latest 300 sessions. Select any session from the paginated table below.</p>
           <div class="session-facts" id="session-facts"></div>
           <p id="session-note" class="history-hint"></p>
           <p id="session-warning" class="history-message" role="status" hidden></p>
@@ -72,13 +80,20 @@
           <div class="history-progress" id="batch-progress" hidden><progress id="batch-meter" value="0" max="100"></progress></div>
           <p id="batch-status" class="history-hint" role="status" aria-live="polite">Run filtered sessions to compare your history. Sessions without complete prices or enough time are reported separately.</p>
           <p id="savings-math" class="history-hint">Overall savings % = total dollars saved ÷ total standard-delivery cost × 100. Daily CSV groups sessions by their Chicago start date and includes cumulative totals.</p>
-          <div class="history-table-wrap"><table class="history-table"><caption class="sr-only">Recorded sessions and simulated costs</caption><thead><tr><th scope="col">Session · Chicago time</th><th scope="col">Grid kWh</th><th scope="col">Immediate · standard</th><th scope="col" id="sparc-rate-heading">SPARC · time-of-day</th><th scope="col">Savings</th><th scope="col">Status</th></tr></thead><tbody id="history-table-body"></tbody></table></div>
+          <div class="history-table-wrap"><table class="history-table"><caption class="sr-only">Recorded sessions and simulated costs</caption><thead><tr><th scope="col" id="session-date-heading">Session · Norway source date</th><th scope="col">Grid kWh</th><th scope="col">Immediate · standard</th><th scope="col" id="sparc-rate-heading">SPARC · time-of-day</th><th scope="col">Savings</th><th scope="col">Status</th></tr></thead><tbody id="history-table-body"></tbody></table></div>
           <div class="history-pagination"><span id="table-count"></span><div><button id="table-previous" class="history-button" type="button" aria-label="Previous page">←</button><button id="table-next" class="history-button" type="button" aria-label="Next page">→</button></div></div>
         </section>
       </div>
     </div>
 
-    <section class="history-method" id="history-method" aria-labelledby="method-title"><p class="eyebrow">THE ASSUMPTIONS, IN THE OPEN</p><h2 id="method-title">Real sessions. A modeled alternative.</h2><div class="method-grid">
+    <section class="history-method" id="history-method" aria-labelledby="method-title"><p class="eyebrow">THE ASSUMPTIONS, IN THE OPEN</p><h2 id="method-title">Real sessions. A modeled alternative.</h2>
+      <div id="residential-method"><p id="source-quality" class="history-hint"></p><div class="method-grid">
+        <div><span>01</span><h3>Reported energy and connection.</h3><p>Dataset 1 provides plug-in time, unplug time, and charger energy. No additional charging losses are added. The first and last five-minute intervals are prorated to the exact connection boundaries. Missing unplug times and uncertain daylight-saving times are excluded.</p></div>
+        <div><span>02</span><h3>Norwegian habits, ComEd scenario.</h3><p>Source times use Europe/Oslo. For the chosen ComEd year, each session maps to the nearest same weekday within its source month. The Chicago plug-in clock and original elapsed duration are preserved. Sessions are independent scenarios, not a simultaneous fleet or observed Illinois bills.</p></div>
+        <div><span>03</span><h3>Useful estimates, clearly labeled.</h3><p>Dataset 2 estimates user charging power and capacity. Dataset 3 estimates state of charge and idle time, assuming a 95% end state. Dataset 4 validates session energy totals. These are derived estimates, not measured battery traces or electricity-price forecasts.</p></div>
+        <div><span>04</span><h3>Retrospective scheduling.</h3><p>Each plan knows the reported energy requirement and unplug deadline. User estimates may use the full source history. This tests scheduling with known needs; it does not validate advance predictions. Power is never raised to hide a shortfall. Only equal-energy completed comparisons count. Standard delivery isolates timing; time-of-day also changes the delivery rate. Fixed study rates exclude flat and capacity charges.</p></div>
+      </div><p class="history-hint">Source: Sørensen, Sartori, Lindberg and Andresen. <a href="https://doi.org/10.5281/zenodo.12730566" target="_blank" rel="noopener noreferrer">Published dataset</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11404051/" target="_blank" rel="noopener noreferrer">Methods and assumptions</a>.</p></div>
+      <div class="method-grid" id="teslamate-method" hidden>
       <div><span>01</span><h3>Your energy stays your energy.</h3><p>Each row uses <code>kwh_used</code> as grid energy. <code>kwh_added</code> and battery percentages are shown as recorded. No vehicle capacity or extra efficiency loss is assumed.</p></div>
       <div><span>02</span><h3>The window matters.</h3><p>Each row is replayed independently. Charging timestamps are interpreted in America/Chicago and rounded outward to five-minute boundaries. They are charging events, not verified plug-in or unplug times. The morning scenario extends availability to the chosen hour, caps the extension at the next recorded session, and always keeps the original window.</p></div>
       <div><span>03</span><h3>Standard versus time-of-day.</h3><p>The baseline charges immediately on standard delivery. SPARC and the alternative plans default to time-of-day delivery. Savings include both rate and timing changes, with the same grid energy, power, and available window. Selecting standard for the plans isolates timing savings. Savings count only when both finish. The study’s fixed rates apply across all dates; flat bill charges and capacity charges are excluded.</p></div>

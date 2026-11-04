@@ -14,8 +14,10 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory night-shift/dist
 
 Open **http://127.0.0.1:8000** in your browser. Stop the server with **Ctrl+C**. Python 3 is the only tool needed to serve it; there is no build step or package installation. The replay data is included, so running the simulator does not require ComEd or Tesla API credentials.
 
-The **Charging history** link opens `charging-history.html`, a separate simulator using
-`charging-history-data/charging_sessions_tm1.csv`. It is also available from the local SPARC app at
+The **Charging history** link opens `charging-history.html`. Its default dataset is now
+`Dataset1_charging_reports (1).csv`, with the three companion prediction files joined and checked.
+The previous TeslaMate history remains available in the **Charging dataset** selector.
+The page is also available from the local SPARC app at
 **http://127.0.0.1:8765/simulation/charging-history.html** after starting `python -m sparc serve`.
 
 In Night Shift's **Set the scene**, the **Charging window** subsection sits below **Plug in** and
@@ -29,6 +31,59 @@ test. Saved results from unrestricted charging are not reused for a custom windo
 
 ## Simulate charging history
 
+The default **Dataset 1 · Norwegian residential** mode uses all 35,377 connection reports from
+267 users at 12 Norwegian residential locations. Filter by source date, location, user, or session
+energy, choose the ComEd scenario year, then **Run filtered sessions**. Dates in the filters and
+table are the original Norway dates. Session details identify the mapped Chicago date and clock.
+
+These are independent charging scenarios using known session energy and unplug deadlines. The
+2018–2021 observations are not Illinois charging records or observed ComEd bills. Each source date
+maps to the nearest matching weekday in the same month of 2025 (default) or 2026 (partial coverage).
+Source timestamps use `Europe/Oslo`; the Chicago scenario preserves the local plug-in clock and
+the original elapsed connection duration, including source daylight-saving changes. Ambiguous or
+nonexistent source timestamps and mapped Chicago plug-in times are flagged and skipped. Each
+five-minute boundary interval is limited to its actual connected seconds; no charging capacity is
+created by rounding. Source observations from different years can map to the same price date, so
+totals are not a simultaneous fleet load or an annual forecast. No battery charging loss factor is
+added to the reported charger energy. The study's fixed delivery rates apply in both replay years.
+
+The prediction files have distinct roles:
+
+| File | Use in the simulation |
+| --- | --- |
+| `Dataset2_user_predictions.csv` | Estimated charger kW by `user_id`, plus labeled estimated battery capacity. 261 users have estimates; missing power requires an explicit what-if selection. |
+| `Dataset3_session_predictions.csv` | Estimated SoC and idle time, joined by session and checked against user ID. These describe the supplied model, including its assumed 95% end SoC. They do not override energy or deadlines. |
+| `Dataset4_hourly_predictions.csv` | Streamed reconciliation of hourly charged energy to Dataset 1 totals. All 34,537 keyed session totals reconcile within 0.01 kWh. Its 6,710 unkeyed rows are excluded from joins. The 41 MB raw file is not loaded by the browser. |
+
+The supplied estimates use retrospective session information and user history. They are not
+electricity-price forecasts or validated predictions available at plug-in. The uncontrolled track
+uses constant selected power from plug-in, following the source model's convention, and is labeled
+as modeled. The default standard-delivery comparison isolates timing savings. Switching to
+time-of-day delivery also includes a rate change. Shortfalls never count as savings and power is
+never raised to make a session finish.
+
+Rebuild and reproduce the full scenario from the repository root (Python 3.11+ and Node required):
+
+```sh
+python3 night-shift/build-residential-data.py
+node --test night-shift/test-residential.cjs night-shift/test-history.cjs
+node night-shift/run-residential.cjs 2025
+```
+
+The builder preserves the original CSVs and records their SHA-256 hashes. It writes the compact
+browser bundle and `results/charging-history/residential-data-quality.json`. The runner writes
+`residential-scenario-2025.json` and `residential-daily-2025.csv` in the same results directory.
+Daily exports group costs by **original Norway plug-in date**, while identifying the scenario year.
+Session exports include source timestamps and time zone, mapped UTC boundaries, exact availability,
+the estimated power/capacity/SoC fields, quality flags, and both tariffs.
+
+Dataset and methodology: Åse Lekang Sørensen, Igor Sartori, Karen Byskov Lindberg and Inger Andresen,
+[Electric vehicle charging dataset with 35,000 charging sessions from 12 residential locations in Norway](https://pmc.ncbi.nlm.nih.gov/articles/PMC11404051/),
+[data repository](https://doi.org/10.5281/zenodo.12730566).
+
+### Previous TeslaMate history
+
+Select **TeslaMate · previous history** to use `charging-history-data/charging_sessions_tm1.csv`.
 Choose a date range and session size, then **Run filtered sessions**. Replay any individual session,
 compare the recorded-pattern estimate, immediate charging, a 1 AM timer, SPARC's day-ahead plan, and
 perfect hindsight. Change power or delivery rate to explore alternatives, then export per-session results
@@ -85,8 +140,13 @@ These commands run from the repository root. The generated bundle records its so
 | `dist/charging-history.html`, `.css`, `.js` | Recorded-session controls, replay, batch comparisons, and export. |
 | `dist/charging-history-engine.js` | History windows, equal-energy comparisons, summaries, and CSV serialization. |
 | `dist/charging-history-data.js` | Bundled charging records and additional historical price hours. |
+| `dist/residential-data.js` | Compact normalized Dataset 1 rows with prediction metadata and reconciliation results. |
+| `dist/residential-engine.js` | Explicit Norway-to-ComEd scenario mapping and source adapters. |
 | `build-history-data.py` | Rebuilds the charging-history bundle from repository CSVs. |
+| `build-residential-data.py` | Validates and joins all four residential CSVs without changing originals. |
+| `run-residential.cjs` | Reproduces the complete residential scenario and daily exports. |
 | `test-history.cjs` | Energy, billing, window, DST, export, and full-dataset checks. |
+| `test-residential.cjs` | Source joins, scenario mapping, exact boundaries, missing data, estimates, and exports. |
 | `dist/LICENSE` | Original MIT license. |
 | `.openai/hosting.json` | Original ChatGPT Sites project and static directory configuration. |
 

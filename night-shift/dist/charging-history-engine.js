@@ -34,11 +34,13 @@
     if (!Number.isFinite(row.start) || !Number.isFinite(row.end) || row.end <= row.start || !Number.isFinite(row.gridKwh) || row.gridKwh <= 0) {
       return {valid: false, reason: "This record needs positive grid energy and a valid time window."};
     }
+    const residential = row.sourceKind === "residential";
     const start = Math.floor(row.start / SLOT) * SLOT;
     const recordedEnd = Math.ceil(row.end / SLOT) * SLOT;
     let end = recordedEnd;
     let capped = false;
     if (options.window === "morning") {
+      if (residential) return {valid: false, reason: "Dataset 1 has verified unplug times; extending availability is not supported."};
       const hour = options.departureHour === undefined ? 7 : Number(options.departureHour);
       if (!Number.isInteger(hour) || hour < 0 || hour > 23) return {valid: false, reason: "Choose a departure hour between 0 and 23."};
       let day = row.startLocal.slice(0, 10);
@@ -56,12 +58,17 @@
       const minimumPower = row.gridKwh / ((recordedEnd - start) / HOUR);
       const observedPower = Number.isFinite(row.powerKw) && row.powerKw > 0 ? row.powerKw : 0;
       // Inconsistent peak/energy measurements are explicitly flagged in the UI.
-      const power = options.powerKw === undefined || options.powerKw === "recorded" ? Math.max(observedPower, minimumPower) : Number(options.powerKw);
-      if (!Number.isFinite(power) || power <= 0) return {valid: false, reason: "Choose positive charging power."};
-      const config = {date: row.startLocal.slice(0, 10), vehicle: "history", startEpoch: start, endEpoch: end,
+      const power = options.powerKw === undefined || options.powerKw === "recorded" ?
+        (residential ? observedPower : Math.max(observedPower, minimumPower)) : Number(options.powerKw);
+      if (!Number.isFinite(power) || power <= 0) return {valid: false, reason: residential ?
+        "No predicted charger power for this user. Choose an explicit what-if power." : "Choose positive charging power."};
+      const config = {date: row.modeledDate || row.startLocal.slice(0, 10), vehicle: "history", startEpoch: start, endEpoch: end,
         gridEnergyKwh: row.gridKwh, power: power, efficiency: 1, reserveMinutes: 0,
         tariff: options.tariff || "time-of-day", strategy: "day-ahead"};
-      return {valid: true, config, recordedEnd, capped, powerAdjusted: observedPower < minimumPower - EPS,
+      // Keep the grid for pricing while limiting boundary intervals to the
+      // exact seconds the reported vehicle is connected.
+      if (residential) Object.assign(config, {availabilityStartEpoch: row.start, availabilityEndEpoch: row.end});
+      return {valid: true, config, recordedEnd, capped, powerAdjusted: !residential && observedPower < minimumPower - EPS,
         extended: end > recordedEnd, recordedDurationHours: (recordedEnd - start) / HOUR};
     }
     return {valid: false, reason: "Unknown charging window."};
@@ -75,11 +82,13 @@
     const flatSlotKwh = row.gridKwh / ((prepared.recordedEnd - config.startEpoch) / SLOT);
     const tracks = strategies.map(function (strategy) {
       const recorded = strategy.id === "recorded";
+      const residential = row.sourceKind === "residential";
       const tariff = strategy.id === "charge-now" ? BASELINE_TARIFF : config.tariff;
-      const result = Engine.simulate(market, Object.assign({}, config, {strategy: recorded ? "manual" : strategy.id, tariff}),
-        recorded ? {manual: function (now) { return now < prepared.recordedEnd ? flatSlotKwh : 0; }} : undefined);
+      const result = Engine.simulate(market, Object.assign({}, config, {strategy: recorded ? (residential ? "charge-now" : "manual") : strategy.id, tariff}),
+        recorded && !residential ? {manual: function (now) { return now < prepared.recordedEnd ? flatSlotKwh : 0; }} : undefined);
       const rateLabel = tariff === "standard" ? "standard delivery" : "time-of-day delivery";
-      return Object.assign({}, strategy, {tariff, label: strategy.id === "charge-now" ? strategy.label : `${strategy.label} · ${rateLabel}`, result});
+      const label = recorded && residential ? "Uncontrolled · modeled" : strategy.label;
+      return Object.assign({}, strategy, {tariff, label: strategy.id === "charge-now" ? label : `${label} · ${rateLabel}`, result});
     });
     const immediate = tracks.find(t => t.id === "charge-now").result;
     const sparc = tracks.find(t => t.id === "day-ahead").result;
@@ -107,7 +116,10 @@
       "modeled_start_utc","modeled_end_utc","modeled_power_kw","power_adjusted","morning_extension_capped",
       "grid_kwh","battery_kwh","logged_csv_cost_usd","recorded_pattern_estimate_usd","immediate_usd",
       "timer_1am_usd","sparc_usd","hindsight_usd","immediate_delivered_kwh","sparc_delivered_kwh",
-      "saving_usd","status","reason"];
+      "saving_usd","status","reason","data_source","source_user_id","source_location","source_timezone",
+      "source_plugin_local","source_plugout_local","comed_price_year","date_mapping","power_basis",
+      "predicted_capacity_kwh","predicted_start_soc_pct","predicted_soc_diff_pct","predicted_charging_hours",
+      "predicted_idle_hours","hourly_predicted_kwh","quality_flags","available_start_utc","available_end_utc"];
     const lines = [fields];
     results.forEach(function (result) {
       const row = result.row;
@@ -115,16 +127,27 @@
       const fixed = value => Number.isFinite(value) ? value.toFixed(6) : "";
       const cost = id => fixed(track(id)?.totalCost);
       const iso = epoch => Number.isFinite(epoch) ? new Date(epoch * 1000).toISOString() : "";
-      lines.push([row.id,row.startLocal,row.endLocal,options.window || "recorded",
+      const residential = row.sourceKind === "residential";
+      const local = epoch => Number.isFinite(epoch) ? new Intl.DateTimeFormat("sv-SE", {timeZone:"America/Chicago",
+        year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(new Date(epoch*1000)) : "";
+      lines.push([row.id,residential ? local(row.start) : row.startLocal,residential ? local(row.end) : row.endLocal,options.window || "recorded",
         options.window === "morning" ? options.departureHour ?? 7 : "",BASELINE_TARIFF,result.config?.tariff || options.tariff || "time-of-day",
         iso(result.config?.startEpoch),iso(result.config?.endEpoch),result.config?.power ?? "",
         result.prepared?.powerAdjusted ?? "",result.prepared?.capped ?? "",row.gridKwh,row.batteryKwh,row.loggedCost,
         cost("recorded"),cost("charge-now"),cost("timer-0100"),cost("day-ahead"),cost("hindsight"),
         fixed(track("charge-now")?.energyKwh),fixed(track("day-ahead")?.energyKwh),
         result.eligible ? fixed(result.saving) : "",!result.valid ? "skipped" : result.eligible ? "compared" : "shortfall",
-        result.reason || (!result.eligible ? "Not all requested energy could be delivered." : "")]);
+        result.reason || (!result.eligible ? "Not all requested energy could be delivered." : ""),
+        residential ? "Dataset1" : "TeslaMate",row.userId || "",row.site || row.location,
+        row.sourceTimezone || "America/Chicago",row.startLocal,row.endLocal || "",row.priceYear || "",
+        residential ? "nearest same weekday within source month; Chicago clock; source elapsed duration" : "original dates",
+        options.powerKw === undefined || options.powerKw === "recorded" ? (residential ? "Dataset2 estimate" : "recorded peak") : "what-if",
+        row.capacityKwh ?? "",row.predictedStartSoc ?? "",row.predictedSocDiff ?? "",row.chargingHours ?? "",
+        row.idleHours ?? "",row.hourlyKwh ?? "",(row.qualityFlags || []).join("; "),
+        iso(result.config?.availabilityStartEpoch ?? result.config?.startEpoch),
+        iso(result.config?.availabilityEndEpoch ?? result.config?.endEpoch)]);
     });
-    const quote = value => `"${String(value).replace(/"/g, '""')}"`;
+    const quote = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
     return lines.map(line => line.map(quote).join(",")).join("\r\n");
   }
   function dailyRows(results, options) {
@@ -161,10 +184,11 @@
   }
   function exportDailyCsv(results, options) {
     options = options || {};
-    const fields = ["session_start_date_chicago","standard_immediate_usd","sparc_planned_usd","saving_usd","saving_pct",
+    const residential = results.some(result => result.row.sourceKind === "residential");
+    const fields = [residential ? "source_plugin_date_oslo" : "session_start_date_chicago","standard_immediate_usd","sparc_planned_usd","saving_usd","saving_pct",
       "grid_kwh","sessions_compared","sessions_skipped","sessions_shortfall","sessions_total",
       "cumulative_standard_usd","cumulative_sparc_usd","cumulative_saving_usd","cumulative_saving_pct",
-      "baseline_tariff","planned_tariff","window","status"];
+      "baseline_tariff","planned_tariff","window","status","data_source","comed_price_year","date_grouping"];
     const fixed = value => Number.isFinite(value) ? value.toFixed(6) : "";
     const tariff = results.find(result => result.config)?.config.tariff || options.tariff || "time-of-day";
     const lines = [fields];
@@ -172,7 +196,8 @@
       lines.push([day.date,fixed(day.baselineCost),fixed(day.sparcCost),fixed(day.saving),fixed(day.savingPct),
         fixed(day.energyKwh),day.comparable,day.skipped,day.shortfall,day.total,
         fixed(day.cumulativeBaselineCost),fixed(day.cumulativeSparcCost),fixed(day.cumulativeSaving),fixed(day.cumulativeSavingPct),
-        BASELINE_TARIFF,tariff,options.window || "recorded",day.status]);
+        BASELINE_TARIFF,tariff,options.window || "recorded",day.status,residential ? "Dataset1" : "TeslaMate",
+        residential ? results[0].row.priceYear : "",residential ? "original Norway plug-in date; mapped ComEd scenario costs" : "Chicago session start date"]);
     });
     const quote = value => `"${String(value).replace(/"/g, '""')}"`;
     return lines.map(line => line.map(quote).join(",")).join("\r\n");
