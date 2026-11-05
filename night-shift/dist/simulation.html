@@ -7,16 +7,21 @@
   <meta name="description" content="Replay real ComEd electricity prices with electric cars, buses and commercial vehicles. Race charging strategies and discover your estimated yearly savings.">
   <title>Night Shift · SPARC charging simulator</title>
   <link rel="stylesheet" href="simulation.css">
+  <link rel="stylesheet" href="charging-window.css">
   <script src="simulation-data.js" defer></script>
   <script src="simulation-engine.js" defer></script>
   <script src="simulation-charge-target.js" defer></script>
   <script src="simulation-view.js" defer></script>
   <script src="simulation.js" defer></script>
+  <script src="charging-history-data.js" defer></script>
+  <script src="charging-history-engine.js" defer></script>
+  <script src="charging-window-engine.js" defer></script>
+  <script src="charging-window-view.js" defer></script>
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
-    <nav aria-label="Main navigation"><a href="charging-history.html">Charging history <span aria-hidden="true">↗</span></a><a href="norway-local.html">Norway simulator</a><a href="#benchmark-title">The full test</a><a href="#simulation-assumptions">How it works</a><a class="nav-current" href="simulation.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span> Play the simulation</a></nav>
+    <nav aria-label="Main navigation"><a href="charging-history.html">Charging history <span aria-hidden="true">↗</span></a><a href="norway-local.html">Norway simulator</a><a href="#window-comparison">History windows</a><a href="#benchmark-title">The full test</a><a href="#simulation-assumptions">How it works</a><a class="nav-current" href="simulation.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span> Play the simulation</a></nav>
   </header>
 
   <main class="page-shell">
@@ -184,6 +189,8 @@
         <section class="price-card" aria-labelledby="price-title"><div class="section-heading"><div><p class="eyebrow">READ THE NIGHT</p><h2 id="price-title">The price trail.</h2></div><div class="chart-legend"><span><i class="legend-price"></i> Supply price</span><span><i class="legend-charge"></i> Charging</span></div></div><div class="chart-container"><svg id="price-chart" viewBox="0 0 820 220" role="img" aria-label="Electricity prices and charging activity across the selected night"><text x="410" y="110" text-anchor="middle" fill="#748078" font-size="13">Your selected night will appear here.</text></svg></div><p class="chart-note">Dashed: the forecast available now. Solid: completed hours' settled prices. Green bars: energy charged. Future actual prices stay hidden.</p></section>
       </div>
     </div>
+
+    <section id="window-comparison" class="window-comparison" aria-labelledby="window-comparison-title"><h2 id="window-comparison-title">Compare recorded times with an overnight window</h2><p>Loading the charging history comparison…</p><noscript>Enable JavaScript to compare the same energy at recorded times and from 8 p.m. to 8 a.m.</noscript></section>
 
     <div class="insights-grid">
       <section class="leaderboard-card" aria-labelledby="leaderboard-title"><div class="section-heading"><div><p class="eyebrow">THE FINISHING ORDER</p><h2 id="leaderboard-title">Every strategy gets a lane.</h2></div><span class="heading-icon" aria-hidden="true">≋</span></div><div class="table-scroll"><table class="leaderboard-table"><thead><tr><th scope="col">Strategy</th><th scope="col">Bill estimate</th><th scope="col">Energy</th><th scope="col">Status</th></tr></thead><tbody id="leaderboard"><tr><td colspan="4" class="empty-cell">Start a replay to see how the strategies compare.</td></tr></tbody></table></div></section>

@@ -17,6 +17,13 @@ Open **http://127.0.0.1:8000** in your browser. Stop the server with **Ctrl+C**.
 The **Charging history** link opens `charging-history.html`. Its default dataset is now
 `Dataset1_charging_reports (1).csv`, with the three companion prediction files joined and checked.
 The previous TeslaMate history remains available in the **Charging dataset** selector.
+**History windows** on the main simulation page compares those TeslaMate events at their recorded
+times with a fixed **8 p.m.–8 a.m.** window. Cost bars use one unchanged recorded-time immediate
+baseline; the hourly chart shows when the same grid energy is delivered. Date filters and the
+delivery-rate selector recalculate both windows on the same completed events. The panel preserves
+each event's modeled power, reports exclusions, and labels additional cost when the fixed window
+costs more. These independent event scenarios are separate from the vehicle controls above.
+Verify with `node --test night-shift/test-charging-windows.cjs`.
 The page is also available from the local SPARC app at
 **http://127.0.0.1:8765/simulation/charging-history.html** after starting `python -m sparc serve`.
 
