@@ -72,6 +72,8 @@
       $(id).disabled = !isResidential();
     }
     $("price-year-field").hidden = !isResidential();
+    $("norway-results-link").hidden = !isResidential();
+    $("norway-local-link").hidden = !isResidential();
     $("residential-method").hidden = !isResidential();
     $("teslamate-method").hidden = isResidential();
     $("history-window").disabled = isResidential();

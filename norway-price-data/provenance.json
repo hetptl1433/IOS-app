@@ -1,0 +1,92 @@
+{
+  "title": "Norwegian historical hourly day-ahead spot prices for Dataset 1 replay",
+  "dataset": "Norwegian hourly residential electricity demand data with consumer characteristics during the European energy crisis",
+  "authors": [
+    "Matthias Hofmann",
+    "Sigurd Bjarghov",
+    "Stian Nessa"
+  ],
+  "doi": "10.5281/zenodo.8423312",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "licenseEvidence": "Zenodo record metadata: metadata.license.id = cc-by-4.0",
+  "sources": [
+    {
+      "label": "Published research dataset, Zenodo record 8423312",
+      "url": "https://zenodo.org/records/8423312"
+    },
+    {
+      "label": "Original prices.csv download",
+      "url": "https://zenodo.org/api/records/8423312/files/prices.csv/content"
+    },
+    {
+      "label": "Data article, sections 3.2.6 and 4.2",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10618698/"
+    },
+    {
+      "label": "Machine-readable dataset metadata and license",
+      "url": "https://zenodo.org/api/records/8423312"
+    }
+  ],
+  "attribution": "Hofmann, Matthias; Bjarghov, Sigurd; Nessa, Stian (2023). Norwegian hourly residential electricity demand data with consumer characteristics during the European energy crisis (v3). Zenodo. https://doi.org/10.5281/zenodo.8423312. CC BY 4.0. Normalized for SPARC; DST transition dates omitted.",
+  "costScope": "Historical day-ahead spot energy prices as provided by the research dataset, in NOK/kWh. No household grid fees, supplier markup, taxes, VAT adjustments, subsidies or fixed charges are added. These are a spot energy comparison, not a reconstruction of household bills.",
+  "currency": "NOK",
+  "unit": "NOK/kWh",
+  "timezone": "Europe/Oslo",
+  "sourceFields": [
+    "Price_area",
+    "Date",
+    "Hour",
+    "Price_NOK_MWh",
+    "Price_NOK_kWh"
+  ],
+  "priceConversion": "Price_NOK_MWh / 1000. The source Price_NOK_kWh field is rounded to two decimal places and is not used.",
+  "hourInterpretation": "Source Hour labels 1..24 identify the successive hourly periods of the local date; Hour 1 is interpreted as 00:00–01:00. Entire clock-change dates are omitted.",
+  "publishedAssumption": {
+    "localTime": "13:00 Europe/Oslo on the previous local date",
+    "description": "Model assumption for when the next-day price curve can be used; the source CSV has no historical publication timestamps. It is not an observed publication-time series.",
+    "field": "published_assumed_utc"
+  },
+  "coverage": {
+    "firstDate": "2019-07-01",
+    "lastDate": "2021-08-07",
+    "areas": [
+      "NO1",
+      "NO3",
+      "NO4",
+      "NO5"
+    ],
+    "rows": 73440
+  },
+  "sourceCoverage": {
+    "rowCount": 135240,
+    "firstDate": "2019-07-01",
+    "lastDate": "2022-07-31",
+    "areas": [
+      "NO1",
+      "NO2",
+      "NO3",
+      "NO4",
+      "NO5"
+    ]
+  },
+  "excludedDates": {
+    "2019-10-27": "Source normalizes every day to 24 hours: spring missing hour is averaged; autumn second repeated hour is omitted. Entire local transition date excluded.",
+    "2020-03-29": "Source normalizes every day to 24 hours: spring missing hour is averaged; autumn second repeated hour is omitted. Entire local transition date excluded.",
+    "2020-10-25": "Source normalizes every day to 24 hours: spring missing hour is averaged; autumn second repeated hour is omitted. Entire local transition date excluded.",
+    "2021-03-28": "Source normalizes every day to 24 hours: spring missing hour is averaged; autumn second repeated hour is omitted. Entire local transition date excluded."
+  },
+  "sourceChecksum": {
+    "md5": "ac85e79c173f690d4fb027941848269e",
+    "sha256": "07a50678c14ec398f897efde4e2a6ff386d5ac828c7cf37a98b90b587019fee3"
+  },
+  "normalizedChecksum": {
+    "sha256": "b81bee3a3e9d10e917b63f832528472f5856c3fbf169c21eaf7355dd8373fdca"
+  },
+  "sourceBytes": 4383465,
+  "normalizedPriceRange": {
+    "minimumNokKwh": -0.01925,
+    "maximumNokKwh": 2.56659
+  },
+  "qualityPolicy": "Preserve negative spot prices. Reject missing/nonfinite prices, duplicate area/date/hour keys and incomplete days. No interpolation, date remapping, foreign prices or fallback price series are used."
+}

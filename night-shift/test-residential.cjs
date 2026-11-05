@@ -135,6 +135,18 @@ test("the planner accounts for limited capacity in the cheapest boundary interva
   }
 });
 
+test("price caps start early enough to account for partial boundary intervals", () => {
+  const Engine = require("./dist/simulation-engine.js");
+  const start = market.at("2025-05-12",20)+60;
+  const row = {...sample,start,end:start+480,gridKwh:.3,powerKw:3.6,modeledDate:"2025-05-12"};
+  const prepared = Lab.configuration(market,row,{});
+  const run = Engine.simulate(market,{...prepared.config,strategy:"cap--9999"});
+  assert.equal(run.ready,true);
+  close(run.energyKwh,.3);
+  assert.ok(run.slots[0].energyKwh > 0);
+  for (const slot of run.slots) assert.ok(slot.energyKwh<=3.6*(slot.availableEnd-slot.availableStart)/3600+1e-9);
+});
+
 test("exports distinguish source dates, scenario dates, and supplied estimates", () => {
   const run = Lab.simulate(market,sample,{tariff:"standard"});
   const csv = Lab.exportCsv([run],{tariff:"standard"});

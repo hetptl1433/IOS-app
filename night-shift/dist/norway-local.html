@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f4ec">
+  <meta name="description" content="Replay Norway charging history using Norwegian electricity prices in NOK, at the original session dates.">
+  <title>Norway simulator · SPARC Night Shift</title>
+  <link rel="stylesheet" href="simulation.css">
+  <link rel="stylesheet" href="norway-local.css">
+  <script src="norway-local-data.js" defer></script>
+  <script src="norway-local-engine.js" defer></script>
+  <script src="norway-local.js" defer></script>
+</head>
+<body class="norway-local-page">
+  <header class="site-header">
+    <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
+    <nav aria-label="Main navigation"><a href="simulation.html">Play the simulation</a><a href="charging-history.html">Charging history</a><a href="norway.html">Chicago comparison</a><a href="norway-local.html" aria-current="page">Norway simulator</a></nav>
+  </header>
+  <main class="page-shell nl-shell">
+    <section class="nl-intro" aria-labelledby="nl-title">
+      <p class="eyebrow">NORWAY CHARGING HISTORY · NORWEGIAN PRICES</p>
+      <h1 id="nl-title">Norway data.<br><span>Norway electricity prices.</span></h1>
+      <p class="nl-lead">Replay real plug-in and unplug times. Compare what each charging strategy would have cost at the original dates, in Norwegian kroner.</p>
+      <p class="nl-help"><strong>Historical hourly spot prices.</strong> Each kWh uses the historical spot price for that hour and Norwegian price area. Charging is simulated in five-minute steps; this history does not include a five-minute price forecast.</p>
+      <p class="nl-source-line" id="nl-source-line">Loading historical session and price coverage…</p>
+      <p class="nl-price-line" id="nl-price-line">The available Norwegian price dates will be shown separately from the charging history.</p>
+    </section>
+
+    <p id="nl-error" class="nl-error" role="alert" hidden></p>
+    <noscript><p class="nl-error">Enable JavaScript to run the Norway historical comparison.</p></noscript>
+
+    <section class="nl-card nl-filter-card" aria-labelledby="nl-filter-title">
+      <div class="nl-heading"><div><p class="eyebrow">1 / CHOOSE THE HISTORY</p><h2 id="nl-filter-title">Which sessions should we test?</h2></div><span class="nl-pill">All times: Europe/Oslo</span></div>
+      <form id="nl-filter-form">
+        <div class="nl-filter-grid">
+          <label>Plug-in date, from<input id="nl-date-from" type="date" required></label>
+          <label>Plug-in date, to<input id="nl-date-to" type="date" required></label>
+          <label>Norwegian price area<select id="nl-area"><option value="">All price areas</option></select></label>
+          <label>Charging location<select id="nl-site"><option value="">All locations</option></select></label>
+        </div>
+        <div class="nl-run-row"><p id="nl-filter-count">Session coverage will appear when the data loads.</p><button class="nl-primary" id="nl-run" type="submit" disabled>Run historical comparison <span aria-hidden="true">↗</span></button></div>
+      </form>
+      <p id="nl-run-status" class="nl-status" role="status" aria-live="polite">No comparison has been run yet.</p>
+      <progress id="nl-progress" value="0" max="1" aria-label="Historical comparison progress" hidden></progress>
+    </section>
+
+    <section id="nl-results" aria-labelledby="nl-result-title" hidden>
+      <div class="nl-heading nl-result-heading"><div><p class="eyebrow">2 / COMPARE THE COST</p><h2 id="nl-result-title">Same energy. Different strategies.</h2></div><button class="nl-secondary" id="nl-download" type="button" disabled>Download results <span aria-hidden="true">↗</span></button></div>
+      <p class="nl-explanation" id="nl-common-note">Savings compare with immediate charging on the same Norwegian spot-price basis. Only sessions completed by every available strategy enter the cost comparison.</p>
+      <div class="nl-highlights">
+        <article class="nl-highlight nl-highlight-best"><span class="nl-small-label">LOWEST COST USING AVAILABLE INFORMATION</span><h3 id="nl-winner">—</h3><strong id="nl-winner-saving">—</strong><p id="nl-winner-note">Run a comparison to see the result.</p></article>
+        <article class="nl-highlight"><span class="nl-small-label">IMMEDIATE CHARGING</span><strong id="nl-baseline">—</strong><p>The starting point for every saving shown below.</p></article>
+        <article class="nl-highlight"><span class="nl-small-label">SAME COMPLETED SESSIONS</span><strong id="nl-comparable">—</strong><p id="nl-energy">—</p></article>
+      </div>
+      <section class="nl-card" aria-labelledby="nl-table-title">
+        <div class="nl-heading"><div><p class="eyebrow">EVERY STRATEGY</p><h3 id="nl-table-title">Total cost across the selected history</h3></div></div>
+        <p class="nl-help">Lower cost is better. A negative saving means higher cost than immediate charging. These totals are for the selected sessions, not an annual bill. The 25, 50 and 100 øre/kWh caps are thresholds for choosing when to charge; every strategy pays the actual hourly spot price.</p>
+        <div class="nl-table-scroll" tabindex="0" role="region" aria-label="Norway charging strategies; scroll horizontally on small screens">
+          <table class="nl-table"><caption class="nl-sr-only">Strategy costs in NOK, compared on the same completed Norway sessions.</caption><thead><tr><th scope="col">Charging strategy</th><th scope="col">Total cost (NOK)</th><th scope="col">Saved (NOK)</th><th scope="col">Saved (%)</th></tr></thead><tbody id="nl-strategy-rows"></tbody></table>
+        </div>
+        <p class="nl-reference">Perfect hindsight knows future prices and is a reference only. This Norwegian history contains hourly day-ahead spot prices, so the live-price strategy has no result.</p>
+      </section>
+      <details class="nl-card nl-exclusions"><summary id="nl-exclusion-title">Which sessions were left out?</summary><p id="nl-exclusion-summary"></p><ul id="nl-exclusion-list"></ul></details>
+    </section>
+
+    <section class="nl-card nl-replay" id="nl-replay" aria-labelledby="nl-replay-title" hidden>
+      <div class="nl-heading"><div><p class="eyebrow">3 / SEE ONE SESSION</p><h2 id="nl-replay-title">Follow the charging history.</h2></div><span class="nl-pill" id="nl-session-area">Norway</span></div>
+      <div class="nl-replay-controls">
+        <div class="nl-session-step"><button id="nl-previous" type="button" class="nl-secondary" aria-label="Previous historical session">←</button><label>Session <input id="nl-session-number" type="number" min="1" value="1" inputmode="numeric"></label><span id="nl-session-total">of 0</span><button id="nl-next" type="button" class="nl-secondary" aria-label="Next historical session">→</button></div>
+        <label class="nl-replay-strategy">Charging strategy<select id="nl-replay-strategy"></select></label>
+        <form id="nl-find-form" class="nl-find-form"><label>Find session ID<input id="nl-find-id" type="search" placeholder="Session ID"></label><button type="submit" class="nl-secondary">Find</button></form>
+      </div>
+      <p class="nl-session-note" id="nl-session-note"></p>
+      <p class="nl-session-result" id="nl-session-result" role="status"></p>
+      <div id="nl-charts" class="nl-charts">
+        <figure><figcaption>Energy delivered <span>kWh</span></figcaption><div id="nl-energy-chart" class="nl-chart"></div></figure>
+        <figure><figcaption>Electricity cost so far <span>NOK</span></figcaption><div id="nl-cost-chart" class="nl-chart"></div></figure>
+      </div>
+      <p class="nl-chart-key"><span class="nl-key-selected"></span><span id="nl-chart-strategy">Selected strategy</span><span class="nl-key-baseline"></span>Immediate charging</p>
+      <details id="nl-hourly-detail"><summary>See the selected strategy’s charging hours and spot prices</summary><p class="nl-help">1 NOK = 100 øre. Times below use Europe/Oslo; the UTC offset distinguishes repeated daylight-saving hours.</p><div class="nl-table-scroll" tabindex="0" role="region" aria-label="Hourly session replay"><table class="nl-table nl-hour-table"><caption class="nl-sr-only">Charging intervals for the selected session and strategy.</caption><thead><tr><th scope="col">Interval starts (Oslo)</th><th scope="col">Energy (kWh)</th><th scope="col">Spot price (øre/kWh)</th><th scope="col">Cost (NOK)</th></tr></thead><tbody id="nl-hourly-rows"></tbody></table></div></details>
+    </section>
+
+    <section class="nl-method" aria-labelledby="nl-method-title">
+      <div><p class="eyebrow">WHAT THESE NUMBERS MEAN</p><h2 id="nl-method-title">Historical prices.<br>Modeled charging choices.</h2><p>Dataset 1 gives the energy delivered and the plug-in window. Dataset 2 supplies estimated charger power. The simulation moves charging within that window and checks whether each strategy finishes before unplugging.</p><p>The energy need and unplug deadline are known to each strategy in this replay. The result is a comparison of charging choices, rather than a forecast of a household’s full electricity bill.</p><p>Timers use Oslo time. An arrival within six hours after the scheduled start can charge immediately. Timers and price caps can start earlier, or charge above the cap, when needed to finish before unplugging.</p></div>
+      <div class="nl-card nl-provenance"><h3>Data and price basis</h3><p id="nl-provenance-summary">Historical price provenance will appear when the Norway data bundle is loaded.</p><p id="nl-cost-scope">Modeled spot-price electricity only. Network fees, tax, VAT, fixed fees, and electricity subsidies are excluded unless the loaded source explicitly says otherwise.</p><p id="nl-publication-note"></p><p>Before the next-day prices are assumed to be published, SPARC forecasts unknown hours using the previous local day’s matching hour, or the current known price. Final costs use actual historical spot prices.</p><p id="nl-area-note"></p><p id="nl-attribution"></p><p id="nl-charging-attribution"></p><ul id="nl-source-links"></ul></div>
+    </section>
+    <footer class="nl-footer"><span>SPARC / NIGHT SHIFT · NORWAY HISTORY</span><a href="norway.html">View the separate Chicago-price comparison ↗</a></footer>
+  </main>
+</body>
+</html>

@@ -330,6 +330,19 @@
           var urgent = session.allowedSlots ? Math.ceil(remaining / full - EPS) >=
             upperBound(session.chargingSlotTimes, session.chargingEnd - session.reserveSeconds - SLOT) - upperBound(session.chargingSlotTimes, now - 1) :
             now + Math.ceil(remaining / full - EPS) * SLOT >= session.end - session.reserveSeconds;
+          if (session.slotLimits) {
+            // A partial last interval cannot provide a full slot's energy.
+            // Start now whenever waiting one more interval would miss the goal.
+            var futureStart = now + SLOT, futureEnd = session.chargingEnd - session.reserveSeconds;
+            var futureCount = session.allowedSlots ? Math.max(0,
+              upperBound(session.chargingSlotTimes, futureEnd - SLOT) - upperBound(session.chargingSlotTimes, futureStart - 1)) :
+              Math.max(0, Math.ceil((futureEnd - futureStart) / SLOT));
+            var futureCapacity = futureCount * full;
+            session.slotLimits.forEach(function (limit, t) {
+              if (t >= futureStart && t < futureEnd && (!session.allowedSlots || session.allowedSlots.has(t))) futureCapacity -= full - limit;
+            });
+            urgent = remaining > futureCapacity + EPS;
+          }
           if (urgent) kwh = full;
           else {
             var posted = market.fiveMinute.get(latestVisible(now));

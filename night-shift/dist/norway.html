@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f4ec">
+  <meta name="description" content="Compare 31 charging strategies on Norway Dataset 1 using time-of-day delivery rates, on the same completed sessions.">
+  <title>Norway results · SPARC Night Shift</title>
+  <link rel="stylesheet" href="simulation.css">
+  <link rel="stylesheet" href="norway-comparison.css">
+  <script src="norway-comparison-data.js" defer></script>
+  <script src="norway-comparison.js" defer></script>
+</head>
+<body class="norway-page">
+  <header class="site-header">
+    <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
+    <nav aria-label="Main navigation"><a href="simulation.html">Play the simulation</a><a href="charging-history.html">Charging history</a><a class="nav-current" href="norway.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span>Chicago comparison</a><a href="norway-local.html">Norway simulator</a></nav>
+  </header>
+  <main class="page-shell norway-shell">
+    <section class="norway-intro" aria-labelledby="norway-title">
+      <p class="eyebrow">NORWAY DATASET 1 · 2025 COMED SCENARIO</p>
+      <h1 id="norway-title">Same energy.<br><span>Different charging costs.</span></h1>
+      <p class="norway-lead">Which charging strategy costs less? We tested 31 setups on the same <strong id="norway-session-count">33,784</strong> completed residential sessions.</p>
+      <p class="norway-origin">Real charging habits from Norway, replayed against Chicago electricity prices. These are modeled costs.</p>
+      <a class="norway-replay-link" href="norway-local.html">Use Norwegian prices and the original charging dates <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <p id="norway-error" class="norway-error" role="alert" hidden></p>
+    <noscript><p class="norway-error">Enable JavaScript to compare the verified Norway results.</p></noscript>
+    <section class="norway-results" id="norway-results" aria-labelledby="comparison-title">
+      <div class="norway-comparison-controls">
+        <div><p class="eyebrow">TIME-OF-DAY DELIVERY</p><h2 id="comparison-title">Savings with the time-of-day rate.</h2></div>
+      </div>
+      <p id="norway-rate-explanation" class="norway-rate-explanation">All setups use time-of-day delivery. Savings include charging-time and delivery-rate changes, compared with immediate charging on standard delivery.</p>
+
+      <div class="norway-highlights" aria-label="Best charging result for this comparison">
+        <article class="norway-highlight norway-highlight-best"><span class="norway-small-label">BEST STRATEGY USING AVAILABLE PRICES</span><h3 id="norway-winner">SPARC + live prices</h3><strong id="norway-best-percent">33.97%</strong><p id="norway-best-note">lower cost through timing + the delivery rate</p></article>
+        <article class="norway-highlight"><span class="norway-small-label">TOTAL SAVED ACROSS THESE SESSIONS</span><strong id="norway-best-dollars">$15,065.83</strong><p id="norway-best-cost">Charging cost: $29,288.87</p></article>
+        <article class="norway-highlight"><span class="norway-small-label">BEST FIXED TIMER</span><h3 id="norway-timer-name">1 AM timer</h3><strong id="norway-timer-percent">29.28%</strong><p id="norway-timer-note">saved with a fixed start time and time-of-day delivery</p></article>
+      </div>
+
+      <div class="norway-baseline"><span>Every savings figure uses the same starting point:</span><strong>Immediate charging on standard delivery · <span id="norway-baseline-cost">$44,354.70</span></strong><span>Totals cover the compared sessions. They are not annual savings.</span></div>
+
+      <section class="norway-card" aria-labelledby="norway-strategies-title">
+        <div class="norway-section-heading"><div><p class="eyebrow">THE MAIN OPTIONS</p><h2 id="norway-strategies-title">Compare the charging strategies.</h2></div><button id="norway-download" class="norway-download" type="button">Download all results <span aria-hidden="true">↗</span></button></div>
+        <p class="norway-table-help">Lower cost is better. Every strategy below delivered the same energy before unplugging.</p>
+        <div class="norway-table-scroll" tabindex="0" role="region" aria-label="Charging strategy comparison; scroll horizontally on small screens">
+          <table class="norway-table"><caption class="sr-only">Main charging strategies for Norway Dataset 1. Savings compared with immediate charging on standard delivery.</caption><thead><tr><th scope="col">Strategy</th><th scope="col">Total charging cost</th><th scope="col">Dollars saved</th><th scope="col">Saved</th></tr></thead><tbody id="norway-strategy-rows"></tbody></table>
+        </div>
+        <p class="norway-reference-note">Perfect hindsight sees every final price in advance. It is a reference for comparison, not a strategy you can use in practice.</p>
+      </section>
+
+      <details class="norway-card norway-timers" id="norway-timers">
+        <summary><span><span class="eyebrow">EVERY FIXED START TIME</span><span class="norway-details-title">See all 24 timer settings</span></span><span class="norway-details-icon" aria-hidden="true">+</span></summary>
+        <p class="norway-table-help">Times are Chicago time in the replay. Timers can start earlier if needed to finish before unplugging. They also allow immediate charging for arrivals up to six hours after the scheduled start.</p>
+        <div class="norway-table-scroll" tabindex="0" role="region" aria-label="All 24 timer results; scroll horizontally on small screens">
+          <table class="norway-table"><caption class="sr-only">Every timer start hour on the same Norway sessions.</caption><thead><tr><th scope="col">Timer start</th><th scope="col">Total charging cost</th><th scope="col">Dollars saved</th><th scope="col">Saved</th></tr></thead><tbody id="norway-timer-rows"></tbody></table>
+        </div>
+        <p class="norway-table-help">A negative saving means the timer costs more than the immediate-charging baseline.</p>
+      </details>
+    </section>
+
+    <section class="norway-study" aria-labelledby="norway-study-title">
+      <div><p class="eyebrow">THE SAME FINISH LINE</p><h2 id="norway-study-title">A fair comparison on Norway data.</h2><p id="norway-study-summary">All 31 setups use time-of-day delivery and completed the same 33,784 sessions, delivering 431,245 kWh. Savings compare with immediate charging on standard delivery.</p><a class="norway-replay-link" href="charging-history.html">Explore the Norway sessions in Charging history <span aria-hidden="true">↗</span></a></div>
+      <details class="norway-method"><summary>What went into these results?</summary><div>
+        <p><strong>Session data:</strong> Dataset 1 supplies reported energy, plug-in time, and unplug time. Dataset 2 supplies estimated charger power. Each plan knows the session's energy need and unplug deadline.</p>
+        <p><strong>Price scenario:</strong> The original Norway sessions are mapped to the nearest matching weekday in the same month of 2025. Local plug-in clock time and elapsed connection duration are preserved in Chicago time.</p>
+        <p id="norway-exclusions"><strong>Excluded sessions:</strong> 1,552 lack required inputs or prices; 41 need more energy than the estimated charger can deliver in the connection window. These sessions contribute no savings.</p>
+        <p><strong>Available information:</strong> The live model was calibrated on the 90 days before 2025. Missing live readings use the simulator's fallback behavior. No future settled price enters SPARC's decisions.</p>
+        <p><strong>Scope:</strong> Costs include hourly supply and the study's fixed delivery rates. Flat bill charges and capacity-charge dollars are excluded. Planners prefer avoiding capacity-risk hours. These are independent scenarios, not a simultaneous fleet or observed Norwegian electricity bills.</p>
+        <p><strong>Full-study snapshot:</strong> This page always shows the verified full Dataset 1 comparison for 2025. Filters and what-if settings on Charging history do not change this table.</p>
+        <p>Source: Sørensen, Sartori, Lindberg and Andresen. <a href="https://doi.org/10.5281/zenodo.12730566" target="_blank" rel="noopener noreferrer">Published dataset</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11404051/" target="_blank" rel="noopener noreferrer">Methodology</a>.</p>
+      </div></details>
+    </section>
+    <footer class="norway-footer"><span>SPARC / NIGHT SHIFT · NORWAY DATASET 1</span><a href="simulation.html">Back to the night simulator ↗</a></footer>
+  </main>
+</body>
+</html>

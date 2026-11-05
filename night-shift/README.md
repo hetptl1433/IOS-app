@@ -20,6 +20,64 @@ The previous TeslaMate history remains available in the **Charging dataset** sel
 The page is also available from the local SPARC app at
 **http://127.0.0.1:8765/simulation/charging-history.html** after starting `python -m sparc serve`.
 
+The separate **Chicago comparison** page is `norway.html`, also available locally at
+**http://127.0.0.1:8765/simulation/norway.html**. This dedicated Dataset 1 page shows the verified
+31-strategy comparison using **time-of-day delivery**, against immediate charging on standard
+delivery. Summary cards explain the best strategy and timer; the main table
+explains each method, and an expandable table contains all 24 timer hours. **Download all results**
+exports the 31 time-of-day results, completion and switching metrics. The page is a full-study 2025 snapshot;
+replay filters and what-if settings do not change it. Its results are not shown for TeslaMate.
+
+## Norway sessions with Norwegian prices
+
+**Norway simulator** opens `norway-local.html`, available in the running local app at
+**http://127.0.0.1:8765/simulation/norway-local.html**. This second page uses the original Norway
+session dates, Europe/Oslo clocks, regional Norwegian hourly spot prices, and NOK. The existing
+`norway.html` remains a separate Chicago-price comparison with a link to this page.
+
+The page starts with the verified full-history result. Filter original dates, Norwegian price area,
+or charging location, then **Run historical comparison**. It compares all available methods on
+the same completed sessions, counts exclusions, and exports session/strategy CSV results. Replay
+any individual source report to compare cumulative energy and cost and inspect the charged
+intervals in NOK/kWh or øre/kWh. The live-price method is explicitly unavailable because this
+source contains hourly day-ahead spot prices, not real-time signals. A saved summary can be viewed
+immediately; run the comparison to generate per-session downloads for the current selection.
+
+Price source: Hofmann, Bjarghov and Nessa (2023),
+[Norwegian hourly residential electricity demand data with consumer characteristics during the European energy crisis](https://zenodo.org/records/8423312),
+CC BY 4.0. The original download and attribution are retained in `norway-price-data/`. Prices
+cover July 1, 2019 through August 7, 2021 in the replay input. All 35,377 charging reports remain
+available; earlier or otherwise unpriced sessions are excluded from savings. The twelve charging
+locations map to four areas: NO1, NO3, NO4 and NO5; no Dataset 1 sites use NO2. See the price-directory
+README and provenance JSON for the verified location mapping, units and source checksums.
+
+The price dataset forces every day to 24 hours by altering clock-change periods. The importer
+omits four entire transition dates, and sessions needing those hours are excluded. It uses the
+precise `Price_NOK_MWh / 1000` field and preserves negative prices. Publication at 13:00 Oslo on
+the previous day is an explicit normal-day assumption; exact historical auction publication logs
+are absent. Before tomorrow's publication, SPARC forecasts its hours from the prior local day's
+same-hour prices, falling back to the current published price if necessary. Settled prices are
+used for billing, and hindsight alone can inspect future unreleased prices.
+
+Costs cover spot energy as provided. No grid fees, supplier markup, VAT, taxes, fixed charges or
+subsidies are added. Each strategy knows the actual reported energy and unplug deadline. All
+available strategies share original connection limits and estimated user power; no Chicago
+delivery rates, US dollars, capacity-risk preference or year remapping enter this simulation.
+
+Rebuild and reproduce locally (Python 3.11+ and Node):
+
+```sh
+python3 night-shift/download-norway-prices.py --source norway-price-data/source/prices.csv
+python3 night-shift/build-norway-local-data.py
+node night-shift/run-norway-local.cjs
+node --test night-shift/test-norway-local.cjs night-shift/test-norway-local-page.cjs
+```
+
+Omit `--source` to fetch and verify the pinned public price source again. The run writes
+`results/charging-history/norway-local-history.json`, `norway-local-strategies.csv`, and the
+saved full-history summary in the offline browser bundle. Input hashes, attribution, license,
+missing price dates and publication assumptions remain embedded in the report and page.
+
 In Night Shift's **Set the scene**, the **Charging window** subsection sits below **Plug in** and
 **Ready by**. Select **Set start & stop times** to choose **Charge from** and **Stop by** in five-minute
 steps. For example, plug in at 8 PM, allow charging from midnight to 6 AM, and be ready by 7 AM.
@@ -80,6 +138,34 @@ the estimated power/capacity/SoC fields, quality flags, and both tariffs.
 Dataset and methodology: Åse Lekang Sørensen, Igor Sartori, Karen Byskov Lindberg and Inger Andresen,
 [Electric vehicle charging dataset with 35,000 charging sessions from 12 residential locations in Norway](https://pmc.ncbi.nlm.nih.gov/articles/PMC11404051/),
 [data repository](https://doi.org/10.5281/zenodo.12730566).
+
+### Compare every automated strategy on Norway data
+
+```sh
+node night-shift/compare-residential.cjs 2025
+```
+
+This writes `results/charging-history/norway-strategies-2025.md`, `.csv`, and `.json`.
+It also refreshes `dist/norway-comparison-data.js`, the exact report shown by the Norway page.
+It tests immediate charging, all 24 timer start hours, the benchmark's 2¢/3¢/5¢ supply-price
+thresholds, SPARC day-ahead, SPARC + live prices, and hindsight: 31 configurations on both
+standard and time-of-day delivery. Manual actions and custom windows require explicit schedules
+and have no invented fixed results.
+
+All cost rows use the same intersection of completed, equal-energy sessions across every
+configuration and both tariffs. The CSV also reports completion across all sessions that immediate
+charging can finish, starts/pauses, and energy charged in capacity-risk hours. The JSON records
+exclusions, hashes, missing signal counts, and the exact common-cohort hash. Savings always use
+standard-delivery immediate charging as the baseline. Standard rows isolate timing; time-of-day
+rows also include the delivery-rate change. Timer starts retain the existing early-start deadline
+override and six-hour grace. Price-cap overrides account for actual partial boundary capacity.
+
+The comparison loads the repository's five-minute feeds for the complete scenario and calibration
+period instead of relying on the browser bundle's shorter signal history. The live model is refit
+using only the 90 days before January 1, 2025, with no scenario-year observations in calibration.
+Actual missing posted readings retain the existing hold-state/day-ahead fallback. The fixed
+delivery rates and capacity-risk preference are shared with the simulator; capacity-charge dollars
+are excluded. Hindsight is a reference with those same risk preferences, not a deployable strategy.
 
 ### Previous TeslaMate history
 
@@ -142,11 +228,19 @@ These commands run from the repository root. The generated bundle records its so
 | `dist/charging-history-data.js` | Bundled charging records and additional historical price hours. |
 | `dist/residential-data.js` | Compact normalized Dataset 1 rows with prediction metadata and reconciliation results. |
 | `dist/residential-engine.js` | Explicit Norway-to-ComEd scenario mapping and source adapters. |
+| `dist/norway-local.html`, `.css`, `.js` | Original-date Norway-price simulator, filters, session replay, source attribution, and exports. |
+| `dist/norway-local-engine.js` | Regional Norwegian spot-price strategies, exact connection limits, and common-cohort totals. |
+| `dist/norway-local-data.js` | Norwegian area prices, original sessions, provenance, and saved full-history results. |
+| `download-norway-prices.py`, `build-norway-local-data.py`, `run-norway-local.cjs` | Reproducible original-date Norwegian price retrieval, bundling, and historical comparison. |
+| `dist/norway.html`, `norway-comparison.css`, `norway-comparison.js` | Norway-only time-of-day results page, explanatory tables, and CSV download. |
+| `dist/norway-comparison-data.js` | Verified full-study comparison embedded for the offline Norway results page. |
 | `build-history-data.py` | Rebuilds the charging-history bundle from repository CSVs. |
 | `build-residential-data.py` | Validates and joins all four residential CSVs without changing originals. |
 | `run-residential.cjs` | Reproduces the complete residential scenario and daily exports. |
+| `compare-residential.cjs` | Compares all 31 automated strategy configurations on the same Norway sessions and exports the table. |
 | `test-history.cjs` | Energy, billing, window, DST, export, and full-dataset checks. |
 | `test-residential.cjs` | Source joins, scenario mapping, exact boundaries, missing data, estimates, and exports. |
+| `test-norway-page.cjs` | Norway-only data guards, time-of-day totals, table rendering, and downloads. |
 | `dist/LICENSE` | Original MIT license. |
 | `.openai/hosting.json` | Original ChatGPT Sites project and static directory configuration. |
 
