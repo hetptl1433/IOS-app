@@ -14,6 +14,58 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory night-shift/dist
 
 Open **http://127.0.0.1:8000** in your browser. Stop the server with **Ctrl+C**. Python 3 is the only tool needed to serve it; there is no build step or package installation. The replay data is included, so running the simulator does not require ComEd or Tesla API credentials.
 
+## ComEd bill simulation from sparc-lite
+
+**ComEd bill costs** opens `comed-costs.html`, or
+**http://127.0.0.1:8765/simulation/comed-costs.html** in the local SPARC app.
+The SPARC home page and Night Shift page also show the verified default comparison.
+This view uses the Model X's daily home-charging totals and historical ComEd inputs from
+`sparc-lite`, with an assumed 8 p.m.–8 a.m. window and 11.5 kW charger. It compares
+fixed-price immediate charging, hourly-price immediate charging, and a day-ahead SPARC
+schedule on the same completed-energy days. Connection times are hypothetical; the daily
+energy totals are supplied observations. No extra charging-loss factor is added.
+
+The comparison itemizes supply, transmission, distribution, riders and credits, Illinois
+excise tax, Glenview municipal tax, and the EV's allocated monthly service and capacity costs.
+The state tax uses the verified first 2,000 kWh/month tier, correcting the older input's
+first-500-kWh description. Hourly bills use the average of twelve complete five-minute
+readings; end-stamped source intervals are assigned to their actual delivery hour.
+Missing prices and infeasible energy targets exclude a day from every method.
+
+Other home usage (default 600 kWh/month) and account capacity obligation (default 2.5 kW)
+are adjustable assumptions. The page explains how monthly account charges are allocated
+by EV energy share, shows full-account charges separately, and prorates partial calendar
+months. The same capacity obligation applies to both hourly strategies; this trace cannot
+establish avoided peak-demand capacity charges. Calendar months approximate unknown billing cycles.
+
+These are estimated EV costs, not reconstructed utility bills. The source lacks hourly-specific
+PEA and procurement charges and uses fixed-plan transmission as an hourly-plan proxy.
+Historical rate assumptions and backfills are retained in the monthly notes. The charging
+address was confirmed to be inside Glenview. State and municipal excise taxes use the
+same filed kWh rules on fixed BES and hourly BESH service; tax is not a percentage of the
+energy price. A visible table identifies each plan's tax rates, basis, sources and status.
+Glenview's first tier is 0.556¢/kWh for the first 2,000 monthly household kWh, including the
+collection-cost addition already included in the filed rate. Higher tiers are modeled
+progressively. Historical carry-forward assumptions are identified in the tax provenance.
+Independent optional fixed/hourly municipal overrides are clearly marked user scenarios;
+blank values use the filed Glenview schedule. The exports identify supply plan and tax rule,
+basis and override status. Percentage franchise adjustments remain absent. Chicago-only
+taxes are not applied. Sources include [ComEd Rider TAX, sheets 258 and 261](https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/bltb8485cefee950e7c/67b4f3aef14e110d1e948678/18_Rider_TAX.pdf?branch=prod_alias),
+[Illinois tax tiers](https://tax.illinois.gov/research/taxrates/excise.html), and
+[ComEd's fixed/hourly billing comparison](https://hourlypricing.comed.com/faqs/).
+Input SHA-256 hashes are preserved.
+
+Reproduce from the repository root:
+
+```sh
+python3 night-shift/build-comed-cost-data.py --source /path/to/sparc-lite
+node night-shift/run-comed-costs.cjs
+node --test night-shift/test-comed-costs.cjs
+```
+
+The builder leaves the source CSVs unchanged. The runner writes the full report and monthly
+CSV to `results/charging-history/`, plus a small default-result bundle for the SPARC home pages.
+
 The **Charging history** link opens `charging-history.html`. Its default dataset is now
 `Dataset1_charging_reports (1).csv`, with the three companion prediction files joined and checked.
 The previous TeslaMate history remains available in the **Charging dataset** selector.

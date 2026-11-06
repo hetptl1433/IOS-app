@@ -8,6 +8,7 @@
   <title>Night Shift · SPARC charging simulator</title>
   <link rel="stylesheet" href="simulation.css">
   <link rel="stylesheet" href="charging-window.css">
+  <link rel="stylesheet" href="comed-overview.css">
   <script src="simulation-data.js" defer></script>
   <script src="simulation-engine.js" defer></script>
   <script src="simulation-charge-target.js" defer></script>
@@ -17,11 +18,13 @@
   <script src="charging-history-engine.js" defer></script>
   <script src="charging-window-engine.js" defer></script>
   <script src="charging-window-view.js" defer></script>
+  <script src="comed-cost-summary.js" defer></script>
+  <script src="comed-overview.js" defer></script>
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
-    <nav aria-label="Main navigation"><a href="charging-history.html">Charging history <span aria-hidden="true">↗</span></a><a href="norway-local.html">Norway simulator</a><a href="#window-comparison">History windows</a><a href="#benchmark-title">The full test</a><a href="#simulation-assumptions">How it works</a><a class="nav-current" href="simulation.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span> Play the simulation</a></nav>
+    <nav aria-label="Main navigation"><a href="charging-history.html">Charging history <span aria-hidden="true">↗</span></a><a href="norway-local.html">Norway simulator</a><a href="#window-comparison">History windows</a><a href="comed-costs.html">ComEd bill costs</a><a href="#benchmark-title">The full test</a><a href="#simulation-assumptions">How it works</a><a class="nav-current" href="simulation.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span> Play the simulation</a></nav>
   </header>
 
   <main class="page-shell">
@@ -191,6 +194,11 @@
     </div>
 
     <section id="window-comparison" class="window-comparison" aria-labelledby="window-comparison-title"><h2 id="window-comparison-title">Compare recorded times with an overnight window</h2><p>Loading the charging history comparison…</p><noscript>Enable JavaScript to compare the same energy at recorded times and from 8 p.m. to 8 a.m.</noscript></section>
+
+    <section id="comed-cost-overview" class="comed-overview" aria-labelledby="comed-overview-title">
+      <div class="co-heading"><div><p class="co-eyebrow">COMED · BEYOND THE ENERGY PRICE</p><h2 id="comed-overview-title">What would the charging bill cost?</h2><p>Replay the Model X home-charging totals from sparc-lite with delivery, transmission, state tax, riders and credits, plus a stated share of monthly service and capacity charges.</p></div><a class="co-link" href="comed-costs.html">Explore the bill simulation ↗</a></div>
+      <p class="co-limit">Estimated EV costs for an address inside Glenview. State and Glenview municipal tax use the same filed kWh rules for fixed and hourly service; the detailed view shows each plan’s tax treatment and source. Historical tax carry-forward assumptions are disclosed. Hourly-specific procurement and PEA and local franchise charges remain absent; hourly transmission uses a fixed-plan proxy.</p>
+    </section>
 
     <div class="insights-grid">
       <section class="leaderboard-card" aria-labelledby="leaderboard-title"><div class="section-heading"><div><p class="eyebrow">THE FINISHING ORDER</p><h2 id="leaderboard-title">Every strategy gets a lane.</h2></div><span class="heading-icon" aria-hidden="true">≋</span></div><div class="table-scroll"><table class="leaderboard-table"><thead><tr><th scope="col">Strategy</th><th scope="col">Bill estimate</th><th scope="col">Energy</th><th scope="col">Status</th></tr></thead><tbody id="leaderboard"><tr><td colspan="4" class="empty-cell">Start a replay to see how the strategies compare.</td></tr></tbody></table></div></section>

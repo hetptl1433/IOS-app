@@ -106,6 +106,9 @@ class ServerTests(unittest.TestCase):
                      "/simulation/norway-comparison.css", "/simulation/norway-comparison-data.js",
                      "/simulation/norway-local.html", "/simulation/norway-local.js",
                      "/simulation/norway-local.css", "/simulation/norway-local-engine.js", "/simulation/norway-local-data.js",
+                     "/simulation/comed-costs.html", "/simulation/comed-costs.js", "/simulation/comed-costs.css",
+                     "/simulation/comed-cost-engine.js", "/simulation/comed-cost-data.js",
+                     "/simulation/comed-cost-summary.js", "/simulation/comed-overview.js", "/simulation/comed-overview.css",
                      "/simulation/charging-history.css"):
             status, content, response = self.request("GET", path)
             self.assertEqual(status, 200, path)
