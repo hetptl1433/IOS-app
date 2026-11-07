@@ -53,13 +53,15 @@ function calculate(report, from="2025-11", to="2026-10") {
       fixed:f.total,immediateNo,immediateWith:immediateNo+hourlyCapacity,
       sparcNo,sparcWith:sparcNo+evCapacity,accountCapacity,evCapacity,
       fixedSavingsNo:f.total-sparcNo,fixedSavingsWith:f.total-sparcNo-evCapacity,
-      hourlySavingsWith:immediateNo+hourlyCapacity-sparcNo-evCapacity};
+      hourlySavingsWith:immediateNo+hourlyCapacity-sparcNo-evCapacity,
+      switchingSavingsWith:f.total-immediateNo-hourlyCapacity};
   });
-  const keys=["fixedKwh","hourlyKwh","sparcKwh","fixed","immediateNo","immediateWith","sparcNo","sparcWith","accountCapacity","evCapacity","fixedSavingsNo","fixedSavingsWith","hourlySavingsWith"];
+  const keys=["fixedKwh","hourlyKwh","sparcKwh","fixed","immediateNo","immediateWith","sparcNo","sparcWith","accountCapacity","evCapacity","fixedSavingsNo","fixedSavingsWith","hourlySavingsWith","switchingSavingsWith"];
   const totals={};
   for(const key of keys)totals[key]=rows.reduce((sum,r)=>sum+r[key],0);
   if(Math.abs(totals.sparcWith-totals.sparcNo-totals.evCapacity)>1e-7)throw new Error("Capacity reconciliation failed");
   if(Math.abs(totals.fixedSavingsWith-(totals.fixed-totals.sparcWith))>1e-7)throw new Error("Savings reconciliation failed");
+  if(Math.abs(totals.switchingSavingsWith+totals.hourlySavingsWith-totals.fixedSavingsWith)>1e-7)throw new Error("Savings attribution does not reconcile");
   return {from,to,capacityKw:report.options.capacityKw,rows,totals};
 }
 
@@ -82,6 +84,23 @@ function markdown(comparison) {
 "",
 "**Capacity impact:** +"+money(t.evCapacity)+" EV-allocated cost versus excluding it. The estimated **whole-household** capacity charge is "+money(t.accountCapacity)+" for 12 months.",
 "**SPARC optimization vs immediate hourly (both with capacity):** "+money(t.hourlySavingsWith)+" ("+pct(t.hourlySavingsWith,t.immediateWith)+").",
+"",
+"## Savings attribution: hourly switching vs SPARC optimization",
+"",
+"| Benefit | Baseline comparison | 12-month modeled saving |",
+"|---|---|---:|",
+"| Switch fixed to hourly (no optimization) | Fixed − hourly immediate, both capacity-inclusive | "+money(t.switchingSavingsWith)+" ("+pct(t.switchingSavingsWith,t.fixed)+" of fixed baseline) |",
+"| SPARC optimization | Hourly immediate − hourly SPARC, both capacity-inclusive | "+money(t.hourlySavingsWith)+" ("+pct(t.hourlySavingsWith,t.immediateWith)+" of hourly baseline) |",
+"| **Combined benefit** | Fixed − hourly SPARC, both capacity-inclusive | **"+money(t.fixedSavingsWith)+" ("+pct(t.fixedSavingsWith,t.fixed)+")** |",
+"",
+"The plan-switching benefit is already included in the combined result. **Do not add a published ComEd average savings percentage again:** it would double-count plan-switching savings. These are modeled EV-allocated costs, not an observed whole-home tariff-change estimate.",
+"",
+"### Monthly attribution",
+"",
+"| Month | Switch to hourly | Additional SPARC | Combined |",
+"|---|---:|---:|---:|",
+...rows.map(r=>"| "+r.month+" | "+money(r.switchingSavingsWith)+" | "+money(r.hourlySavingsWith)+" | "+money(r.fixedSavingsWith)+" |"),
+"| **Total** | **"+money(t.switchingSavingsWith)+"** | **"+money(t.hourlySavingsWith)+"** | **"+money(t.fixedSavingsWith)+"** |",
 "",
 "## Monthly scenario costs",
 "",
