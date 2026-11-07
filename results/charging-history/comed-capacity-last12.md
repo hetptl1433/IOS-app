@@ -13,6 +13,34 @@
 **Capacity impact:** +$111.30 EV-allocated cost versus excluding it. The estimated **whole-household** capacity charge is $272.12 for 12 months.
 **SPARC optimization vs immediate hourly (both with capacity):** $81.35 (9.13%).
 
+## Savings attribution: hourly switching vs SPARC optimization
+
+| Benefit | Baseline comparison | 12-month modeled saving |
+|---|---|---:|
+| Switch fixed to hourly (no optimization) | Fixed − hourly immediate, both capacity-inclusive | $147.03 (14.17% of fixed baseline) |
+| SPARC optimization | Hourly immediate − hourly SPARC, both capacity-inclusive | $81.35 (9.13% of hourly baseline) |
+| **Combined benefit** | Fixed − hourly SPARC, both capacity-inclusive | **$228.37 (22.01%)** |
+
+The plan-switching benefit is already included in the combined result. **Do not add a published ComEd average savings percentage again:** it would double-count plan-switching savings. These are modeled EV-allocated costs, not an observed whole-home tariff-change estimate.
+
+### Monthly attribution
+
+| Month | Switch to hourly | Additional SPARC | Combined |
+|---|---:|---:|---:|
+| 2025-11 | $0.43 | $5.02 | $5.46 |
+| 2025-12 | $9.13 | $6.49 | $15.62 |
+| 2026-01 | $16.30 | $1.06 | $17.36 |
+| 2026-02 | $17.10 | $5.59 | $22.69 |
+| 2026-03 | $12.64 | $10.16 | $22.81 |
+| 2026-04 | $18.52 | $10.25 | $28.77 |
+| 2026-05 | $60.33 | $9.69 | $70.02 |
+| 2026-06 | $4.55 | $7.72 | $12.27 |
+| 2026-07 | $0.16 | $16.17 | $16.34 |
+| 2026-08 | $1.62 | $0.10 | $1.71 |
+| 2026-09 | $6.49 | $6.95 | $13.44 |
+| 2026-10 | $-0.26 | $2.14 | $1.89 |
+| **Total** | **$147.03** | **$81.35** | **$228.37** |
+
 ## Monthly scenario costs
 
 | Month | Filed capacity $/kW-month | Fixed with capacity embedded | SPARC hourly without capacity | SPARC hourly with capacity | EV-allocated capacity |
