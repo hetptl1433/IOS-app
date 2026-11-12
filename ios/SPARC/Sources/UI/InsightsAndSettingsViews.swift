@@ -345,7 +345,7 @@ struct ControllerStatusView: View {
                     if manager.statusWorking { ProgressView().tint(.white) }
                 }
                 .padding(.bottom, 6)
-                SPARCDetail(title: "Controller", value: "SPARC \(paired.deviceID.prefix(4).uppercased())")
+                SPARCDetail(title: "Controller", value: paired.bluetoothName)
                 SPARCDetail(title: "Connection", value: paired.bluetoothPeripheralID == nil ? "Home network"
                             : status != nil && manager.statusError == nil ? "Connected over Bluetooth" : "Bluetooth · not reached")
                 SPARCDetail(title: "Bluetooth on Pi", value: status.map { $0.bluetooth ? "On" : "Off" } ?? "—")

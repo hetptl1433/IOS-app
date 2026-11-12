@@ -116,6 +116,12 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     private var challengeAttemptID: UUID?
     private var exchangeInFlight = false
     private var exchangeQueue: [CheckedContinuation<Void, Never>] = []
+    /// True from Search until the owner pairs a controller, reconnects the saved one, or
+    /// cancels/leaves setup. The 15-second scan ends long before the owner taps a result,
+    /// and the app's background refresh must not take the radio back to the saved
+    /// controller in between: that greyed out the list and could switch the screen to
+    /// the saved Pi while the owner was choosing another one.
+    private(set) var isChoosingController = false
 
     init(vault: any ControllerCredentialStore = ControllerVault.shared,
          verifyController: (@Sendable (PairedController) async throws -> Void)? = nil,
@@ -130,6 +136,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     /// Runtime polling must not replace this intent with an old saved peripheral.
     func prepareForBluetoothSetup() {
         cancel(); errorMessage = nil; devices = []; peripherals = [:]; wantsScan = true
+        isChoosingController = true
         stage = .scanning
         statusMessage = "Preparing to find your nearby controller…"
     }
@@ -145,10 +152,20 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         central?.scanForPeripherals(withServices: [Self.serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
-            guard !Task.isCancelled, let self, self.stage == .scanning else { return }
-            self.central?.stopScan(); self.stage = .idle; self.wantsScan = false
-            self.statusMessage = self.devices.isEmpty ? "No controller found. Bring it nearby and open its setup window, then scan again." : "Choose your controller below."
+            guard !Task.isCancelled, let self else { return }
+            self.finishScanning()
         }
+    }
+    /// Ends the 15-second scan. The list it found stays available while the owner chooses.
+    func finishScanning() {
+        guard stage == .scanning else { return }
+        central?.stopScan(); stage = .idle; wantsScan = false
+        statusMessage = devices.isEmpty ? "No controller found. Bring it nearby and open its setup window, then scan again." : "Choose your controller below."
+    }
+    /// Whether a nearby result is the controller this iPhone already has saved.
+    func isSaved(_ device: DiscoveredController) -> Bool {
+        guard let saved = savedController?.bluetoothPeripheralID else { return false }
+        return saved.caseInsensitiveCompare(device.id.uuidString) == .orderedSame
     }
     func connect(_ device: DiscoveredController) {
         guard let candidate = peripherals[device.id], central?.state == .poweredOn else { return }
@@ -284,6 +301,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     }
     private func saveVerified(_ paired: PairedController) throws {
         try vault.save(paired); savedController = paired; pendingController = nil
+        isChoosingController = false
         if paired.bluetoothPeripheralID == nil { stopBluetooth() }
         stage = .ready
         statusMessage = paired.bluetoothPeripheralID == nil
@@ -296,6 +314,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         if paired.bluetoothPeripheralID == nil { await connectOnLAN(host: paired.host); return }
         let attempt = generation
         errorMessage = nil
+        // The owner picked the saved controller; if it can't be reached, they keep choosing.
+        let wasChoosing = isChoosingController
+        isChoosingController = false
         do {
             let proof = try await exchangeBLE(controller: paired, operation: "ping", body: [:])
             try Task.checkCancellation()
@@ -310,6 +331,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
             if Task.isCancelled || error is CancellationError { cancel(); return }
             errorMessage = error.localizedDescription
             stage = .idle
+            isChoosingController = wasChoosing
         }
     }
 
@@ -329,6 +351,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         else { exchangeInFlight = true }
         defer { if exchangeQueue.isEmpty { exchangeInFlight = false } else { exchangeQueue.removeFirst().resume() } }
         try Task.checkCancellation()
+        guard !isChoosingController else {
+            throw ControllerConnectionError.unavailable("Finish choosing your controller in Settings, or cancel the search, then try again.")
+        }
         guard !wantsScan, (stage == .idle || stage == .ready),
               !isWorking, pending == nil, connectionWaiter == nil, challengeWaiter == nil else {
             throw ControllerConnectionError.unavailable("The Bluetooth controller is busy. Wait for the current request to finish.")
@@ -432,6 +457,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
 
     func cancel() {
         generation &+= 1; pendingController = nil; isWorking = false; errorMessage = nil
+        isChoosingController = false
         timeoutTask?.cancel(); timeoutTask = nil; wantsScan = false; central?.stopScan()
         failPending(ControllerConnectionError.cancelled)
         stopBluetooth()

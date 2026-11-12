@@ -51,7 +51,7 @@ final class AppStore: ObservableObject {
             ? settings.today : nil
         self.snapshot = demo ? .demo(now: now()) : .disconnected(now: now())
         self.records = demo && virtual ? ChargingRecord.demo(now: now()) : []
-        self.controllerName = try? ControllerVault.shared.load()?.deviceName
+        self.controllerName = try? ControllerVault.shared.load()?.displayName
         if demo {
             if testing, let index = arguments.firstIndex(of: "--state"), arguments.indices.contains(index + 1) {
                 forcedDemoState = ChargeState(rawValue: arguments[index + 1])
@@ -89,7 +89,7 @@ final class AppStore: ObservableObject {
             virtualCarEnabled = true
             snapshot = .disconnected(now: now()); records = []
         }
-        controllerName = try? ControllerVault.shared.load()?.deviceName
+        controllerName = try? ControllerVault.shared.load()?.displayName
     }
 
     func setVirtualCarEnabled(_ enabled: Bool) async {
@@ -137,7 +137,7 @@ final class AppStore: ObservableObject {
         refreshing = true
         let currentRevision = revision
         defer { refreshing = false }
-        controllerName = try? ControllerVault.shared.load()?.deviceName
+        controllerName = try? ControllerVault.shared.load()?.displayName
         do {
             let settings = try await client.fetchSettings()
             try settings.weekly.validate()

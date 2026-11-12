@@ -104,7 +104,8 @@ struct ControllerSetupView: View {
                             Image(systemName: "desktopcomputer").foregroundStyle(SPARCTheme.green)
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(device.name).sparcFont(14, weight: .medium)
-                                Text("Nearby · Bluetooth").sparcFont(11).foregroundStyle(SPARCTheme.muted)
+                                Text(manager.isSaved(device) ? "Saved on this iPhone · Bluetooth" : "Nearby · Bluetooth")
+                                    .sparcFont(11).foregroundStyle(manager.isSaved(device) ? SPARCTheme.green : SPARCTheme.muted)
                             }
                             Spacer()
                             Image(systemName: "chevron.right").sparcFont(11).foregroundStyle(SPARCTheme.muted)
@@ -117,11 +118,10 @@ struct ControllerSetupView: View {
                     Text("Searching nearby… If your controller doesn't appear, check that its Bluetooth setup service is running.")
                         .sparcFont(12).foregroundStyle(SPARCTheme.muted)
                 }
-                if !paired || manager.devices.isEmpty {
-                    SPARCButton(title: manager.stage == .scanning ? "Search again" : "Search for controllers", symbol: "antenna.radiowaves.left.and.right", busy: working) {
-                        focused = nil; setupKey = ""; pairAnotherController = false; manager.startScan()
-                    }.accessibilityIdentifier("setup.scan")
-                }
+                // Always offered: with two controllers nearby the owner may need to search again.
+                SPARCButton(title: manager.stage == .scanning || !manager.devices.isEmpty ? "Search again" : "Search for controllers", symbol: "antenna.radiowaves.left.and.right", busy: working) {
+                    focused = nil; setupKey = ""; pairAnotherController = false; manager.startScan()
+                }.accessibilityIdentifier("setup.scan")
             }
         }
     }
@@ -179,7 +179,7 @@ struct ControllerSetupView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if manager.controllerForSetup?.bluetoothPeripheralID != nil {
                     Label("Reconnect over Bluetooth", systemImage: "antenna.radiowaves.left.and.right").sparcFont(16, weight: .semibold)
-                    Text("Keep your Pi nearby and Bluetooth enabled on your iPhone. Wi-Fi setup is not required for this connection.").sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                    Text("Saved controller: \(manager.controllerForSetup?.bluetoothName ?? "your Pi"). Keep it nearby and Bluetooth enabled on your iPhone. Wi-Fi setup is not required for this connection.").sparcFont(13).foregroundStyle(SPARCTheme.muted)
                     SPARCButton(title: "Connect over Bluetooth", symbol: "antenna.radiowaves.left.and.right", busy: working) {
                         focused = nil
                         Task { await manager.reconnectSavedController() }
@@ -205,7 +205,8 @@ struct ControllerSetupView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Image(systemName: "checkmark.circle").sparcFont(42, weight: .light).foregroundStyle(SPARCTheme.green)
                 Text("Your controller is connected.").sparcFont(26, weight: .semibold).tracking(-0.6)
-                Text(manager.savedController?.deviceName ?? "Your home controller").sparcFont(14).foregroundStyle(SPARCTheme.muted)
+                Text(manager.savedController?.displayName ?? "Your home controller").sparcFont(14).foregroundStyle(SPARCTheme.muted)
+                    .accessibilityIdentifier("setup.connectedName")
                 Text(manager.savedController?.bluetoothPeripheralID != nil ? "Your iPhone can send controls and schedules over Bluetooth. Leave Virtual car on in Settings to try a plugged-in car starting at 40%." : "Your iPhone can now reach your paired home controller. Virtual car lets you try charging before connecting vehicle hardware.")
                     .sparcFont(14).foregroundStyle(SPARCTheme.muted)
                 SPARCButton(title: "Use home controller", symbol: "house", busy: store.busy) {

@@ -494,6 +494,47 @@ final class ControllerProtocolTests: XCTestCase {
     }
 
     @MainActor
+    func testSavedBLEPollingWaitsWhileOwnerChoosesFromTheFoundList() async throws {
+        var paired = pairedController()
+        paired.bluetoothPeripheralID = UUID().uuidString
+        let storage = MemoryControllerCredentialStore(paired)
+        let manager = ProvisioningManager(vault: storage)
+        manager.prepareForBluetoothSetup()
+        XCTAssertTrue(manager.isChoosingController)
+        // The 15-second scan ends; the list stays on screen while the owner chooses.
+        manager.finishScanning()
+        XCTAssertEqual(manager.stage, .idle)
+        do {
+            _ = try await manager.exchangeBLE(controller: paired, operation: "get_settings", body: [:])
+            XCTFail("A background poll took Bluetooth back to the saved controller while the owner was choosing")
+        } catch {}
+        XCTAssertEqual(manager.stage, .idle, "The found list must stay usable, not switch to reconnecting")
+        XCTAssertFalse(manager.isWorking)
+        XCTAssertNil(manager.connectedDeviceName)
+        XCTAssertTrue(manager.isChoosingController)
+        XCTAssertEqual(manager.savedController, paired)
+        XCTAssertEqual(try storage.load(), paired)
+        // Leaving or cancelling setup lets polling use the saved controller again.
+        manager.cancel()
+        XCTAssertFalse(manager.isChoosingController)
+    }
+
+    @MainActor
+    func testNearbyListMarksTheSavedControllerAndNamesItLikeThePi() throws {
+        var paired = pairedController()
+        let savedPeripheral = UUID()
+        paired.bluetoothPeripheralID = savedPeripheral.uuidString.lowercased()
+        let manager = ProvisioningManager(vault: MemoryControllerCredentialStore(paired))
+        // The Pi advertises "SPARC-" + the first four characters of its ID, uppercased.
+        XCTAssertEqual(paired.bluetoothName, "SPARC-2DA0")
+        XCTAssertEqual(paired.displayName, "SPARC-2DA0 · SPARC Test Pi")
+        XCTAssertTrue(manager.isSaved(DiscoveredController(id: savedPeripheral, name: "SPARC-2DA0", rssi: -60)))
+        XCTAssertFalse(manager.isSaved(DiscoveredController(id: UUID(), name: "SPARC-8672", rssi: -40)))
+        let unsaved = ProvisioningManager(vault: MemoryControllerCredentialStore(nil))
+        XCTAssertFalse(unsaved.isSaved(DiscoveredController(id: savedPeripheral, name: "SPARC-2DA0", rssi: -60)))
+    }
+
+    @MainActor
     func testFailedLANConversionPreservesBluetoothPairing() async throws {
         var paired = pairedController()
         paired.bluetoothPeripheralID = UUID().uuidString
