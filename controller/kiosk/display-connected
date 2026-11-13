@@ -1,0 +1,16 @@
+#!/bin/sh
+# Succeeds when a display is connected. --list prints the connected outputs;
+# --record saves them so the hotplug helper can tell when a different one appears.
+found=
+for status in /sys/class/drm/card*-*/status; do
+    [ -r "$status" ] || continue
+    name=${status%/status}
+    name=${name##*/}
+    case $name in *Writeback*) continue ;; esac
+    if [ "$(cat "$status")" = connected ]; then found="${found:+$found }$name"; fi
+done
+case ${1:-} in
+    --list) [ -n "$found" ] && printf '%s\n' "$found" ;;
+    --record) printf '%s\n' "$found" > /run/sparc-display/outputs ;;
+esac
+[ -n "$found" ]

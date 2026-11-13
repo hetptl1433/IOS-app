@@ -1,0 +1,6 @@
+[Unit]
+Description=Start or stop the SPARC touchscreen after a display change
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/sparc-display/hotplug

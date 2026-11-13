@@ -16,4 +16,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m unittest discover -s tests -v
+      - name: Install controller test dependencies
+        run: python -m pip install -r controller/requirements.txt
+      - name: Validate native project structure
+        run: |
+          python scripts/ios/generate_project.py --check
+          python scripts/ios/validate_project.py
+      - name: Test research application
+        run: python -m unittest discover -s tests -v
+      - name: Test Raspberry Pi companion protocol and service
+        run: python -m unittest discover -s controller/tests -v

@@ -1,0 +1,23 @@
+[Unit]
+Description=SPARC LAN home controller
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sparc-controller/controller
+ExecStart=/opt/sparc-controller/.venv-controller/bin/python -m sparc_controller --lan-only
+Restart=on-failure
+RestartSec=5
+User=root
+StateDirectory=sparc-controller
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/sparc-controller
+
+[Install]
+WantedBy=multi-user.target

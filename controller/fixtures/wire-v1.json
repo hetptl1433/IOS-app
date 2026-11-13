@@ -1,0 +1,46 @@
+{
+  "warning": "Public deterministic test vectors only. Never use this key or nonce on hardware.",
+  "setupKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "info": {
+    "version": 1,
+    "deviceId": "7d48dfad-909c-42c4-9c7a-02d34ac80be3",
+    "bootId": "8385ab9a-8930-41f4-95b5-91f9d73ae239",
+    "name": "SPARC fixture Pi 4",
+    "serverTime": 1700000000,
+    "capabilities": [
+      "pair",
+      "wifi.provision",
+      "ping"
+    ],
+    "vehicleAdapterAvailable": false
+  },
+  "request": {
+    "id": "080fe1bb-416c-4348-ade6-2d9dde17a147",
+    "timestamp": 1700000000,
+    "operation": "wifi.provision",
+    "body": {
+      "ssid": "SPARC Test",
+      "password": "fixture-only-not-a-real-network"
+    }
+  },
+  "requestNonceHex": "000102030405060708090a0b",
+  "responseNonceHex": "0c0d0e0f1011121314151617",
+  "requestEnvelope": {
+    "box": "AAECAwQFBgcICQoL+gJCvUGSCBLBsKovpEnLRNny/pj3M+MUdjT0+2P99ldmE/UPU4VOp+HH/D6VHzLh5ePYRDNRBD+BFNmACJYIaRPvlkS5dlhclwm9dS5caB+QhuhlyBuvs0c1QBBA1LiUpmBVMZK62CQJu48Bgk8PYcORZqh3EKzYPTMgRHk//JbGZLB6S2GkOauZ5wHzr3b2BKsI/n8C3ZWws4clrB1xuBxFuLFAi530yqSuq6x8BWpvbJ7p7BQB6z90EA==",
+    "v": 1
+  },
+  "responseEnvelope": {
+    "box": "DA0ODxAREhMUFRYX0kSlJ/c7iKhiUaR9CO2rRH0fqwfoKm9PMoWlebQGsrTmQosO3zEJ3tgplxlgjtvmXGSupdTOBWmVaRWdQCR6KT5n1NBwGn6/Ty70PDCWb0BSzf6ejY5y6NZpuOB6zaMvltcfHUKFSCzLmQoFklLQAgvwotFO+dD/+ry45DVa",
+    "v": 1
+  },
+  "response": {
+    "id": "080fe1bb-416c-4348-ade6-2d9dde17a147",
+    "ok": true,
+    "body": {
+      "host": "sparc-fixture.local",
+      "connected": true
+    }
+  },
+  "clientToDeviceKeyHex": "46e0515920a7d44343e56fe3e585ce1bd75b4e764b261ee76a6613f3fa62b1c1",
+  "deviceToClientKeyHex": "1692ceb0c6173ade4635b640c373c02103060e69b20c2be18919ee8c6070d97c"
+}

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs as the display user: wait briefly for the controller's page, then show it
+# full screen in cage. The page itself reconnects if the controller restarts.
+port=${SPARC_DISPLAY_PORT:-8767}
+tries=0
+until curl -fsS -o /dev/null --max-time 1 "http://127.0.0.1:$port/healthz"; do
+    tries=$((tries + 1))
+    [ "$tries" -ge 30 ] && break
+    sleep 1
+done
+exec cage -d -m last -- /usr/local/lib/sparc-display/session "http://127.0.0.1:$port/?kiosk=1"
