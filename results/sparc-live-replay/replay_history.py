@@ -1,4 +1,4 @@
-"""Full-history replay (TeslaMate car, or one of three Tesla Charge Stats cars): each night's real home charging energy, plugged in 6 PM -> 7 AM.
+"""Full-history replay (TeslaMate car, or one of four Tesla Charge Stats cars): each night's real home charging energy, plugged in 6 PM -> 7 AM.
 
 Energy: TeslaMate home AC sessions (kwh_used, from the wall), grouped noon-to-noon, so
 a 1 AM session belongs to the night that began the evening before.
@@ -16,7 +16,6 @@ from zoneinfo import ZoneInfo
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-import subprocess
 sys.path.insert(0, str(REPO / "controller"))
 from sparc_controller.smart_charging import make_plan
 from sparc_controller.billing import cents
@@ -39,6 +38,14 @@ for y in (2022, 2023, 2024, 2025, 2026):
 if (HERE / "data/comed-hourly-2022-05-30-to-2024-01-01.json").exists():
     # Downloaded from ComEd's hourly table with the Pi's own parser (DST days fail, as on the Pi).
     for h, v in json.load(open(HERE / "data/comed-hourly-2022-05-30-to-2024-01-01.json"))["hourly"].items():
+        if v["da"] is not None: ahead.setdefault(int(h), v["da"])
+        if v["rt"] is not None: settled.setdefault(int(h), v["rt"])
+for extra in ("comed-2026-10-15-to-10-27.json", "comed-2026-10-27-to-11-13.json"):
+    # Late Oct 2026 prices, past the end of comed-data/ (Nov 1's table fails to parse, as on the Pi).
+    if not (HERE / "data" / extra).exists(): continue
+    raw = json.load(open(HERE / "data" / extra))
+    for t, p in raw["five"].items(): five.setdefault(int(t), p)
+    for h, v in raw["hourly"].items():
         if v["da"] is not None: ahead.setdefault(int(h), v["da"])
         if v["rt"] is not None: settled.setdefault(int(h), v["rt"])
 five_keys = sorted(five); ahead_keys = sorted(ahead)
@@ -114,17 +121,15 @@ def hindsight(arrive, depart, energy):
 
 # Usage:
 #   replay_history.py teslamate
-#   replay_history.py car0001|car0003|car0006 FIRST LAST
-# Car files are Tesla app Charge Stats exports, removed from the working tree but kept in
-# commit 2e97af2; they are read from there with git show.
+#   replay_history.py car0001|car0003|car0006|car0008 FIRST LAST
+# Car files are Tesla app Charge Stats exports in tesla_datasets_all_20261104-220003/.
 CARS = {"car0001": "car0001_zip60025_tesla-X-LR-2022", "car0003": "car0003_zip60056_tesla-Y-LR-2024",
-        "car0006": "car0006_zip60025_tesla-3-LR-2023"}
+        "car0006": "car0006_zip60025_tesla-3-LR-2023", "car0008": "car0008_zip46514_tesla-3-SR-2019"}
 which = sys.argv[1] if len(sys.argv) > 1 else "teslamate"
 nights = defaultdict(float)
 if which in CARS:
     first, last = date.fromisoformat(sys.argv[2]), date.fromisoformat(sys.argv[3])
-    text = subprocess.run(["git", "-C", str(REPO), "show", f"2e97af2:tesla_datasets_all_20261104-220003/{CARS[which]}.csv"],
-                          check=True, capture_output=True, text=True).stdout
+    text = open(REPO / f"tesla_datasets_all_20261104-220003/{CARS[which]}.csv").read()
     # Day D's home kWh is charged in night D (6 PM -> 7 AM).
     for r in csv.DictReader(text.splitlines()):
         d, kwh = date.fromisoformat(r["date"]), float(r["home_kwh"])

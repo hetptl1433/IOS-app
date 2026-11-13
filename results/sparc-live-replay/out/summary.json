@@ -228,6 +228,51 @@
   "fallbackNights": []
  },
  {
+  "experiment": "Car 4, Model 3 SR 2019",
+  "pricedNights": 201,
+  "excludedNights": 2,
+  "kWh": 3276.099999999999,
+  "firstNight": "2025-10-01",
+  "lastNight": "2026-10-30",
+  "costUSD": {
+   "fixed6pm": 366.8796450000004,
+   "fixed11pm": 366.8796450000004,
+   "hourly6pm": 438.75801642424256,
+   "hourly11pm": 200.5161739999999,
+   "hourlyTODsparc": 128.35215900439897,
+   "hindsight": 106.53991799999999
+  },
+  "centsPerKWh": {
+   "fixed6pm": 11.198670522877826,
+   "fixed11pm": 11.198670522877826,
+   "hourly6pm": 13.392693032088236,
+   "hourly11pm": 6.120575501358321,
+   "hourlyTODsparc": 3.917833979561033,
+   "hindsight": 3.2520349806171978
+  },
+  "sparcSavesUSD": {
+   "fixed6pm": 238.5274859956014,
+   "fixed11pm": 238.5274859956014,
+   "hourly6pm": 310.4058574198436,
+   "hourly11pm": 72.16401499560092
+  },
+  "sparcSavesPercent": {
+   "fixed6pm": 65.01518665490454,
+   "fixed11pm": 65.01518665490454,
+   "hourly6pm": 70.74648115823983,
+   "hourly11pm": 35.989124246705885
+  },
+  "maxPossiblePercent": {
+   "fixed6pm": 70.96052630556817,
+   "fixed11pm": 70.96052630556817,
+   "hourly6pm": 75.7178412674323,
+   "hourly11pm": 46.867169927150094
+  },
+  "fallbackNights": [
+   "2025-11-02"
+  ]
+ },
+ {
   "experiment": "Norwegian homes on ComEd 2025",
   "pricedNights": 27824,
   "excludedNights": 71,

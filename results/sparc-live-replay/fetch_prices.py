@@ -3,7 +3,8 @@
     python3 results/sparc-live-replay/fetch_prices.py
 
 * data/comed-2026-10-27-to-11-13.json: 5-minute prices and the hourly table (day-ahead and settled)
-  for the 15-night Cybertruck replay.
+  for the 15-night Cybertruck replay (and car 4's last nights).
+* data/comed-2026-10-15-to-10-27.json: the same for Oct 15-27, 2026, past the end of comed-data/ (car 4).
 * data/comed-hourly-2022-05-30-to-2024-01-01.json: the hourly table for 2022-2023, which comed-data/
   lacks (its hourly files skip 2015-2023).
 
@@ -34,14 +35,19 @@ def tables(first, last):
     return hours, errors
 
 
-five, day = {}, date(2026, 10, 27)
-while day <= date(2026, 11, 13):
-    start = datetime(day.year, day.month, day.day)
-    for stamp, price in comed.five_minute_prices(start, start + timedelta(hours=23, minutes=55), get):
-        five[str(stamp)] = price
-    day += timedelta(days=1)
-hourly, errors = tables(date(2026, 10, 27), date(2026, 11, 13))
-json.dump({"five": five, "hourly": hourly, "errors": errors}, open(HERE / "data/comed-2026-10-27-to-11-13.json", "w"))
+def window(first, last, name):
+    five, day = {}, first
+    while day <= last:
+        start = datetime(day.year, day.month, day.day)
+        for stamp, price in comed.five_minute_prices(start, start + timedelta(hours=23, minutes=55), get):
+            five[str(stamp)] = price
+        day += timedelta(days=1)
+    hourly, errors = tables(first, last)
+    json.dump({"five": five, "hourly": hourly, "errors": errors}, open(HERE / "data" / name, "w"))
+
+
+window(date(2026, 10, 27), date(2026, 11, 13), "comed-2026-10-27-to-11-13.json")
+window(date(2026, 10, 15), date(2026, 10, 27), "comed-2026-10-15-to-10-27.json")
 
 hourly, errors = tables(date(2022, 5, 30), date(2024, 1, 1))
 json.dump({"hourly": hourly, "errors": errors}, open(HERE / "data/comed-hourly-2022-05-30-to-2024-01-01.json", "w"))

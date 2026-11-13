@@ -73,6 +73,7 @@ summaries.append(summarize("Cybertruck 50-90%, 15 nights", rows))
 hist_ns = load("replay_history.py", "# Usage:")
 for name, file in [("TeslaMate car", "teslamate"), ("Car 1, Model X LR 2022", "car0001"),
                    ("Car 2, Model Y LR 2024", "car0003"), ("Car 3, Model 3 LR 2023", "car0006"),
+                   ("Car 4, Model 3 SR 2019", "car0008"),
                    ("Norwegian homes on ComEd 2025", "norway")]:
     if not (OUT / f"{file}.json").exists():
         continue

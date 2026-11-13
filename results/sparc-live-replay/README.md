@@ -1,6 +1,6 @@
 # SPARC live replay: what the Pi's planner saves on real nights
 
-Six experiments replay the Raspberry Pi's own charging planner (`make_plan` in
+Seven experiments replay the Raspberry Pi's own charging planner (`make_plan` in
 `controller/sparc_controller/smart_charging.py`, mode `live`: ComEd day-ahead prices plus live
 5-minute prices, planning on hourly supply plus Time-of-Day delivery) over real ComEd prices.
 
@@ -112,7 +112,26 @@ settled hourly prices.
 
 - Only 4 months, spring into summer. Summer evening price spikes made hourly from 6 PM 17¢/kWh.
 
-## 6. Norwegian homes, charged in Chicago
+## 6. Car 4, Model 3 SR 2019
+
+201 nights, Oct 2025 – Oct 2026 · 3,276 kWh
+
+| Scenario | Cost | ¢/kWh | SPARC saves | Max possible |
+|---|---:|---:|---:|---:|
+| Fixed plan, from 6 PM | $366.88 | 11.2 | $238.53 · 65% | 71% |
+| Fixed plan, from 11 PM | $366.88 | 11.2 | $238.53 · 65% | 71% |
+| Hourly, from 6 PM | $438.76 | 13.4 | $310.41 · 71% | 76% |
+| Hourly, from 11 PM | $200.52 | 6.1 | $72.16 · 36% | 47% |
+| **Hourly + TOD delivery + SPARC** | **$128.35** | **3.9** | — | |
+| *Perfect hindsight* | *$106.54* | *3.3* | | |
+
+- The car is from zip 46514 (Elkhart, Indiana, outside ComEd), but it is priced on ComEd like the others.
+- No data for Dec 2025, Jan, Jun or Aug 2026. Average 16 kWh a night, the most 38 kWh.
+- Late Oct 2026 prices are past the end of `comed-data/`, so they were downloaded into `data/`.
+- 2 nights left out for missing prices (Sep 6 and Oct 31, 2026). The Nov 2, 2025 night hit the Pi's
+  daylight-saving bug.
+
+## 7. Norwegian homes, charged in Chicago
 
 27,824 user-nights from 267 households · mapped onto 2025 · 445,470 kWh
 
@@ -137,8 +156,8 @@ settled hourly prices.
   missing ComEd prices on Jan 30, Jul 1 and Nov 1, 2025. 96 user-nights fell on the Nov 2, 2025
   daylight-saving night and hit the Pi bug.
 
-Cars 1–3 are Tesla app **Charge Stats** exports added in commit `2e97af2`
-(`tesla_datasets_all_20261104-220003/`). Each day's "Home" kWh is charged that night, 6 PM → 7 AM.
+Cars 1–4 are Tesla app **Charge Stats** exports in `tesla_datasets_all_20261104-220003/` (cars 1–3 added in
+commit `2e97af2`, car 4 later). Each day's "Home" kWh is charged that night, 6 PM → 7 AM.
 The daily values were measured from the app's bar chart in screenshots and scaled so each month matches
 the app's exact total. The kWh are treated as energy from the wall.
 
@@ -152,13 +171,14 @@ python3 results/sparc-live-replay/replay_history.py teslamate
 python3 results/sparc-live-replay/replay_history.py car0001 2022-06-01 2026-10-16
 python3 results/sparc-live-replay/replay_history.py car0003 2024-01-01 2026-10-16
 python3 results/sparc-live-replay/replay_history.py car0006 2024-01-01 2026-10-16
+python3 results/sparc-live-replay/replay_history.py car0008 2025-10-01 2026-10-31
 python3 results/sparc-live-replay/replay_norway.py
 python3 results/sparc-live-replay/summarize.py
 ```
 
 The history runs take a few minutes each; the Norway run uses all but three cores and takes about
-10 minutes on an M5 Pro. `fetch_prices.py` re-downloads the two price files in `data/`
-(about 15 minutes); they are already saved.
+10 minutes on an M5 Pro. `fetch_prices.py` re-downloads the three price files in `data/`
+(about 20 minutes); they are already saved.
 
 | File | What it holds |
 |---|---|
