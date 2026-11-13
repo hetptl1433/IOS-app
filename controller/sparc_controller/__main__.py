@@ -61,6 +61,47 @@ async def watch_wifi(service):
         await asyncio.sleep(30)
 
 
+async def watch_virtual(service):
+    """Persist simulated progress even with the screen powered off and no phone."""
+    first = True
+    while True:
+        async with service._lock:
+            service.advance_virtual()
+            service.expire_today()
+            service.refresh_calendar_window()
+            service.refresh_smart_plan(force=first, cause="processStart" if first else "fiveMinuteReplan")
+            first = False
+        try:
+            await service.capture_history()
+        except Exception:
+            print("Charging continues; history storage will be retried.", file=sys.stderr)
+        seconds = service.clock().timestamp()
+        await asyncio.sleep(min(30, max(0.1, 300 - seconds % 300)))
+
+
+async def watch_tesla_sessions(service):
+    """Costs nothing until SPARC starts a Tesla charge; then one read per 15 minutes."""
+    while True:
+        try:
+            await service.poll_tesla_session()
+        except Exception:
+            print('Tesla charging history could not be updated; charging was not changed.', file=sys.stderr)
+        await asyncio.sleep(60)
+
+
+async def watch_connections(service):
+    while True:
+        try:
+            await service.refresh_connections()
+        except Exception:
+            print('Connection status could not be refreshed; charging configuration was not changed.', file=sys.stderr)
+        try:
+            await service.sync_plug_demo()
+        except Exception:
+            print('The plug demo could not be synchronized.', file=sys.stderr)
+        await asyncio.sleep(10 if service.plug_demo_following else 30)
+
+
 async def run(args):
     lan_only = args.lan_only
     allow_wifi = not lan_only and not args.no_wifi_provision
@@ -72,7 +113,12 @@ async def run(args):
         # Import before starting HTTP so a missing optional BLE dependency leaves no task behind.
         from .bluez import run_ble
     required = [asyncio.create_task(run_http(service, args.host, args.port))]
+    if service.pricing is not None:
+        required.append(asyncio.create_task(service.pricing.run()))
+        required.append(asyncio.create_task(watch_virtual(service)))
     tasks = list(required)
+    tasks.append(asyncio.create_task(watch_connections(service)))
+    tasks.append(asyncio.create_task(watch_tesla_sessions(service)))
     if not lan_only:
         required.append(asyncio.create_task(run_ble(service, args.adapter)))
         tasks.append(required[-1])
@@ -107,7 +153,7 @@ def parse_args(argv=None):
     parser.add_argument("--lan-only", "--no-ble", dest="lan_only", action="store_true", help="Run on the existing LAN without Bluetooth or Wi-Fi provisioning; --no-ble is an alias")
     parser.add_argument("--no-bonjour", action="store_true", help="Skip optional Avahi/D-Bus Bonjour advertising; connect by private IP")
     parser.add_argument("--no-wifi-provision", action="store_true", help="Keep Bluetooth control enabled without creating a NetworkManager Wi-Fi provisioning adapter")
-    parser.add_argument("--app-test", action="store_true", help="Enable the default-on Virtual car for the physical app; never connects to a real vehicle")
+    parser.add_argument("--app-test", action="store_true", help="Enable the default-on Virtual car; real Tesla controls require separate owner authorization and explicit activation")
     parser.add_argument("--pairing-code", default=os.environ.get("SPARC_PAIRING_CODE") or None,
                         help="App-test only: 4-8 digit code the app pairs with instead of the private key (default: $SPARC_PAIRING_CODE)")
     parser.add_argument("--display-port", default=os.environ.get("SPARC_DISPLAY_PORT") or None,

@@ -18,6 +18,11 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 MAX_FRAME = 16_384
 MAX_AGE_SECONDS = 90
+# Bluetooth caps one attribute value at 512 bytes; a longer info read reaches the phone cut off.
+BLE_MAX_VALUE = 512
+# The Bluetooth info is read before pairing, so it lists only what setup needs.
+# GET /v1/info keeps the full list.
+BLE_SETUP_CAPABILITIES = frozenset({"pair", "ping", "wifi.provision", "app-test", "pairing-code"})
 
 
 class ProtocolError(ValueError):
@@ -61,9 +66,14 @@ class DeviceInfo:
         return {"version": 1, "deviceId": self.device_id, "bootId": self.boot_id,
                 "name": self.name, "serverTime": time.time() if now is None else now,
                 "capabilities": ["pair", "ping"] + (["wifi.provision"] if self.wifi_provision else [])
-                    + (["app-test", "virtual-car", "set_virtual_car", "get_snapshot", "charge_now", "pause", "resume", "end"] if self.app_test else [])
+                    + (["app-test", "virtual-car", "set_virtual_car", "set_virtual_car_state", "get_snapshot", "get_settings", "get_rates", "get_savings", "set_sleep_windows", "get_history", "set_campaign", "multi-client", "connections", "set_connection_settings", "check_smart_plug", "tesla_authorize", "charge_now", "pause", "resume", "end"] if self.app_test else [])
                     + (["pairing-code"] if self.pairing_code else []),
                 "vehicleAdapterAvailable": False}
+
+    def ble_public(self, now: float | None = None) -> dict:
+        info = self.public(now)
+        info["capabilities"] = [name for name in info["capabilities"] if name in BLE_SETUP_CAPABILITIES]
+        return info
 
 
 class SecureChannel:

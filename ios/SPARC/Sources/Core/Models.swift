@@ -62,6 +62,223 @@ struct ControllerSettings: Codable, Equatable, Sendable {
     var today: TodayOverride?
     /// Missing on older controllers; new virtual-car controllers default to enabled.
     var virtualCarEnabled: Bool? = nil
+    var campaign: CampaignSchedule? = nil
+    var developer: DeveloperVehicleState? = nil
+    var control: ControllerControl? = nil
+    var clients: ControllerClients? = nil
+    var connections: ControllerConnections? = nil
+    var sleepCalendar: SleepCalendarStatus? = nil
+}
+
+enum ControllerConnectionMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case virtual, tesla
+    case smartPlug = "smart_plug"
+    var id: String { rawValue }
+    var title: String { switch self { case .virtual: return "Virtual Car"; case .tesla: return "Tesla Car"; case .smartPlug: return "Smart Plug" } }
+}
+
+enum VirtualVehicleModel: String, Codable, CaseIterable, Identifiable, Sendable {
+    case cybertruck
+    case modelX = "model_x"
+    case model3 = "model_3"
+    var id: String { rawValue }
+    var title: String { switch self { case .cybertruck: return "Cybertruck"; case .modelX: return "Model X"; case .model3: return "Model 3" } }
+}
+
+enum VehicleDataSource: String, Codable, CaseIterable, Identifiable, Sendable {
+    case virtual, tesla
+    var id: String { rawValue }
+    var title: String { self == .virtual ? "Virtual Car" : "Tesla Car" }
+}
+
+enum TeslaChargeCommand: String, Sendable {
+    case start = "charge_start", stop = "charge_stop", setLimit = "set_charge_limit"
+
+    var title: String {
+        switch self {
+        case .start: return "Start charging"
+        case .stop: return "Stop charging"
+        case .setLimit: return "Set charge limit"
+        }
+    }
+
+    func validate(value: Int?) throws {
+        if self == .setLimit {
+            guard let value, (50...100).contains(value) else { throw ScheduleValidationError.target }
+        } else if value != nil { throw ControllerConnectionError.invalidMessage }
+    }
+}
+
+struct TeslaCommandReceipt: Decodable, Sendable {
+    var accepted: Bool
+    var command: String
+
+    func validate(expected: TeslaChargeCommand) throws {
+        guard accepted, command == expected.rawValue else {
+            throw ControllerConnectionError.unavailable("Tesla did not confirm this charging command. Refresh before trying again.")
+        }
+    }
+}
+
+struct ControllerConnections: Codable, Equatable, Sendable {
+    struct Virtual: Codable, Equatable, Sendable {
+        var model: VirtualVehicleModel
+        var batteryPercent: Double
+        var pluggedIn: Bool
+        var profileOnly: Bool? = nil
+    }
+    struct SmartPlug: Codable, Equatable, Sendable {
+        var address: String?
+        var vehicleSource: VehicleDataSource
+        var status: String
+        var lastCheckedAt: Date?
+        var powerW: Double?
+        var error: String?
+        var verified: Bool?
+        var switchOn: Bool?
+        var followVirtual: Bool?
+    }
+    struct Tesla: Codable, Equatable, Sendable {
+        struct ChargeState: Codable, Equatable, Sendable {
+            var batteryPercent: Double
+            var pluggedIn: Bool
+            var powerKW: Double
+            var state: String
+            var updatedAt: Date
+            var vehicleName: String
+            var source: String
+            var timestampSource: String
+            var stale: Bool?
+        }
+        struct Vehicle: Codable, Equatable, Identifiable, Sendable {
+            var id: String
+            var vin: String
+            var displayName: String
+            /// The Tesla account this car comes from. A Pi that holds a single account leaves it out.
+            var accountId: String?
+        }
+        /// One Tesla sign-in on the Pi. A Pi that holds a single account doesn't send this list.
+        struct Account: Codable, Equatable, Identifiable, Sendable {
+            var id: String
+            var label: String
+            var authorized: Bool
+            var vehicleCount: Int
+            var error: String?
+        }
+        var configured: Bool
+        var authorized: Bool
+        var status: String
+        var vehicleName: String?
+        var error: String?
+        var vehicleId: String?
+        var vehicles: [Vehicle]?
+        var keyPairingURL: URL?
+        var commandsReady: Bool?
+        var chargeState: ChargeState?
+        var accounts: [Account]?
+        /// The account that owns the selected car; charging commands go through it.
+        var accountId: String?
+    }
+    var revision: Int
+    var mode: ControllerConnectionMode
+    var activeMode: ControllerConnectionMode?
+    var virtual: Virtual
+    var smartPlug: SmartPlug
+    var tesla: Tesla
+    func validate() throws {
+        guard revision >= 0, virtual.batteryPercent.isFinite, (0...100).contains(virtual.batteryPercent),
+              smartPlug.lastCheckedAt?.timeIntervalSince1970.isFinite != false,
+              smartPlug.powerW?.isFinite != false,
+              (smartPlug.address?.utf8.count ?? 0) <= 512 else { throw SnapshotError.invalid }
+        if let url = tesla.keyPairingURL {
+            guard url.scheme?.lowercased() == "https", ["tesla.com", "www.tesla.com"].contains(url.host?.lowercased() ?? ""),
+                  url.path.hasPrefix("/_ak/"), url.user == nil, url.password == nil,
+                  url.port == nil || url.port == 443 else { throw SnapshotError.invalid }
+        }
+        if let accounts = tesla.accounts {
+            guard accounts.count <= 32, Set(accounts.map(\.id)).count == accounts.count,
+                  accounts.allSatisfy({ !$0.id.isEmpty && $0.id.utf8.count <= 64 && $0.label.utf8.count <= 256
+                      && (0...1000).contains($0.vehicleCount) }) else { throw SnapshotError.invalid }
+        }
+        if let value = tesla.chargeState {
+            guard value.batteryPercent.isFinite, (0...100).contains(value.batteryPercent), value.powerKW.isFinite,
+                  value.updatedAt.timeIntervalSince1970.isFinite, value.source == "TeslaFleetAPI",
+                  ["vehicle", "received"].contains(value.timestampSource) else { throw SnapshotError.invalid }
+        }
+    }
+}
+
+struct ConnectionSettingsUpdate: Encodable, Sendable {
+    struct Virtual: Encodable, Sendable {
+        var model: VirtualVehicleModel?
+        var batteryPercent: Double?
+        var pluggedIn: Bool?
+    }
+    struct SmartPlug: Encodable, Sendable {
+        var address: String
+        var vehicleSource: VehicleDataSource
+        var followVirtual: Bool? = nil
+    }
+    var mode: ControllerConnectionMode
+    var virtual: Virtual? = nil
+    var smartPlug: SmartPlug? = nil
+    var expectedRevision: Int
+    func validate() throws {
+        guard expectedRevision >= 0 else { throw SnapshotError.invalid }
+        if let battery = virtual?.batteryPercent {
+            guard battery.isFinite, (0...100).contains(battery) else { throw SnapshotError.invalid }
+        }
+        if let smartPlug {
+            guard !smartPlug.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  smartPlug.address.utf8.count <= 512 else {
+                throw ControllerConnectionError.unavailable("Enter your Shelly plug's local address.")
+            }
+        }
+    }
+}
+
+struct TeslaAuthorization: Decodable, Sendable {
+    var authorizationURL: URL
+    var expiresAt: Date?
+    var stateExpiresAt: Date?
+    func validate() throws {
+        let host = authorizationURL.host?.lowercased() ?? ""
+        guard authorizationURL.scheme?.lowercased() == "https", host == "auth.tesla.com",
+              authorizationURL.user == nil, authorizationURL.password == nil,
+              authorizationURL.port == nil || authorizationURL.port == 443,
+              expiresAt?.timeIntervalSince1970.isFinite != false,
+              stateExpiresAt?.timeIntervalSince1970.isFinite != false else { throw ControllerConnectionError.invalidMessage }
+    }
+}
+
+struct DeveloperVehicleState: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var simulated: Bool
+    var batteryPercent: Double
+    var pluggedIn: Bool
+    var revision: Int
+    var updatedAt: Date?
+    func validate() throws {
+        guard simulated, batteryPercent.isFinite, (0...100).contains(batteryPercent), revision >= 0,
+              updatedAt?.timeIntervalSince1970.isFinite != false else { throw SnapshotError.invalid }
+    }
+}
+
+struct ControllerControl: Codable, Equatable, Sendable {
+    var sequence: Int
+    var operation: String?
+    var updatedAt: Date?
+    var clientId: String?
+    var clientName: String?
+    func validate() throws {
+        guard sequence >= 0, updatedAt?.timeIntervalSince1970.isFinite != false,
+              clientId == nil || UUID(uuidString: clientId!) != nil else { throw SnapshotError.invalid }
+    }
+}
+
+struct ControllerClients: Codable, Equatable, Sendable {
+    var pairedCount: Int
+    var currentClientId: String?
 }
 
 struct ScheduleGoal: Equatable, Sendable {
@@ -91,6 +308,21 @@ struct ChargeSnapshot: Codable, Equatable, Sendable {
     var controlOnly: Bool? = nil
     /// Explicitly virtual values must never be treated as physical vehicle telemetry.
     var virtualCar: Bool? = nil
+    var realPricing: Bool? = nil
+    var rateAvailable: Bool? = nil
+    var costAvailable: Bool? = nil
+    var costFinal: Bool? = nil
+    var unpricedEnergyKWh: Double? = nil
+    var control: ControllerControl? = nil
+
+    /// Tesla reports cached vehicle measurements separately from unavailable session totals.
+    var manualOnly: Bool? = nil
+    var source: String? = nil
+    var telemetryStale: Bool? = nil
+    var energyAvailable: Bool? = nil
+    var savingsAvailable: Bool? = nil
+    var scheduleAvailable: Bool? = nil
+    var targetAvailable: Bool? = nil
 
     /// Values shown only in the explicitly labeled design demo.
     static func demo(now: Date = Date()) -> ChargeSnapshot {
@@ -118,6 +350,7 @@ struct ChargeSnapshot: Codable, Equatable, Sendable {
     }
 
     func validate() throws {
+        try control?.validate()
         guard (0...100).contains(batteryPercent), (50...100).contains(targetPercent),
               !vehicleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               vehicleName.utf8.count <= 128, windowEnd >= windowStart,
@@ -127,6 +360,11 @@ struct ChargeSnapshot: Codable, Equatable, Sendable {
               powerKW >= 0, energyKWh >= 0, remainingMinutes >= 0,
               remainingMinutes <= 10080 else { throw SnapshotError.invalid }
         if virtualCar == true, controlOnly == true { throw SnapshotError.invalid }
+        if manualOnly == true {
+            guard virtualCar == false, controlOnly != true, source == "TeslaFleetAPI",
+                  energyAvailable == false, costAvailable == false, savingsAvailable == false,
+                  scheduleAvailable == false else { throw SnapshotError.invalid }
+        }
         if controlOnly == true {
             guard batteryPercent == 0, powerKW == 0, energyKWh == 0,
                   remainingMinutes == 0, monthlySavings == 0, currentRateCents == 0,

@@ -180,6 +180,11 @@ enum SPARCFormat {
     static func window(_ start: Date, _ end: Date) -> String { "\(time(start)) – \(time(end))" }
     static func money(_ amount: Double) -> String { amount.formatted(.currency(code: "USD")) }
     static func decimal(_ value: Double, digits: Int = 1) -> String { value.formatted(.number.precision(.fractionLength(digits))) }
+    static func cents(_ value: Double) -> String {
+        guard value.isFinite else { return "—" }
+        if abs(value - value.rounded()) < 0.05, let whole = Int(exactly: value.rounded()) { return "\(whole)" }
+        return decimal(value, digits: 1)
+    }
     static func duration(_ minutes: Int) -> String { "\(max(0, minutes) / 60)h \(max(0, minutes) % 60)m" }
     static func clockDate(_ minutes: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian)
@@ -211,19 +216,25 @@ struct UnavailableBatteryRing: View {
 }
 
 extension AppStore {
-    var showsTelemetry: Bool { hasLiveTelemetry || isVirtualCarActive }
+    var showsTelemetry: Bool {
+        if profileConnectionMode == .tesla { return hasLiveTelemetry && profileTeslaID == connections?.tesla.vehicleId && activeConnectionMode == .tesla }
+        return profileConnectionMode == .virtual ? isVirtualCarActive : hasLiveTelemetry || isVirtualCarActive
+    }
     var displayedTarget: String {
+        if !isDemo, campaign != nil, let goal = effectiveGoal { return "\(goal.targetPercent)%" }
         if showsTelemetry { return "\(snapshot.targetPercent)%" }
         if let goal = effectiveGoal { return "\(goal.targetPercent)%" }
         return "—"
     }
     var displayedReadyTime: String {
+        if !isDemo, campaign != nil { return effectiveGoal.map { SPARCFormat.time($0.departure) } ?? "Not scheduled" }
         if isDemo && effectiveGoal == nil { return "Not scheduled" }
         if showsTelemetry { return SPARCFormat.time(snapshot.readyBy) }
         if let goal = effectiveGoal { return SPARCFormat.time(goal.readyBy) }
         return "—"
     }
     var displayedWindow: String {
+        if let window = campaignWindow { return SPARCFormat.window(window.start, window.end) }
         if isDemo && effectiveGoal == nil { return "No charging window scheduled" }
         if isControllerTest && !isVirtualCarActive {
             guard effectiveGoal != nil else { return "No charging window scheduled" }
@@ -519,6 +530,20 @@ struct SPARCToastAction {
     func callAsFunction(_ message: String) { show(message) }
 }
 
+private struct SPARCTabBarTopKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    /// Window y of the floating tab bar's top edge for pages shown in a tab; nil in sheets.
+    /// A page pushed inside a tab's NavigationStack does not get the bar in its bottom safe area,
+    /// so a pinned bottom control uses this to stay above it.
+    var sparcTabBarTop: CGFloat? {
+        get { self[SPARCTabBarTopKey.self] }
+        set { self[SPARCTabBarTopKey.self] = newValue }
+    }
+}
+
 private struct SPARCToastKey: EnvironmentKey {
     static let defaultValue = SPARCToastAction(show: { _ in })
 }
@@ -578,9 +603,11 @@ extension SPARCFormat {
     /// "Just now" under a minute, then minutes, then hours. Never ticks by the second.
     static func ago(_ date: Date, now: Date = .now) -> String {
         let seconds = max(0, now.timeIntervalSince(date))
+        guard seconds.isFinite else { return "Earlier" }
         if seconds < 60 { return "Just now" }
         if seconds < 3600 { return "\(Int(seconds / 60)) min ago" }
-        return "\(Int(seconds / 3600)) h ago"
+        guard let hours = Int(exactly: floor(seconds / 3600)) else { return "Earlier" }
+        return "\(hours) h ago"
     }
 }
 
@@ -611,10 +638,20 @@ struct SPARCMilestone: Identifiable {
 }
 
 extension AppStore {
-    /// The virtual car and the on-phone preview present as the owner's Cybertruck. A real vehicle keeps its own name.
     var displayVehicleName: String {
+        if profileConnectionMode == .tesla { return chargingCarName }
+        if let connections, connections.activeMode == .virtual || isVirtualCarActive {
+            return connections.virtual.model.title
+        }
         if snapshot.controlOnly == true { return snapshot.vehicleName }
         return isDemo || isVirtualCarActive ? "Cybertruck" : snapshot.vehicleName
+    }
+    var usesCybertruckArtwork: Bool {
+        if profileConnectionMode == .tesla { return false }
+        if let connections, connections.activeMode == .virtual || isVirtualCarActive {
+            return connections.virtual.model == .cybertruck
+        }
+        return isDemo || snapshot.vehicleName.localizedCaseInsensitiveContains("cybertruck")
     }
 
     private var chargedNights: Set<Date> {
@@ -693,5 +730,64 @@ extension AppStore {
             item("save25", "$25 saved", "leaf", savings / 25, left: "\(SPARCFormat.money(max(0, 25 - savings))) to go"),
             item("run10", "10 nights in a row", "flame", Double(bestRun) / 10, left: "\(max(0, 10 - bestRun)) to go")
         ]
+    }
+}
+
+/// A small ⓘ that keeps explanations off the screen until someone asks for them.
+struct SPARCInfoButton<Content: View>: View {
+    let title: String
+    let content: Content
+    @State private var shown = false
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    var body: some View {
+        Button { shown = true } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(SPARCTheme.muted)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .sheet(isPresented: $shown) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) { content }
+                        .padding(20)
+                        .frame(maxWidth: 640, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                }
+                .background(SPARCTheme.background)
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { shown = false } } }
+            }
+            .presentationDetents([.medium, .large])
+            .preferredColorScheme(.dark)
+            .tint(.white)
+        }
+    }
+}
+
+/// One label/value line inside an info sheet.
+struct SPARCInfoRow: View {
+    let label: String
+    let value: String
+    var emphasized = false
+    init(_ label: String, _ value: String, emphasized: Bool = false) {
+        self.label = label; self.value = value; self.emphasized = emphasized
+    }
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label).foregroundStyle(emphasized ? .white : SPARCTheme.muted)
+            Spacer(minLength: 8)
+            Text(value).monospacedDigit().foregroundStyle(emphasized ? SPARCTheme.spark : .white)
+        }
+        .sparcFont(15, weight: emphasized ? .semibold : .regular)
+        .padding(.vertical, 11)
+        .accessibilityElement(children: .combine)
     }
 }

@@ -191,6 +191,10 @@ struct InsightsView: View {
     @State private var metric: InsightMetric = .savings
 
     var body: some View {
+        if store.isDemo { demoBody } else { ControllerSavingsView() }
+    }
+
+    @ViewBuilder private var demoBody: some View {
         let data = InsightData(all: store.records, period: period, metric: metric)
         InsightsSettingsPage(glow: .topLeading) {
             insightsPageTitle("Your good-energy story.")
@@ -203,15 +207,13 @@ struct InsightsView: View {
             if store.records.isEmpty {
                 totalSection(data, empty: true)
                 metricChips
-                emptyCard(symbol: "chart.xyaxis.line", title: "Your story starts with a charge.",
-                          text: "Completed charges from your controller will appear here once it reports session history.")
+                emptyCard(symbol: "chart.xyaxis.line", title: "Your story starts with a charge.")
                     .padding(.top, 8)
             } else {
                 totalSection(data, empty: false)
                 metricChips
                 if data.records.isEmpty {
-                    emptyCard(symbol: "moon.stars", title: "No charges \(period.word) yet.",
-                              text: "Your good-energy story fills in after each charge.")
+                    emptyCard(symbol: "moon.stars", title: "No charges \(period.word) yet.")
                         .padding(.top, 8)
                 } else {
                     chartCard(data)
@@ -219,10 +221,6 @@ struct InsightsView: View {
                 }
                 milestonesSection
                 if !data.records.isEmpty { tiles(data) }
-                Text("Savings compare the same energy charged right away. They leave out taxes and fixed charges.")
-                    .sparcFont(11.5).lineSpacing(2)
-                    .foregroundStyle(Color(white: 0.48))
-                    .padding(.top, 16).padding(.horizontal, 4)
             }
         }
     }
@@ -231,14 +229,21 @@ struct InsightsView: View {
 
     private func totalSection(_ data: InsightData, empty: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(metric.heading + " " + period.word)
-                .sparcFont(13, weight: .semibold).foregroundStyle(SPARCTheme.muted)
+            HStack(spacing: 0) {
+                Text(metric.heading + " " + period.word)
+                    .sparcFont(13, weight: .semibold).foregroundStyle(SPARCTheme.muted)
+                if metric == .savings {
+                    SPARCInfoButton("How savings are calculated") {
+                        Text("Compared with charging right away. Taxes and fixed charges are not included.")
+                    }
+                }
+            }
             Text(empty ? "—" : metric.text(data.total))
                 .sparcFont(60, weight: .bold).tracking(-3.3).monospacedDigit()
                 .foregroundStyle(metric == .savings && !empty ? SPARCTheme.spark : .white)
                 .lineLimit(1).minimumScaleFactor(0.5)
                 .padding(.top, 4)
-            Text(empty ? "No charges recorded yet" : "\(data.records.count) smart \(data.records.count == 1 ? "charge" : "charges")")
+            Text(empty ? "No charges yet" : "\(data.records.count) smart \(data.records.count == 1 ? "charge" : "charges")")
                 .sparcFont(13.5).monospacedDigit().foregroundStyle(SPARCTheme.muted)
                 .padding(.top, 8)
         }
@@ -392,11 +397,10 @@ struct InsightsView: View {
                 .foregroundStyle(SPARCTheme.spark).accessibilityHidden(true)
             Group {
                 if savings > 0 {
-                    Text("You kept \(SPARCFormat.money(savings)), ")
+                    Text("You saved \(SPARCFormat.money(savings)) · ")
                         + Text("\(InsightsFormat.percentLess(share))% less").foregroundColor(SPARCTheme.spark)
-                        + Text(" for the same energy.")
                 } else {
-                    Text("Charging right away would have cost about the same.")
+                    Text("About the same as charging right away.")
                 }
             }
             .sparcFont(14, weight: .semibold).monospacedDigit()
@@ -492,13 +496,11 @@ struct InsightsView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func emptyCard(symbol: String, title: String, text: String) -> some View {
+    private func emptyCard(symbol: String, title: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: symbol).font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(SPARCTheme.spark).accessibilityHidden(true)
             Text(title).sparcFont(20, weight: .semibold).tracking(-0.3)
-            Text(text).sparcFont(14).foregroundStyle(SPARCTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -537,6 +539,14 @@ struct RecordsView: View {
     }
 
     var body: some View {
+        Group {
+            if store.isDemo { demoBody } else { ControllerRecordsView() }
+        }
+        .navigationTitle("History")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder private var demoBody: some View {
         let list = records
         InsightsSettingsPage(glow: .topTrailing) {
             insightsPageTitle("Every charge,\naccounted for.")
@@ -551,10 +561,6 @@ struct RecordsView: View {
                         .padding(.top, 20).padding(.horizontal, 2)
                     monthCard(month).padding(.top, 10)
                 }
-                Text("The green bar shows how much less each charge cost than charging right away.")
-                    .sparcFont(11.5).lineSpacing(2)
-                    .foregroundStyle(Color(white: 0.48))
-                    .padding(.top, 14).padding(.horizontal, 4)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -685,9 +691,6 @@ struct RecordsView: View {
             Image(systemName: "clock.arrow.circlepath").font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(SPARCTheme.spark).accessibilityHidden(true)
             Text("Good things take a first charge.").sparcFont(20, weight: .semibold).tracking(-0.3)
-            Text("Your completed charges will appear here once your controller reports session history.")
-                .sparcFont(14).foregroundStyle(SPARCTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -704,7 +707,7 @@ private struct SessionDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(InsightsFormat.fullDate(record.date)) · a smart little finish")
+                Text(InsightsFormat.fullDate(record.date))
                     .sparcFont(13, weight: .semibold).foregroundStyle(SPARCTheme.muted)
                     .accessibilityAddTraits(.isHeader)
                 Text(SPARCFormat.money(record.savings))
@@ -724,9 +727,6 @@ private struct SessionDetailView: View {
                 .background(Color(white: 0.039), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color(white: 0.137), lineWidth: 1))
                 .padding(.top, 18)
-                Text("The comparison uses the same energy charged right away. It is an estimate, not a bill credit.")
-                    .sparcFont(11.5).lineSpacing(2).foregroundStyle(Color(white: 0.48))
-                    .padding(.top, 12).padding(.horizontal, 4)
                 SPARCActionButton(title: "Done", kind: .secondary, height: 52) { dismiss() }
                     .accessibilityIdentifier("records.sessionDone")
                     .padding(.top, 16)
@@ -774,20 +774,9 @@ private struct BluetoothRune: Shape {
 
 struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
+    @AppStorage(SavingsComparison.storageKey) private var savingsComparison: SavingsComparison = .fixedPlan
     @EnvironmentObject private var provisioning: ProvisioningManager
     @Environment(\.sparcToast) private var toast
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("sparc.developerOptions") private var developerUnlocked = false
-    @State private var versionTaps = 0
-    @State private var tapReset: Task<Void, Never>?
-
-    private let tapsNeeded = 7
-
-    private var showsDeveloper: Bool {
-        let arguments = ProcessInfo.processInfo.arguments
-        // UI tests start hidden unless they ask, whatever an earlier run unlocked.
-        return (developerUnlocked && !arguments.contains("--uitesting")) || arguments.contains("-SPARCShowDeveloper")
-    }
 
     var body: some View {
         InsightsSettingsPage(bottomInset: 40) {
@@ -796,15 +785,16 @@ struct SettingsView: View {
             vehicleCard.padding(.top, 18)
             sectionLabel("Connection")
             connectionRow
+            sectionLabel("Your car")
+            chargingConnectionsCard
             sectionLabel("Charging")
             chargingCard
             sectionLabel("Privacy")
             privacyCard
-            if showsDeveloper { developerSection.transition(.opacity) }
+            developerSection
             footer.padding(.top, 28)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { tapReset?.cancel() }
     }
 
     // MARK: Pieces
@@ -857,12 +847,11 @@ struct SettingsView: View {
         let plug = plugState
         let name = store.displayVehicleName
         return HStack(spacing: 6) {
-            Image("Cybertruck").resizable().aspectRatio(1.5, contentMode: .fit)
+            ControllerVehicleView(charging: false)
                 .frame(width: 138, height: 92)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(name).sparcFont(18, weight: .bold).tracking(-0.2)
-                Text("Charges at home").sparcFont(13).foregroundStyle(SPARCTheme.muted).padding(.top, 3)
                 if let plug {
                     HStack(spacing: 6) {
                         Image(systemName: plug.live ? "powerplug" : "powerplug.portrait")
@@ -906,12 +895,18 @@ struct SettingsView: View {
         return reachable ? .connected(viaBluetooth: controller.bluetoothPeripheralID != nil) : .offline
     }
 
+    /// "SPARC-XXXX · " for the saved Pi, so two controllers with the same device name are told apart.
+    private var controllerLabel: String {
+        guard !store.isDemo, let name = provisioning.savedController?.bluetoothName else { return "" }
+        return name + " · "
+    }
+
     @ViewBuilder private var connectionRow: some View {
         switch link {
         case .notPaired:
             NavigationLink { ControllerSetupView() } label: {
                 connectionLabel(title: "Connect a controller",
-                                subtitle: "Pair your Raspberry Pi with Bluetooth or your home network",
+                                subtitle: "Pair your Raspberry Pi",
                                 subtitleColor: SPARCTheme.muted, dot: nil, bluetooth: true)
             }
             .buttonStyle(SPARCPressStyle())
@@ -920,7 +915,7 @@ struct SettingsView: View {
             let how = viaBluetooth ? "Bluetooth" : "your home network"
             NavigationLink { ConnectionView() } label: {
                 connectionLabel(title: "Home controller",
-                                subtitle: "Connected over \(how) · synced \(SPARCFormat.ago(store.snapshot.updatedAt).lowercased())",
+                                subtitle: "\(controllerLabel)Connected · \(how)",
                                 subtitleColor: SPARCTheme.mint, dot: SPARCTheme.spark, bluetooth: viaBluetooth)
             }
             .buttonStyle(SPARCPressStyle())
@@ -928,7 +923,7 @@ struct SettingsView: View {
         case .offline:
             NavigationLink { ConnectionView() } label: {
                 connectionLabel(title: "Home controller",
-                                subtitle: "Not connected right now · reconnects on its own",
+                                subtitle: "\(controllerLabel)Not connected",
                                 subtitleColor: SPARCTheme.warning, dot: SPARCTheme.warning, bluetooth: true)
             }
             .buttonStyle(SPARCPressStyle())
@@ -936,7 +931,7 @@ struct SettingsView: View {
         case .standby:
             NavigationLink { ConnectionView() } label: {
                 connectionLabel(title: "Home controller",
-                                subtitle: "Paired · not in use right now",
+                                subtitle: "\(controllerLabel)Paired · not in use",
                                 subtitleColor: SPARCTheme.muted, dot: Color(white: 0.6), bluetooth: true)
             }
             .buttonStyle(SPARCPressStyle())
@@ -985,6 +980,12 @@ struct SettingsView: View {
     // MARK: Charging and privacy
 
     private var scheduleSubtitle: String {
+        if store.sleepCalendarStatus?.enabled == true {
+            return store.sleepCalendarStatus?.nextWake.map { "Calendar · wake at " + SPARCFormat.time($0) } ?? "Calendar · waiting for a sleep event"
+        }
+        if !store.isDemo, let campaign = store.campaign {
+            return "\(campaign.nights) nights · \(campaign.targetBatteryPercent)% by \(SPARCFormat.time(SPARCFormat.clockDate(campaign.departureMinutes)))\(campaign.enabled ? "" : " · paused")"
+        }
         let weekly = store.weekly
         guard weekly.enabled, !weekly.days.isEmpty else { return "Weekly routine is off" }
         let names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -999,28 +1000,93 @@ struct SettingsView: View {
     }
 
     private var historySubtitle: String {
+        if store.profileConnectionMode == .tesla {
+            guard let history = store.selectedTeslaHistory else { return "No Tesla charges yet" }
+            return history.sessions.isEmpty ? "No Tesla charges yet" : "\(history.sessions.count) charges\(store.teslaHistoryIsStale ? " · offline" : "")"
+        }
+        if store.combinedSavings != nil { return "Past 15 days" }
+        if !store.isDemo {
+            return store.historySessions.isEmpty ? "No sessions yet" : "\(store.historySessions.count) sessions\(store.historyIsStale ? " · offline" : "")"
+        }
         let calendar = ScheduleEngine.chicagoCalendar
         let interval = calendar.dateInterval(of: .month, for: .now)
         let thisMonth = store.records.filter { interval?.contains($0.date) == true }.count
         func charges(_ count: Int) -> String { "\(count) \(count == 1 ? "charge" : "charges")" }
         if thisMonth > 0 { return "\(charges(thisMonth)) this month" }
-        if !store.records.isEmpty { return "\(charges(store.records.count)) recorded" }
+        if !store.records.isEmpty { return "\(charges(store.records.count))" }
         return "No charges yet"
+    }
+
+    private var chargingConnectionsCard: some View {
+        VStack(spacing: 0) {
+            NavigationLink { SmartPlugSettingsView() } label: {
+                menuRow(symbol: "powerplug", title: "Smart Plug", subtitle: store.connections?.smartPlug.address ?? "Shelly Plug US Gen4")
+            }.buttonStyle(SPARCPressStyle()).accessibilityIdentifier("settings.smartPlug")
+            divider
+            NavigationLink { TeslaCarSettingsView() } label: {
+                menuRow(symbol: "bolt.car", title: "Tesla", subtitle: teslaSubtitle)
+            }.buttonStyle(SPARCPressStyle()).accessibilityIdentifier("settings.teslaCar")
+            divider
+            NavigationLink { VirtualCarSettingsView() } label: {
+                menuRow(symbol: "car.side", title: "Virtual Car", subtitle: store.connections.map { $0.virtual.model.title } ?? "Model, battery, plug")
+            }.buttonStyle(SPARCPressStyle()).accessibilityIdentifier("settings.virtualCar")
+            if store.connections != nil, store.connectionsIsStale {
+                divider
+                Text("Last saved · connect to edit")
+                    .sparcFont(12).foregroundStyle(SPARCTheme.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            }
+        }.sparcSurface(radius: 22).clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var teslaSubtitle: String {
+        guard let tesla = store.connections?.tesla else { return "Connect your Tesla" }
+        let accounts = store.teslaAccounts
+        guard tesla.authorized else { return accounts.isEmpty ? "Connect your Tesla" : "Sign in to Tesla again" }
+        if accounts.count > 1 {
+            let cars = tesla.vehicles?.count ?? 0
+            return "\(accounts.count) accounts · \(cars) car\(cars == 1 ? "" : "s")"
+        }
+        if let name = tesla.vehicleName, !name.isEmpty { return "Connected · \(name)" }
+        return "Connected · pick your car"
     }
 
     private var chargingCard: some View {
         VStack(spacing: 0) {
-            NavigationLink { CurrentScheduleView() } label: {
-                menuRow(symbol: "calendar", title: "Charging schedule", subtitle: scheduleSubtitle)
+            Group {
+            if store.profileConnectionMode == .tesla {
+                NavigationLink { TeslaManualChargingView() } label: {
+                    menuRow(symbol: "bolt.car", title: "Tesla charging", subtitle: store.chargingCarName)
+                }
+            } else {
+                NavigationLink { CurrentScheduleView() } label: {
+                    menuRow(symbol: "calendar", title: "Charging schedule", subtitle: scheduleSubtitle)
+                }
+            }
             }
             .buttonStyle(SPARCPressStyle())
             .accessibilityIdentifier("settings.schedule")
             divider
+            if store.profileConnectionMode != .tesla {
+                NavigationLink { AppleSleepCalendarView() } label: {
+                    menuRow(symbol: "moon.zzz", title: "Sleep calendar event", subtitle: "Use a Calendar event")
+                }
+                .buttonStyle(SPARCPressStyle())
+                divider
+            }
             NavigationLink { RecordsView() } label: {
-                menuRow(symbol: "clock", title: "Charging history", subtitle: historySubtitle)
+                menuRow(symbol: "clock", title: "History", subtitle: historySubtitle)
             }
             .buttonStyle(SPARCPressStyle())
             .accessibilityIdentifier("settings.history")
+            if store.profileConnectionMode != .tesla {
+                divider
+                NavigationLink { SavingsComparisonView() } label: {
+                    menuRow(symbol: "chart.bar.xaxis", title: "Savings comparison", subtitle: savingsComparison.settingsSubtitle)
+                }
+                .buttonStyle(SPARCPressStyle())
+                .accessibilityIdentifier("settings.savingsComparison")
+            }
         }
         .sparcSurface(radius: 22)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -1068,61 +1134,17 @@ struct SettingsView: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: Developer (hidden until the version is tapped seven times)
+    // MARK: Developer
 
     private var developerSection: some View {
         VStack(spacing: 0) {
-            sectionLabel("Developer", tag: "Only you see this")
-            VStack(spacing: 0) {
-                Toggle(isOn: Binding(get: { store.isDemo }, set: { enabled in
-                    store.setDemoMode(enabled)
-                    if store.isDemo == enabled { toast(enabled ? "Running on this phone" : "Using your home controller") }
-                })) {
-                    developerLabel("Demo mode", "Run everything on this phone, without the Pi")
-                }
-                .tint(SPARCTheme.spark)
-                .accessibilityIdentifier("settings.demoMode")
-                .disabled(store.busy)
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                divider
-                Toggle(isOn: Binding(get: { store.virtualCarEnabled }, set: { enabled in
-                    Task {
-                        await store.setVirtualCarEnabled(enabled)
-                        if store.virtualCarEnabled == enabled, store.errorMessage == nil {
-                            toast(enabled ? "Virtual car plugged in at 40%" : "Virtual car unplugged")
-                        }
-                    }
-                })) {
-                    developerLabel("Virtual car", "Plugged in, starting at 40%")
-                }
-                .tint(SPARCTheme.spark)
-                .accessibilityIdentifier("settings.virtualCar")
-                .disabled(store.busy)
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                divider
-                Button {
-                    withAnimation(SPARCMotion.calm(SPARCMotion.quick, reduceMotion)) { developerUnlocked = false }
-                } label: {
-                    Text("Hide developer options").sparcFont(14, weight: .semibold)
-                        .foregroundStyle(SPARCTheme.muted)
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(SPARCPressStyle())
-                .accessibilityIdentifier("settings.hideDeveloper")
+            sectionLabel("Developer")
+            NavigationLink { VirtualCarSettingsView(preserveConnectionMode: true) } label: {
+                menuRow(symbol: "slider.horizontal.3", title: "Developer settings", subtitle: "Virtual car and plug")
             }
-            .background(SPARCTheme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color(red: 0x2E / 255, green: 0x3A / 255, blue: 0x33 / 255),
-                              style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
-        }
-    }
-
-    private func developerLabel(_ title: String, _ subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).sparcFont(15, weight: .semibold)
-            Text(subtitle).sparcFont(12.5).foregroundStyle(SPARCTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            .buttonStyle(SPARCPressStyle())
+            .accessibilityIdentifier("settings.developer")
+            .sparcSurface(radius: 22)
         }
     }
 
@@ -1138,71 +1160,307 @@ struct SettingsView: View {
     private var footer: some View {
         VStack(spacing: 4) {
             Text("SPARC").sparcFont(15, weight: .bold).tracking(0.3)
-            Button(action: tapVersion) {
-                Text(versionText).sparcFont(13).foregroundStyle(SPARCTheme.tertiary)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            Text(versionText).sparcFont(13).foregroundStyle(SPARCTheme.tertiary)
+                .padding(.horizontal, 16).frame(minHeight: 44)
             .accessibilityLabel(versionText.replacingOccurrences(of: " (", with: ", build ").replacingOccurrences(of: ")", with: ""))
             .accessibilityIdentifier("settings.version")
-            Text("Times in \(SPARCFormat.zone.identifier)").sparcFont(11.5)
-                .foregroundStyle(Color(white: 0.48))
         }
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
     }
 
-    private func tapVersion() {
-        if showsDeveloper { toast("Developer options are already on"); return }
-        versionTaps += 1
-        tapReset?.cancel()
-        tapReset = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled else { return }
-            versionTaps = 0
+
+}
+
+private struct ConnectionSetupContext: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if store.connectionsIsStale {
+                Label("Last saved · connect to edit", systemImage: "wifi.slash")
+                    .sparcFont(13).foregroundStyle(SPARCTheme.warning)
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 16)
+    }
+}
+
+private struct ConnectionSetupError: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        if let error = store.errorMessage {
+            Text(error).sparcFont(13).foregroundStyle(SPARCTheme.dangerText)
+                .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
         }
-        if versionTaps >= tapsNeeded {
-            tapReset?.cancel()
-            versionTaps = 0
-            withAnimation(SPARCMotion.calm(SPARCMotion.quick, reduceMotion)) { developerUnlocked = true }
-            toast("Developer options unlocked")
-        } else if versionTaps >= 3 {
-            let left = tapsNeeded - versionTaps
-            toast("\(left) more \(left == 1 ? "tap" : "taps") to developer options")
+    }
+}
+
+private struct VirtualCarSettingsView: View {
+    @EnvironmentObject private var store: AppStore
+    var preserveConnectionMode = false
+    @State private var model: VirtualVehicleModel = .cybertruck
+    @State private var batteryPercent: Double?
+    @State private var batteryEdited = false
+    @State private var plugEdited = false
+    @State private var pluggedIn = false
+    @State private var original: ControllerConnections.Virtual?
+    @State private var edited = false
+    @State private var newerData = false
+    @State private var saving = false
+    @State private var saved = false
+    private var battery: Binding<Double> {
+        Binding(get: { batteryPercent ?? 0 }, set: { batteryPercent = $0; batteryEdited = true; edited = true; saved = false })
+    }
+    var body: some View {
+        InsightsSettingsPage(bottomInset: 40) {
+            insightsPageTitle("Virtual Car")
+            if let current = store.connections?.virtual {
+                Text("\(store.connectionsIsStale ? "Last recorded" : "Controller now"): \(current.model.title), \(SPARCFormat.decimal(current.batteryPercent))% · \(current.pluggedIn ? "plugged in" : "unplugged")")
+                    .sparcFont(14, weight: .semibold).foregroundStyle(SPARCTheme.spark).padding(.top, 16)
+                VStack(alignment: .leading, spacing: 20) {
+                    Picker("Vehicle model", selection: Binding(get: { model }, set: { model = $0; edited = true; saved = false })) {
+                        ForEach(VirtualVehicleModel.allCases) { Text($0.title).tag($0) }
+                    }.pickerStyle(.segmented).accessibilityIdentifier("virtual.model")
+                    if batteryPercent != nil {
+                        HStack {
+                            Text("Current battery")
+                            Spacer(minLength: 12)
+                            TextField("Percentage", value: battery, format: .number.precision(.fractionLength(0...2)))
+                                .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(width: 85)
+                                .accessibilityIdentifier("virtual.batteryPercent")
+                            Text("%")
+                        }
+                        Slider(value: battery, in: 0...100, step: 0.1).tint(SPARCTheme.spark)
+                            .accessibilityLabel("Virtual battery percentage")
+                        Toggle("Plugged in", isOn: Binding(get: { pluggedIn }, set: { pluggedIn = $0; plugEdited = true; edited = true; saved = false }))
+                            .tint(SPARCTheme.spark).accessibilityIdentifier("virtual.pluggedIn")
+                    }
+                    if newerData {
+                        Text("Car state changed. Your edits are kept.").foregroundStyle(SPARCTheme.warning)
+                        Button("Reload current car state") { load() }.foregroundStyle(SPARCTheme.spark).frame(minHeight: 44)
+                    }
+                    SPARCActionButton(title: saved ? "Virtual setup saved" : "Save virtual setup", symbol: "checkmark", kind: .primary, height: 52, busy: store.busy) {
+                        guard let settings = store.connections else { return }
+                        let update = ConnectionSettingsUpdate(mode: preserveConnectionMode ? settings.mode : .virtual,
+                            virtual: .init(model: model, batteryPercent: batteryEdited ? batteryPercent : nil, pluggedIn: plugEdited ? pluggedIn : nil), expectedRevision: settings.revision)
+                        saving = true
+                        Task {
+                            await store.saveConnectionSettings(update)
+                            saving = false; saved = store.errorMessage == nil
+                            if saved { load() }
+                        }
+                    }.accessibilityIdentifier("virtual.save")
+                }.sparcFont(14).padding(16).sparcSurface(radius: 22).padding(.top, 16)
+                    .disabled(store.busy || store.connectionsIsStale)
+            } else {
+                Text("Connect to the Pi to edit.")
+                    .sparcFont(14).foregroundStyle(SPARCTheme.muted).padding(.top, 16)
+            }
+            ConnectionSetupError()
+        }.navigationBarTitleDisplayMode(.inline)
+        .onAppear { if original == nil { load() } }
+        .onChange(of: store.connections?.virtual) { _, value in
+            guard !saving else { return }
+            if !edited { load() } else if value != original { newerData = true }
         }
+        .task { await store.refresh() }
+    }
+    private func load() {
+        guard let state = store.connections?.virtual else { return }
+        original = state; model = state.model; batteryPercent = state.batteryPercent; pluggedIn = state.pluggedIn
+        edited = false; newerData = false; batteryEdited = false; plugEdited = false
+    }
+}
+
+private struct SmartPlugSettingsView: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var address = ""
+    @State private var password = ""
+    @State private var vehicleSource: VehicleDataSource = .virtual
+    @State private var originalAddress: String?
+    @State private var originalSource: VehicleDataSource?
+    @State private var edited = false
+    @State private var newerData = false
+    @State private var saving = false
+    @State private var requestedPower: Bool?
+    var body: some View {
+        InsightsSettingsPage(bottomInset: 40) {
+            HStack(spacing: 0) {
+                insightsPageTitle("Smart Plug")
+                SPARCInfoButton("About the smart plug") {
+                    Text("Shelly Plug US Gen4. Enter its local IP address or .local name. Saving checks the plug without switching its outlet.")
+                    Text("Follow virtual car switches the real outlet on while the virtual car charges and off when it stops.")
+                    Text("If enabled, enter the plug’s local password to verify it.")
+                }
+                Spacer(minLength: 0)
+            }
+            ConnectionSetupContext()
+            VStack(alignment: .leading, spacing: 18) {
+                TextField("Local IP address or .local name", text: Binding(get: { address }, set: { address = $0; edited = true }))
+                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityIdentifier("smartPlug.address")
+                SecureField("Local plug password (if enabled)", text: $password)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled().privacySensitive()
+                    .accessibilityIdentifier("smartPlug.password")
+                Picker("Vehicle data", selection: Binding(get: { vehicleSource }, set: { vehicleSource = $0; edited = true })) {
+                    ForEach(VehicleDataSource.allCases) { Text($0.title).tag($0) }
+                }.pickerStyle(.segmented).accessibilityIdentifier("smartPlug.vehicleSource")
+                if vehicleSource == .virtual {
+                    NavigationLink("Edit virtual car") { VirtualCarSettingsView(preserveConnectionMode: true) }
+                        .foregroundStyle(SPARCTheme.spark).frame(minHeight: 44)
+                } else if store.connections?.tesla.authorized != true {
+                    Text("Connect Tesla first (Settings › Tesla).").foregroundStyle(SPARCTheme.warning)
+                }
+                if newerData {
+                    Text("Plug changed on the Pi. Your edits are kept.").foregroundStyle(SPARCTheme.warning)
+                    Button("Reload current plug settings") { load() }.foregroundStyle(SPARCTheme.spark).frame(minHeight: 44)
+                }
+                SPARCActionButton(title: "Save and check plug", symbol: "powerplug", kind: .primary, height: 52, busy: store.busy) {
+                    guard let settings = store.connections else { return }
+                    let update = ConnectionSettingsUpdate(mode: .smartPlug,
+                        smartPlug: .init(address: address.trimmingCharacters(in: .whitespacesAndNewlines), vehicleSource: vehicleSource), expectedRevision: settings.revision)
+                    saving = true
+                    let checkPassword = password.isEmpty ? nil : password
+                    password = ""
+                    Task {
+                        await store.saveConnectionSettings(update)
+                        if store.errorMessage == nil { await store.checkSmartPlug(password: checkPassword) }
+                        saving = false
+                        if store.errorMessage == nil { load() }
+                    }
+                }.accessibilityIdentifier("smartPlug.connect")
+            }.sparcFont(14).padding(16).sparcSurface(radius: 22).padding(.top, 16)
+                .disabled(store.busy || store.connectionsIsStale)
+            if let plug = store.connections?.smartPlug {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(plug.verified == true ? "Connected" : plug.status.replacingOccurrences(of: "_", with: " ").capitalized,
+                          systemImage: plug.verified == true ? "checkmark.circle.fill" : "powerplug")
+                        .sparcFont(15, weight: .semibold)
+                        .foregroundStyle(plug.verified == true ? SPARCTheme.spark : SPARCTheme.muted)
+                    HStack {
+                        Text(plug.switchOn.map { $0 ? "Outlet on" : "Outlet off" } ?? "Outlet unavailable")
+                        Spacer()
+                        if let watts = plug.powerW { Text("\(SPARCFormat.decimal(watts)) W").monospacedDigit() }
+                    }
+                    if let date = plug.lastCheckedAt { Text("Checked \(SPARCFormat.ago(date).lowercased())").foregroundStyle(SPARCTheme.muted) }
+                    if let error = plug.error { Text(error).foregroundStyle(SPARCTheme.dangerText).fixedSize(horizontal: false, vertical: true) }
+                    if plug.verified == true, plug.followVirtual != nil, store.profileConnectionMode == .virtual, let settings = store.connections, let plugAddress = plug.address {
+                        Toggle(isOn: Binding(get: { plug.followVirtual == true }, set: { value in
+                            Task {
+                                await store.saveConnectionSettings(ConnectionSettingsUpdate(mode: settings.mode,
+                                    smartPlug: .init(address: plugAddress, vehicleSource: .virtual, followVirtual: value), expectedRevision: settings.revision))
+                            }
+                        })) {
+                            Text("Follow virtual car")
+                        }.tint(SPARCTheme.spark).frame(minHeight: 44)
+                            .disabled(store.busy || store.connectionsIsStale)
+                            .accessibilityIdentifier("smartPlug.followVirtual")
+                    }
+                    if plug.verified == true, plug.followVirtual == nil, store.profileConnectionMode == .virtual {
+                        Text("Update your Pi to enable virtual-car following.").foregroundStyle(SPARCTheme.warning)
+                    }
+                    if plug.verified == true, store.profileConnectionMode == .virtual, plug.followVirtual == true {
+                        Text("Following the virtual car").foregroundStyle(SPARCTheme.muted)
+                    } else {
+                        HStack {
+                            Button("Turn outlet on") { requestedPower = true }
+                            Spacer()
+                            Button("Turn outlet off") { requestedPower = false }
+                        }.foregroundStyle(SPARCTheme.spark).frame(minHeight: 44)
+                            .disabled(store.busy || store.connectionsIsStale || plug.verified != true)
+                    }
+                }.sparcFont(13).frame(maxWidth: .infinity, alignment: .leading).padding(16).sparcSurface(radius: 22).padding(.top, 16)
+            }
+            ConnectionSetupError()
+        }.navigationBarTitleDisplayMode(.inline)
+        .onAppear { if originalSource == nil { load() } }
+        .onChange(of: store.connections?.smartPlug) { _, value in
+            guard !saving else { return }
+            if !edited { load() }
+            else if value?.address != originalAddress || value?.vehicleSource != originalSource { newerData = true }
+        }
+        .confirmationDialog("Control the real Shelly outlet?", isPresented: Binding(get: { requestedPower != nil }, set: { if !$0 { requestedPower = nil } })) {
+            Button(requestedPower == true ? "Turn real outlet on" : "Turn real outlet off") {
+                guard let on = requestedPower else { return }; requestedPower = nil
+                Task { await store.setSmartPlugPower(on: on) }
+            }
+            Button("Cancel", role: .cancel) { requestedPower = nil }
+        } message: { Text("This switches the physical outlet.") }
+        .task { await store.refresh() }
+    }
+    private func load() {
+        guard let plug = store.connections?.smartPlug else { return }
+        address = plug.address ?? ""; vehicleSource = plug.vehicleSource
+        originalAddress = plug.address; originalSource = plug.vehicleSource; edited = false; newerData = false
+    }
+}
+
+private struct TeslaCarSettingsView: View {
+    var body: some View {
+        TeslaConnectionSetupView()
+            .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 // MARK: - Privacy
 
+/// Settings → Savings comparison: what "saved" is measured against.
+private struct SavingsComparisonView: View {
+    @AppStorage(SavingsComparison.storageKey) private var comparison: SavingsComparison = .fixedPlan
+    var body: some View {
+        InsightsSettingsPage(bottomInset: 40) {
+            insightsPageTitle("Savings comparison")
+            group("Compare SPARC with", [
+                ("Fixed-price plan", !comparison.isHourly, { comparison = .fixedPlan }),
+                ("Hourly pricing", comparison.isHourly, { if !comparison.isHourly { comparison = .hourlyAt6PM } })])
+            if comparison.isHourly {
+                group("Charging starts", [
+                    ("6 PM", comparison == .hourlyAt6PM, { comparison = .hourlyAt6PM }),
+                    ("At plug-in", comparison == .hourlyAtPlugIn, { comparison = .hourlyAtPlugIn })])
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .animation(.snappy, value: comparison)
+    }
+    private func group(_ title: String, _ items: [(String, Bool, () -> Void)]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title).sparcFont(12, weight: .semibold).tracking(1).textCase(.uppercase)
+                .foregroundStyle(SPARCTheme.tertiary)
+                .padding(.top, 22).padding(.bottom, 8).padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(items.indices, id: \.self) { index in
+                    if index > 0 { Rectangle().fill(Color(white: 0.11)).frame(height: 1) }
+                    Button(action: items[index].2) {
+                        HStack {
+                            Text(items[index].0).sparcFont(15, weight: .semibold)
+                            Spacer()
+                            if items[index].1 {
+                                Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(SPARCTheme.spark)
+                            }
+                        }
+                        .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 52).contentShape(Rectangle())
+                    }
+                    .buttonStyle(SPARCPressStyle()).foregroundStyle(.white)
+                    .accessibilityAddTraits(items[index].1 ? .isSelected : [])
+                    .accessibilityIdentifier("savingsComparison." + items[index].0)
+                }
+            }
+            .sparcSurface(radius: 22)
+        }
+    }
+}
+
 private struct PrivacyInformationView: View {
     var body: some View {
         InsightsSettingsPage(bottomInset: 40) {
             insightsPageTitle("Your home.\nYour data.")
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "house").font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(SPARCTheme.spark).accessibilityHidden(true)
-                Text("Charging schedules stay on your Raspberry Pi. The iPhone talks directly to your paired controller.")
-                    .sparcFont(14, weight: .semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SPARCTheme.spark.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(SPARCTheme.spark.opacity(0.28), lineWidth: 1))
-            .accessibilityElement(children: .combine)
-            .padding(.top, 16)
             VStack(alignment: .leading, spacing: 0) {
-                privacyItem("Bluetooth", "Find and securely pair your nearby Raspberry Pi. Access is requested when you tap Search for controllers.")
+                privacyItem("Bluetooth", "Find and pair your Pi.")
                 privacyDivider
-                privacyItem("Local network", "Reach your paired controller over your home Wi-Fi. Access is requested when you connect locally.")
+                privacyItem("Local network", "Reach your Pi over home Wi-Fi.")
                 privacyDivider
-                privacyItem("Pairing key", "Stored in the iPhone Keychain. Wi-Fi passwords are sent encrypted to the controller and aren't saved by this app.")
+                privacyItem("Pairing key", "Stored in the iPhone Keychain.")
                 privacyDivider
-                privacyItem("No account required", "This app has no cloud sign-in, analytics or calendar access.")
+                privacyItem("Optional Tesla account", "Credentials stay on your Pi.")
             }
             .sparcSurface(radius: 22)
             .padding(.top, 12)
@@ -1244,10 +1502,6 @@ struct ControllerStatusView: View {
     var body: some View {
         InsightsSettingsPage(bottomInset: 40) {
             insightsPageTitle("Status")
-            Text("Your Pi, its connections and its Wi-Fi.")
-                .sparcFont(14).foregroundStyle(SPARCTheme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
             if let paired = manager.savedController {
                 if let error = manager.statusError {
                     statusNote(error, symbol: "exclamationmark.circle", isError: true)
@@ -1258,12 +1512,12 @@ struct ControllerStatusView: View {
                 if paired.bluetoothPeripheralID != nil {
                     wifiCard.padding(.top, 20)
                 } else {
-                    statusNote("This iPhone reaches your Pi over your home network. Wi-Fi setup works with a Bluetooth pairing.", symbol: "network")
+                    statusNote("Wi-Fi setup needs a Bluetooth pairing.", symbol: "network")
                         .padding(.top, 12)
                 }
                 if !store.isDemo { chargingCard.padding(.top, 20) }
             } else {
-                statusNote("Connect your Raspberry Pi from Settings to see its status here.", symbol: "antenna.radiowaves.left.and.right")
+                statusNote("No Pi connected.", symbol: "antenna.radiowaves.left.and.right")
                     .padding(.top, 16)
             }
         }
@@ -1335,7 +1589,7 @@ struct ControllerStatusView: View {
         VStack(alignment: .leading, spacing: 0) {
             sectionHeader("Home controller", busy: manager.statusWorking)
             VStack(spacing: 0) {
-                statusRow("Controller", "SPARC \(paired.deviceID.prefix(4).uppercased())")
+                statusRow("Controller", paired.bluetoothName)
                 statusRow("Connection", connectionValue, dot: connectionDot)
                 statusRow("Bluetooth on Pi", status.map { $0.bluetooth ? "On" : "Off" } ?? "—")
                 statusRow("Running for", status.map { SPARCFormat.duration($0.uptimeSeconds / 60) } ?? "—")
@@ -1376,10 +1630,6 @@ struct ControllerStatusView: View {
                             Task { await manager.scanWiFi() }
                         }
                         .accessibilityIdentifier("status.changeWiFi")
-                    } else if wifi.connected {
-                        Text("To switch networks, restart your Pi, then set it up here within 10 minutes.")
-                            .sparcFont(12.5).foregroundStyle(SPARCTheme.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if let notice = manager.wifiNotice {
@@ -1395,10 +1645,10 @@ struct ControllerStatusView: View {
     }
 
     private var wifiSummary: String {
-        guard let status else { return manager.statusWorking ? "Checking your Pi…" : "Pull down to check your Pi." }
+        guard let status else { return manager.statusWorking ? "Checking your Pi…" : "Status unavailable." }
         guard let wifi = status.wifi else { return "This Pi keeps its own network settings." }
         if wifi.connected { return wifi.ssid.map { "Connected to \($0)." } ?? "Connected to your network." }
-        return "Your Pi isn't on Wi-Fi. Pick your network and enter its password. It travels to the Pi over your encrypted Bluetooth link."
+        return "Your Pi isn't on Wi-Fi."
     }
 
     private var canJoin: Bool {
@@ -1466,9 +1716,6 @@ struct ControllerStatusView: View {
             .disabled(!canJoin)
             .opacity(canJoin ? 1 : 0.45)
             .accessibilityIdentifier("status.joinWiFi")
-            Text("Use a WPA2/WPA3 personal network. If joining fails, your Pi goes back to its previous network.")
-                .sparcFont(11.5).foregroundStyle(SPARCTheme.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

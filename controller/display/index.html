@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>SPARC</title>
-<link rel="stylesheet" href="/display.css">
+<link rel="stylesheet" href="/display.css?v=ad37a2911fba">
 <script src="/display.js" defer></script>
+<script src="/qrcode.js" defer></script>
+<script src="/connections.js" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true" focusable="false">
@@ -30,11 +32,12 @@
 
 <div class="app" id="app" data-view="charge" data-state="loading">
   <header class="bar">
-    <button class="brand" type="button" id="brand" aria-label="SPARC"><span class="brand-mark"><svg class="i"><use href="#i-bolt"/></svg></span>SPARC</button>
+    <div class="brand" id="brand" aria-label="SPARC"><span class="brand-mark"><svg class="i"><use href="#i-bolt"/></svg></span>SPARC</div>
     <nav class="tabs" aria-label="Screens">
       <button class="tab is-active" type="button" data-go="charge"><svg class="i"><use href="#i-bolt"/></svg><span>Charge</span></button>
       <button class="tab" type="button" data-go="schedule"><svg class="i"><use href="#i-calendar"/></svg><span>Schedule</span></button>
-      <button class="tab" type="button" data-go="status"><svg class="i"><use href="#i-gauge"/></svg><span>Status</span></button>
+      <button class="tab" type="button" data-go="savings"><svg class="i"><use href="#i-leaf"/></svg><span>Savings</span></button>
+      <button class="tab" type="button" data-go="status"><svg class="i"><use href="#i-gauge"/></svg><span>Settings</span></button>
     </nav>
     <div class="bar-end">
       <span class="link" id="link"><span class="ping"></span><span id="link-label">Connecting</span></span>
@@ -44,6 +47,14 @@
 
   <main class="views">
     <section class="view view-charge" id="view-charge" aria-label="Charge">
+      <div class="card tesla-manual" id="tesla-charge" hidden>
+        <h1 id="tesla-live-name">Tesla</h1>
+        <p class="sub" id="tesla-live-status">Refresh to read your car.</p>
+        <p class="soc num" id="tesla-live-battery">—</p>
+        <p class="caption num" id="tesla-live-power">—</p>
+        <div class="save-row"><button class="btn cta" type="button" data-tesla-command="charge_start">Start charging</button><button class="btn" type="button" data-tesla-command="charge_stop">Stop charging</button><button class="btn" type="button" data-tesla-refresh>Refresh car</button><button class="btn" type="button" data-connection-mode="tesla">Tesla settings</button></div>
+        <p class="hint" id="tesla-live-message" role="status"></p>
+      </div>
       <div class="hero">
         <div class="hero-head">
           <span class="chip" id="chip"><span class="ping"></span><span id="chip-label">Connecting</span></span>
@@ -54,7 +65,8 @@
           <div class="truck">
             <div class="ground" aria-hidden="true"></div>
             <div class="zaps" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-            <img src="/truck.webp" alt="Your Cybertruck" draggable="false">
+            <img id="vehicle-image" src="/truck.webp" alt="Your Cybertruck" draggable="false">
+            <svg id="vehicle-generic" class="vehicle-generic" viewBox="0 0 400 240" role="img" aria-label="Virtual car" hidden><path d="m74 134 37-58q8-13 27-13h125q20 0 29 16l34 55 31 17v42H44v-42z" fill="#b7c1bc" stroke="#e8efea" stroke-width="4"/><path d="m114 128 29-44h114l27 44z" fill="#18342b"/><path d="M205 84v44M74 151h252" stroke="#e2eae4" stroke-width="4"/><circle cx="107" cy="191" r="27" fill="#101713" stroke="#d1dcd5" stroke-width="6"/><circle cx="293" cy="191" r="27" fill="#101713" stroke="#d1dcd5" stroke-width="6"/><text id="vehicle-generic-name" x="200" y="35" fill="#e2eae4" font-size="24" text-anchor="middle">Model 3</text></svg>
             <svg class="lightbar" viewBox="0 0 1536 1024" aria-hidden="true">
               <defs><filter id="lb-glow" x="-10%" y="-300%" width="120%" height="700%"><feGaussianBlur stdDeviation="10"/></filter></defs>
               <polyline class="lb-glow" pathLength="100" points="946,481 1094,500 1260,502.5 1472,503 1511,490" filter="url(#lb-glow)"/>
@@ -93,7 +105,7 @@
         <div class="tiles">
           <div class="tile"><p class="label">Added</p><p class="v num"><span id="added">—</span><small> kWh</small></p></div>
           <div class="tile"><p class="label" id="left-label">To target</p><p class="v num" id="left">—</p></div>
-          <div class="tile"><p class="label">Cost so far</p><p class="v num" id="cost">—</p></div>
+          <div class="tile"><p class="label">Energy cost estimate</p><p class="v num" id="cost">—</p></div>
         </div>
       </div>
 
@@ -104,6 +116,58 @@
     </section>
 
     <section class="view view-schedule" id="view-schedule" aria-label="Schedule" hidden>
+      <div class="card sched campaign-card" id="campaign-card" hidden>
+        <div class="sched-head">
+          <div><h2>Nightly routine</h2><p class="sub" id="campaign-summary">Your saved routine · Chicago time</p></div>
+          <button class="switch" type="button" id="campaign-enabled" role="switch" aria-checked="true" aria-label="Nightly routine enabled"><span></span></button>
+        </div>
+        <p class="caption campaign-current" id="campaign-current">&nbsp;</p>
+        <div class="campaign-fields">
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-start-less" aria-label="Start 15 minutes earlier">−</button><div class="val"><span class="cap">Charging allowed from</span><span class="num" id="campaign-start">—</span></div><button class="round" type="button" id="campaign-start-more" aria-label="Start 15 minutes later">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-ready-less" aria-label="Ready 15 minutes earlier">−</button><div class="val"><span class="cap">Ready by</span><span class="num" id="campaign-ready">—</span></div><button class="round" type="button" id="campaign-ready-more" aria-label="Ready 15 minutes later">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-target-less" aria-label="Decrease routine target battery">−</button><div class="val"><span class="cap">Target battery</span><span class="num" id="campaign-target">—</span></div><button class="round" type="button" id="campaign-target-more" aria-label="Increase routine target battery">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-initial-less" aria-label="Decrease routine starting battery">−</button><div class="val"><span class="cap">Starting test battery</span><span class="num" id="campaign-initial">—</span></div><button class="round" type="button" id="campaign-initial-more" aria-label="Increase routine starting battery">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-date-less" aria-label="First night one day earlier">−</button><div class="val"><span class="cap">First night</span><span class="num" id="campaign-date">—</span></div><button class="round" type="button" id="campaign-date-more" aria-label="First night one day later">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-nights-less" aria-label="One fewer night">−</button><div class="val"><span class="cap">Number of nights</span><span class="num" id="campaign-nights">—</span></div><button class="round" type="button" id="campaign-nights-more" aria-label="One more night">+</button></div>
+          <div class="stepper night-field"><button class="round" type="button" id="campaign-sleep-less" aria-label="Decrease routine screen timeout">−</button><div class="val"><span class="cap">Screen off after</span><span class="num" id="campaign-sleep">—</span></div><button class="round" type="button" id="campaign-sleep-more" aria-label="Increase routine screen timeout">+</button></div>
+          <div class="routine-end"><p class="label">Last departure</p><p class="num" id="campaign-end">—</p></div>
+        </div>
+        <div class="save-row"><button class="btn cta" type="button" id="campaign-save"><svg class="i"><use href="#i-check"/></svg><span class="txt">Save routine</span></button><button class="btn small" type="button" id="campaign-undo" hidden>Undo</button></div>
+        <p class="hint" id="campaign-hint"></p>
+      </div>
+      <div class="card sched night-card" id="night-card" hidden>
+        <div class="sched-head"><div><h2>Current night</h2><p class="sub" id="night-summary">Your saved plan · Chicago time</p></div></div>
+        <div class="night-fields">
+          <div class="stepper night-field">
+            <button class="round" type="button" id="night-start-less" aria-label="Decrease start charging"><svg class="i"><use href="#i-minus"/></svg></button>
+            <div class="val"><span class="cap">Charging allowed from</span><span class="num" id="night-start">—</span></div>
+            <button class="round" type="button" id="night-start-more" aria-label="Increase start charging"><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="stepper night-field">
+            <button class="round" type="button" id="night-ready-less" aria-label="Decrease ready by"><svg class="i"><use href="#i-minus"/></svg></button>
+            <div class="val"><span class="cap">Ready by</span><span class="num" id="night-ready">—</span></div>
+            <button class="round" type="button" id="night-ready-more" aria-label="Increase ready by"><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="stepper night-field">
+            <button class="round" type="button" id="night-target-less" aria-label="Decrease target battery"><svg class="i"><use href="#i-minus"/></svg></button>
+            <div class="val"><span class="cap">Target battery</span><span class="num" id="night-target">—</span></div>
+            <button class="round" type="button" id="night-target-more" aria-label="Increase target battery"><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="stepper night-field">
+            <button class="round" type="button" id="night-initial-less" aria-label="Decrease starting test battery"><svg class="i"><use href="#i-minus"/></svg></button>
+            <div class="val"><span class="cap">Starting test battery</span><span class="num" id="night-initial">—</span></div>
+            <button class="round" type="button" id="night-initial-more" aria-label="Increase starting test battery"><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="stepper night-field">
+            <button class="round" type="button" id="night-sleep-less" aria-label="Decrease screen sleeps after"><svg class="i"><use href="#i-minus"/></svg></button>
+            <div class="val"><span class="cap">Screen sleeps after</span><span class="num" id="night-sleep">—</span></div>
+            <button class="round" type="button" id="night-sleep-more" aria-label="Increase screen sleeps after"><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="night-day"><p class="caption">Start day</p><div class="seg" id="night-day"><button type="button" data-day="0">Today</button><button type="button" data-day="1">Tomorrow</button></div></div>
+        </div>
+        <div class="save-row"><button class="btn cta" type="button" id="night-save"><svg class="i"><use href="#i-check"/></svg><span class="txt">Save changes</span></button><button class="btn small" type="button" id="night-undo">Undo</button></div>
+        <p class="hint" id="night-hint"></p>
+      </div>
       <div class="card sched" id="trip-card">
         <div class="sched-head">
           <div><h2>Next trip</h2><p class="sub" id="trip-sub">Just once. Your routine stays.</p></div>
@@ -172,7 +236,56 @@
       </div>
     </section>
 
-    <section class="view view-status" id="view-status" aria-label="Status" hidden>
+    <section class="view view-savings" id="view-savings" aria-label="Savings" hidden>
+      <div class="card combined-savings" id="combined-savings">
+        <div id="combined-results" aria-live="polite"></div>
+      </div>
+      <details class="card"><summary>History</summary>
+      <div class="savings-heading"><div><h1>This week</h1><p class="sub" id="savings-range">Monday to Sunday · Chicago time</p></div><button class="btn small" type="button" id="history-refresh">Refresh</button></div>
+      <div class="savings-totals">
+        <div class="tile savings-total saving-total" id="savings-total-card"><p class="label" id="savings-label">Savings this week</p><p class="num total-value" id="savings-percent">—</p><p class="caption" id="savings-amount">Waiting for recorded prices</p></div>
+        <div class="tile savings-total"><p class="label">Energy charged</p><p class="num total-value"><span id="savings-energy">—</span><small> kWh</small></p></div>
+        <div class="tile savings-total"><p class="label" id="savings-cost-label">Cost this week</p><p class="num total-value" id="savings-cost">—</p></div>
+      </div>
+      <div class="tile daily-savings-card">
+        <div class="section-heading"><h2>Savings by night</h2></div>
+        <div class="daily-savings" id="daily-savings" aria-label="Daily savings percentages"></div>
+      </div>
+      <div class="tile energy-card">
+        <div class="section-heading"><h2>Energy by day</h2></div>
+        <div class="energy-chart" id="energy-chart" aria-label="Daily charged energy"></div>
+        <p class="day-detail num" id="day-detail">Your recorded charging will appear here.</p>
+      </div>
+      <button class="tile routine-preview" type="button" id="savings-edit-routine"><span><span class="label">Your routine</span><span class="routine-preview-text" id="savings-routine">Loading saved routine…</span></span><span class="routine-edit-label">Edit routine <span aria-hidden="true">↗</span></span></button>
+      <div class="history-heading section-heading"><div><h2>Charging history</h2><p class="caption" id="history-update"></p></div><span class="history-count num" id="history-count"></span></div>
+      <div class="session-list" id="session-list" aria-live="polite"><p class="history-empty">Loading charging history…</p></div>
+      <button class="btn small history-more" type="button" id="history-more" hidden>Load earlier sessions</button>
+      <div class="savings-note"><p id="history-price-note">Electricity supply only · real ComEd prices · simulated car.</p></div>
+      </details>
+    </section>
+
+    <section class="view view-status" id="view-status" aria-label="Settings" hidden>
+      <div class="tile connection-choices">
+        <p class="label">Connections</p>
+        <p class="caption" id="connection-current">Current charging: Virtual Car</p>
+        <div class="connection-choice-grid">
+          <button type="button" class="btn" data-connection-mode="smart_plug"><svg class="i"><use href="#i-plug"/></svg>Smart Plug</button>
+          <button type="button" class="btn" data-connection-mode="tesla">Tesla Car</button>
+          <button type="button" class="btn" data-connection-mode="virtual">Virtual Car</button>
+        </div>
+        <p class="caption" id="connection-summary">Loading shared connection settings…</p>
+      </div>
+      <button class="tile settings-dev-link" type="button" id="settings-dev">
+        <span class="label"><svg class="i"><use href="#i-chip"/></svg>Developer</span>
+        <span class="dev-link-title">Car controls <span aria-hidden="true">↗</span></span>
+        <span class="caption" id="settings-car-state">Loading current car state…</span>
+      </button>
+      <div class="tile settings-shared">
+        <p class="label">Shared controller <span class="num" id="st-clients">— apps remembered</span></p>
+        <p class="shared-command" id="st-command">No saved command recorded</p>
+        <p class="caption" id="st-command-client">&nbsp;</p>
+      </div>
+      <button class="tile settings-dev-link" type="button" id="settings-history"><span class="label">Charging</span><span class="dev-link-title">Charging history <span aria-hidden="true">↗</span></span></button>
       <div class="tile stat">
         <p class="label"><svg class="i"><use href="#i-chip"/></svg>SPARC <span id="st-id"></span></p>
         <p class="v num" id="st-online">Online</p>
@@ -196,16 +309,16 @@
       <div class="tile stat">
         <p class="label"><svg class="i"><use href="#i-bolt"/></svg>Rate now</p>
         <p class="v num" id="st-rate">—</p>
-        <div class="rate-bars" id="rate-bars" aria-hidden="true"></div>
+        <p class="caption" id="st-rate-sub">ComEd price unavailable</p>
       </div>
       <div class="tile stat">
-        <p class="label"><svg class="i"><use href="#i-leaf"/></svg>Saved this charge</p>
+        <p class="label"><svg class="i"><use href="#i-leaf"/></svg><span id="st-saved-label">Latest recorded saving</span></p>
         <p class="v num green" id="st-saved">—</p>
-        <p class="caption">vs. charging right away</p>
+        <p class="caption" id="st-saved-sub">No comparison recorded</p>
       </div>
       <div class="tile plan">
         <div class="plan-head">
-          <p class="title"><svg class="i"><use href="#i-moon"/></svg>Tonight's plan</p>
+          <p class="title"><svg class="i"><use href="#i-moon"/></svg>Tonight's price-based plan</p>
           <p class="plan-window num" id="plan-window">—</p>
         </div>
         <div class="plan-track" id="plan-track" aria-hidden="true"></div>
@@ -229,18 +342,65 @@
   </div>
 
   <div class="dev" id="dev" hidden>
-    <div class="card dev-card" role="dialog" aria-label="Developer">
+    <div class="card dev-card" role="dialog" aria-modal="true" aria-labelledby="dev-title">
       <div class="sched-head">
-        <div><h2>Developer</h2><p class="sub num" id="dev-info">&nbsp;</p></div>
-        <button class="btn small" type="button" id="dev-close">Done</button>
+        <div><h2 id="dev-title">Developer car controls</h2><p class="sub num" id="dev-info">Current simulated car state</p></div>
+        <button class="btn small" type="button" id="dev-close">Close</button>
       </div>
-      <div class="dev-row">
-        <div>
-          <p class="dev-title">Demo car</p>
-          <p class="caption">On: a car plugged in at 40% that charges and follows your schedules. Turning it back on starts again at 40%.</p>
+      <div class="dev-battery">
+        <p class="label">Battery percentage</p>
+        <div class="stepper">
+          <button class="round" type="button" id="dev-battery-less" aria-label="Decrease current battery by one percent">−</button>
+          <p class="dev-battery-value num" id="dev-battery-value">—</p>
+          <button class="round" type="button" id="dev-battery-more" aria-label="Increase current battery by one percent">+</button>
         </div>
-        <button class="switch" type="button" id="dev-demo" role="switch" aria-checked="false" aria-label="Demo car"><span></span></button>
+        <input type="range" id="dev-battery-slider" min="0" max="100" step="1" value="0" aria-label="Current battery percentage">
       </div>
+      <button class="dev-plug-row" type="button" id="dev-plugged" role="switch" aria-checked="false"><span><span class="dev-title">Plugged in</span><span class="caption" id="dev-plugged-caption">Current connection state</span></span><span class="dev-plug-toggle" aria-hidden="true"><span></span></span></button>
+      <p class="dev-live num" id="dev-live">Loading live car state…</p>
+      <div class="save-row"><button class="btn cta" type="button" id="dev-apply" disabled><svg class="i"><use href="#i-check"/></svg><span class="txt">Apply car state</span></button><button class="btn small" type="button" id="dev-load-live">Load live</button></div>
+      <p class="hint" id="dev-hint"></p>
+    </div>
+  </div>
+
+  <div class="dev" id="connection-dialog" hidden>
+    <div class="card dev-card connection-card" role="dialog" aria-modal="true" aria-labelledby="connection-title">
+      <div class="sched-head"><div><h2 id="connection-title">Connections</h2><p class="sub">Shared with your paired apps</p></div><button class="btn small" type="button" id="connection-close">Close</button></div>
+      <p class="connection-active" id="connection-active">Current charging: Virtual Car · overnight test continues</p>
+      <div class="seg" id="connection-modes"><button type="button" data-mode="smart_plug">Smart Plug</button><button type="button" data-mode="tesla">Tesla Car</button><button type="button" data-mode="virtual">Virtual Car</button></div>
+      <section id="connection-plug-section" hidden>
+        <h3>Shelly Plug US Gen4</h3>
+        <label class="connection-field">Plug's local IP address<input id="connection-plug-address" type="text" inputmode="decimal" placeholder="192.168.1.50" maxlength="64" autocomplete="off" spellcheck="false"></label>
+        <label class="connection-field">Car battery data<select id="connection-plug-source"><option value="virtual">Virtual Car</option><option value="tesla">Tesla Car</option></select></label>
+        <label class="connection-field">Local plug password, if enabled<input id="connection-plug-password" type="password" maxlength="256" autocomplete="off"></label>
+        <p class="caption" id="connection-plug-status">Not connected</p>
+        <div class="save-row"><button class="btn" type="button" id="connection-plug-check">Connect / refresh plug</button><button class="btn small" type="button" id="connection-plug-on" disabled>Outlet On</button><button class="btn small" type="button" id="connection-plug-off" disabled>Outlet Off</button></div>
+      </section>
+      <section id="connection-virtual-section" hidden>
+        <h3>Virtual Car</h3>
+        <label class="connection-field">Vehicle appearance<select id="connection-virtual-model"><option value="cybertruck">Cybertruck</option><option value="model_x">Model X</option><option value="model_3">Model 3</option></select></label>
+        <label class="connection-field">Current battery percentage<input id="connection-virtual-battery" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label>
+        <label class="connection-toggle"><input id="connection-virtual-plugged" type="checkbox">Plugged in</label>
+        <p class="caption" id="connection-virtual-live">Loading current battery…</p>
+      </section>
+      <section id="connection-tesla-section" hidden>
+        <h3>Tesla Car</h3><p class="caption" id="connection-tesla-status">Loading connection status…</p>
+        <p class="caption" id="connection-tesla-charge"></p>
+        <div class="save-row"><button class="btn" type="button" id="connection-tesla-authorize">Connect Tesla</button><button class="btn small" type="button" id="connection-tesla-refresh">Refresh vehicles</button><button class="btn small" type="button" id="connection-tesla-disconnect">Disconnect from Pi</button></div>
+        <label class="connection-field">Authorized vehicle<select id="connection-tesla-vehicle"><option value="">Choose a vehicle</option></select></label><button class="btn small" type="button" id="connection-tesla-select">Use selected vehicle</button>
+        <div id="connection-tesla-link-box" hidden><p class="caption">Scan with your iPhone.</p><canvas id="connection-tesla-qr" width="320" height="320" aria-label="Tesla connection QR code"></canvas><textarea id="connection-tesla-link" readonly rows="3" aria-label="Tesla authorization link"></textarea></div>
+        <div id="connection-tesla-return-box" hidden>
+          <p class="caption">If the app can't finish, paste the return page address here.</p>
+          <label class="connection-field">Tesla return page address<textarea id="connection-tesla-return" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Tesla return page address"></textarea></label>
+          <button class="btn" type="button" id="connection-tesla-complete">Finish Tesla connection</button>
+        </div>
+        <p class="caption" id="connection-tesla-key-hint"></p>
+        <div class="save-row"><button class="btn" type="button" id="connection-tesla-key">Pair SPARC key</button><button class="btn cta" type="button" id="connection-tesla-activate">Use Tesla for charging</button></div>
+        <label class="connection-field">Tesla charge limit (%)<input id="connection-tesla-limit" type="number" min="50" max="100" step="1" value="80"></label>
+        <div class="save-row"><button class="btn" type="button" data-tesla-command="set_charge_limit">Set charge limit</button><button class="btn" type="button" data-tesla-command="charge_start">Start charging</button><button class="btn" type="button" data-tesla-command="charge_stop">Stop charging</button></div>
+      </section>
+      <div class="save-row"><button class="btn cta" type="button" id="connection-save">Save setup</button><button class="btn small" type="button" id="connection-reload">Reload current setup</button><button class="btn small" type="button" id="connection-virtual-activate">Use Virtual Car</button></div>
+      <p class="hint" id="connection-message" role="status"></p>
     </div>
   </div>
 
@@ -258,5 +418,6 @@
 
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 </div>
+  <script src="/combined-savings.js?v=553f0f2fcf14" defer></script>
 </body>
 </html>

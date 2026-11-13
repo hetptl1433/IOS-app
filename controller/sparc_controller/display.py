@@ -8,15 +8,20 @@ import ipaddress
 import json
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from .app_test import CHICAGO, local_instant
 from .network import pi_temperature
 from .protocol import compact_json
+from .pricing import ComEdPricing
 
 PAGES = Path(__file__).resolve().parents[1] / "display"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
           "/display.css": ("display.css", "text/css; charset=utf-8"),
           "/display.js": ("display.js", "text/javascript; charset=utf-8"),
+          "/combined-savings.js": ("combined-savings.js", "text/javascript; charset=utf-8"),
+          "/connections.js": ("connections.js", "text/javascript; charset=utf-8"),
+          "/qrcode.js": ("qrcode.js", "text/javascript; charset=utf-8"),
           "/truck.webp": ("truck.webp", "image/webp")}
 COMMANDS = ("charge_now", "pause", "resume", "end")
 MAX_BODY = 4096
@@ -37,10 +42,11 @@ def loopback(address):
 
 
 class DisplayTransport:
-    def __init__(self, service, port):
+    def __init__(self, service, port, pricing=None):
         self.service, self.port = service, port
         self.active = 0
         self.files = {}
+        self.pricing = pricing if pricing is not None else (getattr(service, "pricing", None) or ComEdPricing())
 
     @property
     def hosts(self):
@@ -49,6 +55,7 @@ class DisplayTransport:
     def state(self):
         state = self.service.display_state()
         state["controller"]["temperatureC"] = pi_temperature()
+        state["pricing"] = self.pricing.state()
         return {"ok": True, **state}
 
     async def handle(self, reader, writer):
@@ -58,7 +65,7 @@ class DisplayTransport:
             return
         self.active += 1
         try:
-            status, content_type, body = await asyncio.wait_for(self.request(reader), 10)
+            status, content_type, body = await asyncio.wait_for(self.request(reader), 45)
             cache = "no-cache" if content_type.startswith(("text/", "image/")) else "no-store"
             writer.write(f"HTTP/1.1 {status} {REASONS[status]}\r\nContent-Type: {content_type}\r\n"
                          f"Content-Length: {len(body)}\r\nCache-Control: {cache}\r\nConnection: close\r\n"
@@ -78,7 +85,7 @@ class DisplayTransport:
         return status, "application/json", compact_json(value)
 
     async def request(self, reader):
-        raw = await reader.readuntil(b"\r\n\r\n")
+        raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 10)
         lines = raw.decode("ascii").split("\r\n")
         first = lines[0].split(" ")
         if len(first) != 3 or first[2] != "HTTP/1.1":
@@ -100,12 +107,36 @@ class DisplayTransport:
         if method == "GET":
             if path == "/healthz": return self.reply(200, {"ok": True})
             if path == "/api/state": return self.reply(200, self.state())
+            if path == "/api/savings":
+                try:
+                    params=parse_qs(urlsplit(target).query,strict_parsing=True)
+                    if set(params)-{"kind"} or any(len(v)!=1 for v in params.values()):raise ValueError("Choose one savings view.")
+                    return self.reply(200,await self.service.savings_view({k:v[0] for k,v in params.items()}))
+                except ValueError as exc:
+                    return self.reply(400,{"ok":False,"error":str(exc)})
+            if path == "/api/rates":
+                try:
+                    params = parse_qs(urlsplit(target).query, strict_parsing=True)
+                    if set(params)-{"day"} or any(len(v)!=1 for v in params.values()):
+                        raise ValueError("Choose one day for rate history.")
+                    return self.reply(200, await self.service.dispatch("get_rates", {k:v[0] for k,v in params.items()}, "display"))
+                except ValueError as exc:
+                    return self.reply(400, {"ok":False,"error":str(exc)})
+            if path == "/api/history":
+                try:
+                    params = parse_qs(urlsplit(target).query, strict_parsing=True)
+                    if set(params)-{"cursor", "limit"} or any(len(v)!=1 for v in params.values()):
+                        raise ValueError("Choose a valid history page.")
+                    body = {key:int(value[0]) for key,value in params.items()}
+                    return self.reply(200, await self.service.history_view(body))
+                except ValueError:
+                    return self.reply(400, {"ok":False, "error":"Choose a valid history page."})
             if path in STATIC:
                 name, content_type = STATIC[path]
                 if name not in self.files: self.files[name] = (PAGES / name).read_bytes()
                 return 200, content_type, self.files[name]
             return self.reply(404, {"ok": False, "error": "Not found."})
-        if method != "POST" or path not in ("/api/command", "/api/weekly", "/api/trip", "/api/demo"):
+        if method != "POST" or path not in ("/api/command", "/api/weekly", "/api/trip", "/api/demo", "/api/overnight", "/api/campaign", "/api/developer", "/api/connections", "/api/connections/activate", "/api/connections/plug/check", "/api/connections/plug/power", "/api/connections/tesla/authorize", "/api/connections/tesla/complete", "/api/connections/tesla/refresh", "/api/connections/tesla/select", "/api/connections/tesla/disconnect", "/api/connections/tesla/command"):
             return self.reply(405 if path.startswith("/api/") else 404, {"ok": False, "error": "Not found."})
         if headers.get("origin", f"http://127.0.0.1:{self.port}") not in {"http://" + host for host in self.hosts} \
                 or headers.get("sec-fetch-site", "same-origin") not in ("same-origin", "none"):
@@ -116,20 +147,34 @@ class DisplayTransport:
         if not length.isascii() or not length.isdigit() or not 0 < int(length) <= MAX_BODY:
             return self.reply(413, {"ok": False, "error": "Request too large."})
         try:
-            body = json.loads(await reader.readexactly(int(length)))
+            body = json.loads(await asyncio.wait_for(reader.readexactly(int(length)), 10))
             if not isinstance(body, dict): raise ValueError("Send a JSON object.")
-            await self.post(path, body)
+            result = await self.post(path, body)
         except ValueError as exc:
             return self.reply(400, {"ok": False, "error": str(exc) if not isinstance(exc, json.JSONDecodeError) else "Send JSON."})
         except Exception:
             return self.reply(500, {"ok": False, "error": "SPARC could not complete that. Try again."})
-        return self.reply(200, self.state())
+        return self.reply(200, {**self.state(), **({'actionResult':result} if result is not None else {})})
 
     async def post(self, path, body):
+        connection_actions = {'/api/connections':'set_connection_settings',
+            '/api/connections/activate':'activate_connection', '/api/connections/tesla/command':'tesla_command',
+            '/api/connections/plug/check':'check_smart_plug', '/api/connections/plug/power':'set_smart_plug_power',
+            '/api/connections/tesla/authorize':'tesla_authorize', '/api/connections/tesla/refresh':'tesla_refresh',
+            '/api/connections/tesla/complete':'tesla_complete_authorization',
+            '/api/connections/tesla/select':'tesla_select_vehicle', '/api/connections/tesla/disconnect':'tesla_disconnect'}
+        if path in connection_actions:
+            return await self.service.dispatch(connection_actions[path], body, 'display')
         if path == "/api/command":
             if body.get("command") not in COMMANDS:
                 raise ValueError("Choose Charge now, Pause, Resume or End.")
-            await self.service.dispatch(body["command"], {}, "display")
+            return await self.service.dispatch(body["command"], {}, "display")
+        elif path == "/api/overnight":
+            await self.service.dispatch("set_overnight", body, "display")
+        elif path == "/api/campaign":
+            await self.service.dispatch("set_campaign", body, "display")
+        elif path == "/api/developer":
+            await self.service.dispatch("set_virtual_car_state", body, "display")
         elif path == "/api/weekly":
             await self.service.dispatch("set_weekly", body, "display")
         elif path == "/api/demo":
@@ -152,5 +197,11 @@ class DisplayTransport:
 async def run_display(service, port):
     transport = DisplayTransport(service, port)
     server = await asyncio.start_server(transport.handle, "127.0.0.1", port, limit=8192)
-    async with server:
-        await server.serve_forever()
+    pricing_task = None if getattr(service, "pricing", None) is not None else asyncio.create_task(transport.pricing.run())
+    try:
+        async with server:
+            await server.serve_forever()
+    finally:
+        if pricing_task is not None:
+            pricing_task.cancel()
+            await asyncio.gather(pricing_task, return_exceptions=True)

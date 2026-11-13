@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/hetptl1433/sparc",
+  "commit": "28d838d0d68ee175b56861622dbd0847a9cdced1",
+  "files": {
+    "clock.py": "204736823f0e9af9e2eea02797cb3b510a983f2dd2e20f5751b63137fd1c44b4",
+    "planner.py": "c39da5d6df41771b95cae3a3ee0608b7713d404df3a1e78b2a560ed9302fb040",
+    "strategies.py": "a56b61a9c41eacf19ed13450c1c33b54b3c95ba9624cdf0e8164c68c06d8ea2f",
+    "market.py": "a6bcebd1e78a24f0ec1910afcb6faa676c33661ee060dd0baa858b84eb165931",
+    "forecast.py": "2fa71c247637a314f8f274484551f69fd4dcc1530e5d2b4e6496a40fb93075bd",
+    "weather.py": "43255fcc50887f68d6c6a615b41e6d12a5564bbec32c5678c561931ba2b88317",
+    "comed.py": "537e7c580afb83bffaef8746d9b4430b68ff54c60585fa478154496900e8337d",
+    "holidays.py": "39b117092e62f93c689a65fb1549a6995e6a620348d75f437b2c8d8240fdf941",
+    "tariff.py": "c645b9133cfa3ac7c4a55ffa24630bba075b9fdad6a66c23377c07a2cb69de4b"
+  },
+  "adapter": "../smart_charging.py",
+  "notes": "Research source files above are copied byte-for-byte. Delivery charges are set to zero by the adapter because the account tariff is not supplied; forecast cost therefore covers energy supply only."
+}

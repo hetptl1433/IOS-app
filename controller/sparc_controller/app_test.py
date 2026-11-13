@@ -42,6 +42,12 @@ class TestGoal:
 
 def schedule_goal(settings: dict, now: datetime, remaining_seconds: float | None = None) -> TestGoal | None:
     weekly = settings["weekly"]
+    overnight = settings.get("overnightRun") or {}
+    if smart_plan_enabled(settings, now):
+        departure = datetime.fromisoformat(overnight["departure"]).astimezone(UTC)
+        if now < departure:
+            start = datetime.fromisoformat(overnight["start"]).astimezone(UTC)
+            return TestGoal(overnight["targetBatteryPercent"], departure, departure-timedelta(minutes=overnight.get("readyBufferMinutes",0)), start, False, True)
     override = settings.get("today")
     if override:
         departure = datetime.fromisoformat(override["departure"].replace("Z", "+00:00")).astimezone(UTC)
@@ -83,9 +89,34 @@ def schedule_goal(settings: dict, now: datetime, remaining_seconds: float | None
     return TestGoal(target, departure, ready_by, start, fixed, automatic)
 
 
+def smart_plan_enabled(settings, now: datetime | None = None):
+    config = settings.get("overnightRun") or {}
+    if config.get("strategy") != "day_ahead_live" or config.get("finalizedAt"):
+        return False
+    if config.get("campaignId") and (settings.get("campaign") or {}).get("enabled") is False:
+        return False
+    if now is not None:
+        return now < datetime.fromisoformat(config["departure"]).astimezone(UTC)
+    return True
+
+
+def smart_intervals(settings):
+    plan = settings.get("smartChargePlan") or {}
+    result = []
+    for value in plan.get("intervals", []):
+        try:
+            start = datetime.fromisoformat(value["start"]).astimezone(UTC)
+            end = datetime.fromisoformat(value["end"]).astimezone(UTC)
+            if end > start: result.append((start, end))
+        except (ValueError, TypeError, KeyError):
+            continue
+    return result
+
+
 class AppTestControl:
-    def __init__(self, clock: Callable[[], datetime]):
+    def __init__(self, clock: Callable[[], datetime], pricing=None):
         self.clock = clock
+        self.pricing = pricing
 
     @staticmethod
     def initial_virtual_state() -> dict:
@@ -106,10 +137,21 @@ class AppTestControl:
             raise ValueError("Invalid saved virtual-car state.")
         for key in ("batteryPercent", "energyKWh", "cost", "immediateCost"):
             item = value.get(key)
-            if type(item) not in (int, float) or not math.isfinite(item) or item < 0:
+            if type(item) not in (int, float) or not math.isfinite(item) or (key in ("batteryPercent", "energyKWh") and item < 0):
                 raise ValueError("Invalid saved virtual-car state.")
         if value["batteryPercent"] > 100:
             raise ValueError("Invalid saved virtual-car battery.")
+        buckets = value.get("energyByHour", {})
+        if not isinstance(buckets, dict) or len(buckets) > 5000:
+            raise ValueError("Invalid saved energy ledger.")
+        for hour, energy in buckets.items():
+            if not isinstance(hour, str) or type(energy) not in (int, float) or not math.isfinite(energy) or energy < 0:
+                raise ValueError("Invalid saved energy ledger.")
+            try:
+                parsed = datetime.fromisoformat(hour)
+                if parsed.tzinfo is None or parsed.minute or parsed.second or parsed.microsecond: raise ValueError()
+            except (TypeError, ValueError):
+                raise ValueError("Invalid saved energy ledger.") from None
         return dict(value)
 
     @staticmethod
@@ -145,6 +187,8 @@ class AppTestControl:
     def command_value(self, command: str, settings: dict) -> dict:
         now = self.clock().astimezone(UTC)
         goal = schedule_goal(settings, now)
+        if command == "resume" and smart_plan_enabled(settings, now):
+            return {"manualState": None, "manualUntil": None}
         state = {"charge_now": "charging", "resume": "charging", "pause": "paused", "end": "waiting"}[command]
         until = None
         if goal:
@@ -168,7 +212,15 @@ class AppTestControl:
             if now >= goal.ready_by:
                 state = "complete" if not virtual else "waiting"
             elif now >= goal.window_start:
-                state = "charging"
+                if smart_plan_enabled(settings, now):
+                    plan = settings.get("smartChargePlan")
+                    if plan:
+                        state = "charging" if any(start <= now < end for start, end in smart_intervals(settings)) else "waiting"
+                    else:
+                        # No committed plan: charge within the window to protect the deadline.
+                        state = "charging"
+                else:
+                    state = "charging"
         if manual:
             state = manual
         if model:
@@ -177,6 +229,15 @@ class AppTestControl:
                 state = "unplugged"
             elif model["batteryPercent"] >= target - 1e-8:
                 state = "complete"
+            # A campaign is a finite overnight simulation. Even a manual charge
+            # cannot escape its current configured window, including UI edits.
+            config = settings.get("overnightRun") or {}
+            if config.get("campaignId") and config.get("sessionId") and model["pluggedIn"]:
+                start = datetime.fromisoformat(config["start"]).astimezone(UTC)
+                departure = datetime.fromisoformat(config["departure"]).astimezone(UTC)
+                disabled = (settings.get("campaign") or {}).get("enabled") is False
+                if disabled or config.get("finalizedAt") or not start <= now < departure:
+                    state = "complete" if model["batteryPercent"] >= config["targetBatteryPercent"] - 1e-8 else "waiting"
         return state, goal
 
     def advance_virtual(self, settings: dict, start: datetime, end: datetime) -> dict:
@@ -184,6 +245,8 @@ class AppTestControl:
         model = self.virtual_state(settings)
         if end <= start or not model["pluggedIn"]:
             return model
+        if self.pricing is not None:
+            model["energyByHour"] = dict(model.get("energyByHour", {}))
         working = dict(settings, virtualCarState=model)
         cursor = start.astimezone(UTC)
         end = end.astimezone(UTC)
@@ -202,6 +265,10 @@ class AppTestControl:
             state, goal = self.state_at(working, cursor)
             next_hour = cursor.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
             boundary = min(end, next_hour)
+            if smart_plan_enabled(settings, cursor):
+                for begins, finishes in smart_intervals(settings):
+                    for instant in (begins, finishes):
+                        if instant > cursor: boundary = min(boundary, instant)
             if until and until > cursor:
                 boundary = min(boundary, until)
             if goal:
@@ -216,9 +283,16 @@ class AppTestControl:
                 model["batteryPercent"] = min(float(target), model["batteryPercent"]
                     + energy * VIRTUAL_EFFICIENCY / VIRTUAL_CAPACITY_KWH * 100)
                 model["energyKWh"] += energy
-                model["cost"] += energy * self.example_rate(cursor) / 100
-                model["immediateCost"] += energy * 0.21
+                if self.pricing is None:
+                    model["cost"] += energy * self.example_rate(cursor) / 100
+                    model["immediateCost"] += energy * 0.21
+                else:
+                    hour = cursor.replace(minute=0, second=0, microsecond=0).isoformat()
+                    model["energyByHour"][hour] = model["energyByHour"].get(hour, 0.0) + energy
             cursor = boundary
+        if self.pricing is not None:
+            model["cost"] = self.pricing.energy_cost(model.get("energyByHour", {}))["cost"]
+            model["immediateCost"] = 0.0
         return model
 
     def snapshot(self, settings: dict) -> dict:
@@ -240,15 +314,35 @@ class AppTestControl:
             remaining = self.remaining_seconds(settings, now, model["batteryPercent"])
             start = max(now, start)
             end = start + timedelta(seconds=remaining)
+            costs = self.pricing.energy_cost(model.get("energyByHour", {})) if self.pricing is not None else None
+            if costs is not None:
+                costs["unpricedEnergyKWh"] += max(0.0, model["energyKWh"] - sum(model.get("energyByHour", {}).values()))
+                if costs["unpricedEnergyKWh"] > 1e-8: costs["final"] = False
+                model["cost"] = costs["cost"]
             result.update({
                 "batteryPercent": min(100, int(math.floor(model["batteryPercent"] + 1e-8))),
                 "pluggedIn": model["pluggedIn"],
                 "powerKW": VIRTUAL_POWER_KW if state == "charging" else 0.0,
                 "energyKWh": model["energyKWh"], "estimatedCost": model["cost"],
                 "sessionSavings": max(0.0, model["immediateCost"] - model["cost"]),
-                "remainingMinutes": int(math.ceil(remaining / 60)),
-                "currentRateCents": self.example_rate(now),
+                "remainingMinutes": 0 if state == "complete" else int(math.ceil(remaining / 60)),
+                "currentRateCents": self.example_rate(now) if self.pricing is None else (self.pricing.state()["rateCents"] or 0.0),
                 "windowStart": utc_string(start), "windowEnd": utc_string(end),
                 "vehicleName": "Virtual car",
             })
+        if virtual and self.pricing is not None:
+            result.update({"realPricing": True, "rateAvailable": self.pricing.state()["rateCents"] is not None,
+                           "costAvailable": costs["unpricedEnergyKWh"] < 1e-8,
+                           "costFinal": costs["final"], "unpricedEnergyKWh": costs["unpricedEnergyKWh"],
+                           "savingsAvailable": False, "sessionSavings": 0.0})
+        if virtual and smart_plan_enabled(settings, now):
+            plan = settings.get("smartChargePlan") or {}
+            pending = [(begins, finishes) for begins, finishes in smart_intervals(settings) if finishes > now]
+            result.update({"smartCharging": True, "plannerReason": plan.get("reason", "Awaiting first plan"),
+                           "plannerFeasible": plan.get("feasible", True),
+                           "plannedFinishAt": utc_string(pending[-1][1]) if pending else None,
+                           "nextChargeAt": utc_string(max(now, pending[0][0])) if pending else None})
+            if pending:
+                result["windowStart"] = utc_string(max(now, pending[0][0]))
+                result["windowEnd"] = utc_string(pending[-1][1])
         return result

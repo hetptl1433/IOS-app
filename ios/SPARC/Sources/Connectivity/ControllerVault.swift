@@ -9,6 +9,12 @@ struct PairedController: Codable, Equatable, Sendable {
     let setupKey: String
     /// Missing in existing saved pairings: those continue to use the LAN transport.
     var bluetoothPeripheralID: String? = nil
+
+    /// The name the Pi advertises over Bluetooth ("SPARC-" and the first four characters
+    /// of its ID). Every app-test Pi reports the same deviceName, so this is what tells
+    /// two controllers apart, and it matches the nearby list.
+    var bluetoothName: String { "SPARC-" + deviceID.prefix(4).uppercased() }
+    var displayName: String { "\(bluetoothName) · \(deviceName)" }
 }
 
 protocol ControllerCredentialStore: Sendable {

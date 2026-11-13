@@ -197,16 +197,29 @@ final class SPARCFlowTests: XCTestCase {
         add(attachment)
     }
 
-    func testFreshLaunchUsesWaitingDemoAndAllFiveTabsAreReachable() {
+    func testFreshLaunchKeepsDailyTabsAndSettingsHistoryReachable() {
         launch()
         XCTAssertTrue(app.staticTexts["Waiting for a better charging time"].exists)
         assertNoDemoWording()
-        for tab in ["charge", "plan", "insights", "records", "home"] {
+        for tab in ["charge", "plan", "insights", "home"] {
             tapTab(tab)
             screenshot("tab-\(tab)")
         }
         reveal(app.buttons["home.chargeNow"])
         XCTAssertEqual(app.buttons["home.chargeNow"].label, "Charge now")
+        XCTAssertFalse(app.buttons["tab.records"].exists)
+        reveal(app.buttons["home.settings"])
+        app.buttons["home.settings"].tap()
+        waitForPage("Settings")
+        let history = app.buttons["settings.history"]
+        reveal(history)
+        history.tap()
+        waitForPage("Every charge,\naccounted for.")
+        let session = app.buttons["records.session.0"]
+        reveal(session)
+        session.tap()
+        XCTAssertTrue(app.scrollViews["records.sessionDetail"].waitForExistence(timeout: 5))
+        screenshot("settings-charging-history-session")
     }
 
     func testHomeChargeNowLabelAndHeadlightMatchEveryState() {
@@ -248,8 +261,10 @@ final class SPARCFlowTests: XCTestCase {
         let rate = app.buttons["home.rate"]
         reveal(rate)
         rate.tap()
-        waitForSelected(app.buttons["tab.plan"])
-        waitForPage("Your charging rhythm.")
+        XCTAssertTrue(app.staticTexts["Rate details"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Your delivery rate"].exists)
+        app.buttons["rates.done"].tap()
+        waitForDismissal(app.buttons["rates.done"])
 
         tapTab("home")
         let viewPlan = app.buttons["home.viewPlan"]
@@ -441,13 +456,20 @@ final class SPARCFlowTests: XCTestCase {
         XCTAssertTrue(pause.waitForExistence(timeout: 5), "Charge now on the Charge tab must start charging at once")
         screenshot("charge-started")
 
-        // Keep charging closes the dialog and leaves the charge running.
+        // Keep charging closes the dialog and leaves the charge running. From iOS 26 the dialog is a
+        // popover that hides its cancel button ("Keep charging"); tapping outside it is that choice.
         let end = app.buttons["charge.end"]
         reveal(end)
         end.tap()
-        let keep = dialogButton("Keep charging")
-        keep.tap()
-        waitForDismissal(keep)
+        let question = app.staticTexts["End this charging session?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "End session must ask before ending")
+        let keep = app.buttons.matching(NSPredicate(format: "label == %@", "Keep charging")).firstMatch
+        if keep.exists {
+            keep.tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        }
+        waitForDismissal(question)
         XCTAssertTrue(app.buttons["charge.pause"].exists)
 
         // End session ends it, and the page offers to start again.
@@ -493,33 +515,37 @@ final class SPARCFlowTests: XCTestCase {
         screenshot("settings-schedule")
     }
 
-    func testDeveloperOptionsAreHiddenInSettingsByDefault() {
+    func testSettingsNeverOffersDemoModeOrForgetsFromTheMainList() {
         launch()
         app.buttons["home.settings"].tap()
         waitForPage("Settings")
-        // The version line is the last thing on the page; the developer card would sit just above it.
-        reveal(app.buttons["settings.version"])
-        for identifier in ["settings.demoMode", "settings.virtualCar", "settings.forgetController"] {
-            XCTAssertFalse(app.descendants(matching: .any)[identifier].firstMatch.exists, "\(identifier) must stay hidden")
+        // The version line is the last thing on the page; reaching it means the whole list was scanned.
+        let version = app.staticTexts["settings.version"]
+        reveal(version)
+        XCTAssertTrue(version.label.hasPrefix("Version "), version.label)
+        // Example data is test-only, and forgetting the controller lives behind Home controller.
+        for identifier in ["settings.demoMode", "settings.hideDeveloper", "settings.forgetController"] {
+            XCTAssertFalse(app.descendants(matching: .any)[identifier].firstMatch.exists, "\(identifier) must not be in Settings")
         }
         screenshot("settings-default")
     }
 
-    func testDeveloperOptionsAppearInSettingsWithTheLaunchArgument() {
-        launch(extra: ["-SPARCShowDeveloper"])
+    func testDeveloperSettingsOpenTheVirtualCarFromSettings() {
+        launch()
         app.buttons["home.settings"].tap()
         waitForPage("Settings")
-        for identifier in ["settings.demoMode", "settings.virtualCar"] {
-            let toggle = app.descendants(matching: .any)[identifier].firstMatch
-            reveal(toggle)
-            XCTAssertTrue(toggle.exists, "\(identifier) must show with -SPARCShowDeveloper")
-        }
-        screenshot("settings-developer-options")
+        let developer = app.buttons["settings.developer"]
+        reveal(developer)
+        developer.tap()
+        waitForPage("Virtual Car")
+        screenshot("settings-developer-virtual-car")
+        app.navigationBars.buttons["Back"].tap()
+        waitForPage("Settings")
     }
 
     func testAccessibilityTextKeepsTabsAndScheduleReachable() {
         launch(extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        for tab in ["home", "charge", "plan", "insights", "records"] {
+        for tab in ["home", "charge", "plan", "insights"] {
             XCTAssertTrue(app.buttons["tab.\(tab)"].isHittable)
         }
         openPlan()

@@ -49,16 +49,36 @@ enum ControllerJSON {
     static var encoder: JSONEncoder { let x = JSONEncoder(); x.dateEncodingStrategy = .iso8601; x.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]; return x }
     static var decoder: JSONDecoder {
         let x = JSONDecoder()
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
         x.dateDecodingStrategy = .custom { decoder in
             let value = try decoder.singleValueContainer().decode(String.self)
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: value) { return date }
-            formatter.formatOptions = [.withInternetDateTime]
-            guard let date = formatter.date(from: value) else { throw ControllerConnectionError.invalidMessage }
+            if let date = fractional.date(from: value) { return date }
+            guard let date = plain.date(from: value) else { throw ControllerConnectionError.invalidMessage }
             return date
         }
         return x
+    }
+}
+
+/// A public installation identity, independent of the pairing secret and phone hardware.
+struct ControllerClientIdentity: Codable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let appVersion: String
+    let build: String
+    private static let lock = NSLock()
+    static var current: ControllerClientIdentity {
+        lock.lock(); defer { lock.unlock() }
+        let defaults = UserDefaults.standard, key = "sparc.client.id.v1"
+        let saved = defaults.string(forKey: key).flatMap(UUID.init(uuidString:))
+        let id = (saved ?? UUID()).uuidString.lowercased()
+        if defaults.string(forKey: key) != id { defaults.set(id, forKey: key) }
+        return ControllerClientIdentity(id: id, name: "SPARC iPhone",
+                                        appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0",
+                                        build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1")
     }
 }
 
@@ -89,7 +109,9 @@ struct ControllerWireResponse: Codable, Sendable {
 /// App-test controllers that advertise "pairing-code" accept a short shared code
 /// instead of the private key. Anyone who knows the code can pair.
 enum ControllerPairingCode {
+    #if DEBUG
     static let `default` = "0000"
+    #endif
     /// Matches the controller's pairing_code_key, giving a key ControllerWireCodec accepts.
     static func setupKey(for code: String) -> String? {
         guard (4...8).contains(code.utf8.count), code.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
@@ -101,7 +123,8 @@ struct ControllerWireCodec {
     let info: ControllerInfo
     private let sendKey: SymmetricKey
     private let receiveKey: SymmetricKey
-    init(setupKey: String, info: ControllerInfo) throws {
+    private let client: ControllerClientIdentity?
+    init(setupKey: String, info: ControllerInfo, client: ControllerClientIdentity? = nil) throws {
         try info.validate()
         guard setupKey.utf8.count == 64, setupKey.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }) else { throw ControllerConnectionError.invalidKey }
         let chars = Array(setupKey.utf8)
@@ -114,13 +137,14 @@ struct ControllerWireCodec {
         sendKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: master, salt: Data(info.deviceId.utf8), info: Data("SPARC/1/c2d".utf8), outputByteCount: 32)
         receiveKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: master, salt: Data(info.deviceId.utf8), info: Data("SPARC/1/d2c".utf8), outputByteCount: 32)
         self.info = info
+        self.client = client
     }
     private func aad(_ direction: String) -> Data { Data("SPARC/1\n\(info.deviceId)\n\(info.bootId)\n\(direction)".utf8) }
     func sealRequest(operation: String, body: [String: WireValue], id: String, timestamp: Double,
                      nonce: Data? = nil) throws -> Data {
-        struct Request: Encodable { let id: String; let timestamp: Double; let operation: String; let body: [String: WireValue] }
+        struct Request: Encodable { let id: String; let timestamp: Double; let operation: String; let body: [String: WireValue]; let client: ControllerClientIdentity? }
         struct Envelope: Encodable { let v = 1; let box: String }
-        let plaintext = try ControllerJSON.encoder.encode(Request(id: id, timestamp: timestamp, operation: operation, body: body))
+        let plaintext = try ControllerJSON.encoder.encode(Request(id: id, timestamp: timestamp, operation: operation, body: body, client: client))
         let sealed: ChaChaPoly.SealedBox
         if let nonce { sealed = try ChaChaPoly.seal(plaintext, using: sendKey, nonce: ChaChaPoly.Nonce(data: nonce), authenticating: aad("c2d")) }
         else { sealed = try ChaChaPoly.seal(plaintext, using: sendKey, authenticating: aad("c2d")) }
@@ -128,7 +152,7 @@ struct ControllerWireCodec {
         guard data.count <= ControllerFrameBuffer.maximumLength else { throw ControllerConnectionError.invalidMessage }
         return data
     }
-    func openResponse(_ data: Data, expectedID: String) throws -> ControllerWireResponse {
+    func openResponse(_ data: Data, expectedID: String? = nil) throws -> ControllerWireResponse {
         struct Envelope: Decodable { let v: Int; let box: String }
         guard data.count <= ControllerFrameBuffer.maximumLength else { throw ControllerConnectionError.invalidMessage }
         do {
@@ -136,9 +160,34 @@ struct ControllerWireCodec {
             guard envelope.v == 1, let combined = Data(base64Encoded: envelope.box) else { throw ControllerConnectionError.invalidMessage }
             let plaintext = try ChaChaPoly.open(ChaChaPoly.SealedBox(combined: combined), using: receiveKey, authenticating: aad("d2c"))
             let reply = try JSONDecoder().decode(ControllerWireResponse.self, from: plaintext)
-            guard reply.id.caseInsensitiveCompare(expectedID) == .orderedSame else { throw ControllerConnectionError.invalidMessage }
+            if let expectedID, reply.id.caseInsensitiveCompare(expectedID) != .orderedSame { throw ControllerConnectionError.invalidMessage }
             return reply
         } catch { throw ControllerConnectionError.invalidMessage }
+    }
+}
+
+/// Bluetooth notifications are a shared stream: another phone can be receiving a
+/// response when this phone subscribes or starts a request. Keep assembling the
+/// stream between requests and resynchronize after an initial frame suffix.
+struct ControllerNotificationStream {
+    private var buffer = Data()
+    mutating func append(_ chunk: Data) -> [Data] {
+        buffer.append(chunk)
+        let limit = ControllerFrameBuffer.maximumLength
+        if buffer.count > 2 * (limit + 4) { buffer = Data(buffer.suffix(limit + 4)) }
+        var frames: [Data] = [], offset = 0
+        while buffer.count - offset >= 4 {
+            let length = buffer[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+            guard length > 0, length <= limit else { offset += 1; continue }
+            // Envelopes are JSON text; requiring its opening brace also avoids
+            // treating a partially observed binary header as a new frame.
+            if buffer.count > offset + 4, buffer[offset + 4] != 0x7b { offset += 1; continue }
+            guard buffer.count - offset >= length + 4 else { break }
+            frames.append(Data(buffer[(offset + 4)..<(offset + length + 4)]))
+            offset += length + 4
+        }
+        if offset > 0 { buffer = Data(buffer.dropFirst(offset)) }
+        return frames
     }
 }
 

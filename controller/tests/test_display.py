@@ -8,6 +8,7 @@ import time
 import unittest
 from unittest.mock import patch
 import uuid
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sparc_controller.display import STATIC, DisplayTransport, loopback
@@ -93,6 +94,94 @@ class DisplayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["snapshot"]["powerKW"], 11.5)
         self.assertEqual(self.service.settings["virtualCarState"]["batteryPercent"], 40)
         self.assertEqual(state["local"], {"date": "2026-10-27", "minutes": 750})
+
+    async def test_tesla_activation_and_commands_use_explicit_local_endpoints(self):
+        from test_connections_service import FakeFleet
+        fleet = FakeFleet(lambda:self.now)
+        fleet.state.update(authorized=True,status='connected',vehicleId='123',
+                           vehicleName='Actual Fleet vehicle',commandsReady=True)
+        self.service.tesla = fleet
+        car = dict(self.service.settings['virtualCarState'])
+        # A saved setup, status read, and invalid activation cannot actuate.
+        status,reply = await self.post('/api/connections/activate',{'mode':'smart_plug'})
+        self.assertEqual(status,400)
+        self.assertEqual(self.service.active_connection_mode,'virtual')
+        status,reply = await self.post('/api/connections/activate',{'mode':'tesla'})
+        self.assertEqual(status,200,reply)
+        self.assertEqual(reply['connections']['activeMode'],'tesla')
+        self.assertFalse(any(name=='command' for name,_ in fleet.calls))
+        state = await self.state()
+        self.assertEqual(state['snapshot']['batteryPercent'],62)
+        self.assertTrue(state['snapshot']['manualOnly'])
+        self.assertFalse(state['snapshot']['virtualCar'])
+        status,reply = await self.post('/api/connections/tesla/command',{'command':'charge_stop'})
+        self.assertEqual(status,200,reply)
+        self.assertTrue(reply['actionResult']['accepted'])
+        self.assertEqual([call for call in fleet.calls if call[0]=='command'],[('command',('charge_stop',None))])
+        self.assertEqual(self.service.settings['virtualCarState'],car)
+        status,reply = await self.post('/api/connections/activate',{'mode':'virtual'})
+        self.assertEqual(status,200)
+        self.assertEqual(reply['connections']['activeMode'],'virtual')
+        status,reply = await self.post('/api/connections/tesla/command',{'command':'charge_start'})
+        self.assertEqual(status,400)
+        self.assertEqual(sum(name=='command' for name,_ in fleet.calls),1)
+
+    def configure_tesla_authorization(self):
+        from test_tesla import FakeTesla
+        from sparc_controller.tesla import AUDIENCES, TeslaAdapter, _default_save
+        _default_save(self.path/'tesla-client.json',{
+            'clientId':'687f9e0c-2855-4d0e-b617-780ebd52843a', 'clientSecret':'private-client-secret',
+            'redirectURI':'https://sparc.ipodeskai.com/auth/tesla/callback',
+            'audience':AUDIENCES[0], 'domain':'sparc.ipodeskai.com'})
+        fleet = FakeTesla(lambda:self.now)
+        self.service.tesla = TeslaAdapter(self.path,clock=lambda:self.now,transport=fleet)
+        return fleet
+
+    async def test_tesla_screen_can_finish_its_own_authorization_once_without_vehicle_commands(self):
+        fleet = self.configure_tesla_authorization()
+        status,reply = await self.post('/api/connections/tesla/authorize',{})
+        self.assertEqual(status,200,reply)
+        state = parse_qs(urlsplit(reply['actionResult']['authorizationURL']).query)['state'][0]
+        self.assertEqual((await self.post('/api/connections/tesla/complete',{'code':'private-code','state':'0'*64}))[0],400)
+        self.assertEqual(fleet.calls,[])
+        status,reply = await self.post('/api/connections/tesla/complete',{'code':'private-code','state':state})
+        self.assertEqual(status,200,reply)
+        self.assertTrue(reply['connections']['tesla']['authorized'])
+        self.assertEqual(reply['connections']['activeMode'],'virtual')
+        self.assertNotIn('private-code',json.dumps(reply))
+        self.assertNotIn('access-1',json.dumps(reply))
+        self.assertEqual(fleet.token_count,1)
+        self.assertEqual(len(fleet.calls),1)
+        self.assertEqual((await self.post('/api/connections/tesla/complete',{'code':'private-code','state':state}))[0],400)
+        self.assertEqual(fleet.token_count,1)
+
+    async def test_tesla_screen_completion_preserves_origin_expiry_and_app_binding_checks(self):
+        fleet = self.configure_tesla_authorization()
+        started = await self.service.tesla.authorize_start(str(uuid.uuid4()))
+        state = parse_qs(urlsplit(started['authorizationURL']).query)['state'][0]
+        body = {'code':'private-code','state':state}
+        self.assertEqual((await self.post('/api/connections/tesla/complete',body))[0],400)
+        status,reply = await self.post('/api/connections/tesla/authorize',{})
+        body['state'] = parse_qs(urlsplit(reply['actionResult']['authorizationURL']).query)['state'][0]
+        self.assertEqual((await self.post('/api/connections/tesla/complete',body,{'Origin':'https://attacker.example'}))[0],403)
+        self.assertEqual((await self.post('/api/connections/tesla/complete',dict(body,extra='field')))[0],400)
+        self.now += timedelta(minutes=10)
+        self.assertEqual((await self.post('/api/connections/tesla/complete',body))[0],400)
+        self.assertEqual(fleet.calls,[])
+
+    async def test_tesla_display_activation_rejects_stale_data_without_touching_virtual_state(self):
+        from test_connections_service import FakeFleet
+        fleet = FakeFleet(lambda:self.now)
+        fleet.state.update(authorized=True,status='connected',vehicleId='123',
+                           vehicleName='Actual Fleet vehicle',commandsReady=True)
+        fleet.stale = True
+        self.service.tesla = fleet
+        settings = json.loads(json.dumps(self.service.settings))
+        status,reply = await self.post('/api/connections/activate',{'mode':'tesla'})
+        self.assertEqual(status,400)
+        self.assertIn('stale',reply['error'])
+        self.assertEqual(self.service.settings,settings)
+        self.assertFalse(any(name=='command' for name,_ in fleet.calls))
 
     async def test_controls_weekly_and_trip_round_trip(self):
         self.assertIsNone((await self.state())["manual"])

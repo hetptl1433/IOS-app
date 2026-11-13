@@ -34,6 +34,13 @@ struct ControllerSetupView: View {
     private var visibleError: String? { startedHere ? manager.errorMessage : nil }
     private var hasSaved: Bool { manager.controllerForSetup != nil }
     private var inlinePinned: Bool { typeSize.isAccessibilitySize }
+    @Environment(\.sparcTabBarTop) private var tabBarTop
+    @State private var pageBottom: CGFloat = 0
+    /// How far the floating tab bar reaches up over this page's bottom edge (0 in a sheet).
+    private var tabBarOverlap: CGFloat {
+        guard let tabBarTop, pageBottom > 0 else { return 0 }
+        return max(0, pageBottom - tabBarTop)
+    }
     private var editingNetworkField: Bool { focused == .host || focused == .lanKey }
 
     private var phase: Phase {
@@ -63,12 +70,15 @@ struct ControllerSetupView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !inlinePinned && !editingNetworkField {
                 pinned
-                    .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 8)
+                    .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 8 + tabBarOverlap)
                     .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
                     .background(SPARCTheme.background)
             }
         }
+        // The page's own frame ends at its safe area, which (when pushed in a tab) does not include
+        // the floating tab bar. Measured here, outside the pinned bar, so padding cannot feed back.
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { pageBottom = $0 }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(SPARCTheme.background, for: .navigationBar)
         .toolbar {
@@ -103,10 +113,12 @@ struct ControllerSetupView: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, 18)
                     .accessibilityAddTraits(.isHeader)
-                Text(heroSubtitle).sparcFont(15).foregroundStyle(SPARCTheme.muted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .padding(.top, 8).padding(.horizontal, 16)
+                if let subtitle = heroSubtitle {
+                    Text(subtitle).sparcFont(15).foregroundStyle(SPARCTheme.muted)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .padding(.top, 8).padding(.horizontal, 16)
+                }
             }
             .frame(maxWidth: .infinity)
             .transition(.opacity)
@@ -125,12 +137,10 @@ struct ControllerSetupView: View {
         return "Meet your home controller."
     }
 
-    private var heroSubtitle: String {
-        if needsKey { return "Enter the pairing code from your controller, or its private 64-character setup key." }
-        if phase == .found { return visibleDevices.count > 1 ? "Tap the one you want to connect." : "Tap it to connect." }
-        if stage == .scanning { return "Keep your phone near your Raspberry Pi." }
-        if noControllerFound { return "Bring it nearby and open its setup window, then search again." }
-        return "Connect nearby with Bluetooth, or use your home network."
+    private var heroSubtitle: String? {
+        if needsKey { return "Enter the code or 64-character setup key." }
+        if phase != .found, stage != .scanning, noControllerFound { return "Bring it nearby, then search again." }
+        return nil
     }
 
     // MARK: Linking
@@ -214,7 +224,8 @@ struct ControllerSetupView: View {
 
     private var doneHero: some View {
         let overBluetooth = manager.savedController?.bluetoothPeripheralID != nil
-        let name = manager.savedController?.deviceName ?? "Your home controller"
+        // The Bluetooth name (SPARC-XXXX) is what the Pi advertises and what the nearby list showed.
+        let name = manager.savedController?.displayName ?? "Your home controller"
         return VStack(spacing: 0) {
             ZStack {
                 Circle().fill(SPARCTheme.spark)
@@ -229,18 +240,17 @@ struct ControllerSetupView: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 20)
                 .accessibilityAddTraits(.isHeader)
-            Text("\(name) is ready. You can control charging and your schedule from this iPhone.")
+            Text(name)
                 .sparcFont(15.5).foregroundStyle(SPARCTheme.muted)
                 .multilineTextAlignment(.center)
-                .lineSpacing(3)
                 .padding(.top, 10).padding(.horizontal, 12)
+                .accessibilityIdentifier("setup.connectedName")
             SetupChipRow(spacing: 8) {
                 SetupChip(title: "Encrypted") { Image(systemName: "lock").font(.system(size: 12, weight: .semibold)) }
                 SetupChip(title: overBluetooth ? "Bluetooth" : "Home network") {
                     if overBluetooth { ConnectionBluetoothMark(size: 13, color: SPARCTheme.spark, weight: 2.2) }
                     else { Image(systemName: "wifi").font(.system(size: 12, weight: .semibold)) }
                 }
-                SetupChip(title: "Reconnects by itself") { Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .semibold)) }
             }
             .padding(.top, 18)
         }
@@ -275,6 +285,8 @@ struct ControllerSetupView: View {
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("setup.status")
         }
+        if hasSaved && (phase == .search || phase == .found) && !needsKey {
+        }
         if (phase == .search || phase == .found) && stage != .needsKey && connectedName == nil {
             if !hasSaved || pairAnotherController {
                 lanPairingCard
@@ -298,9 +310,6 @@ struct ControllerSetupView: View {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Status & Wi-Fi").sparcFont(15, weight: .semibold)
-                        Text("See your Pi's connection and set up its Wi-Fi")
-                            .sparcFont(12.5).foregroundStyle(SPARCTheme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))
@@ -317,6 +326,9 @@ struct ControllerSetupView: View {
         }
         if phase != .done {
             quietButton("Open iPhone permissions", size: 12.5) { openIPhoneSettings() }
+        } else {
+            quietButton("Replace controller") { startSearch() }
+                .accessibilityIdentifier("setup.replace")
         }
     }
 
@@ -368,10 +380,10 @@ struct ControllerSetupView: View {
                 quietButton("Use a pairing code instead") { codeOpen = true; focused = .code }
                     .accessibilityIdentifier("setup.useCode")
             }
-            if stage != .scanning {
-                quietButton("Search again") { startSearch() }
-                    .accessibilityIdentifier("setup.scan")
-            }
+            // Always offered: with two controllers nearby the owner may need to search again,
+            // including while results are still arriving.
+            quietButton("Search again") { startSearch() }
+                .accessibilityIdentifier("setup.scan")
         }
     }
 
@@ -386,7 +398,8 @@ struct ControllerSetupView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(device.name).sparcFont(17, weight: .bold).foregroundStyle(.white)
                         .lineLimit(2)
-                    Text(signalText(device)).sparcFont(13).foregroundStyle(SPARCTheme.mint)
+                    Text(signalText(device)).sparcFont(13)
+                        .foregroundStyle(manager.isSavedController(device) ? SPARCTheme.spark : SPARCTheme.mint)
                 }
                 Spacer(minLength: 8)
                 Text("Connect").sparcFont(15, weight: .bold).foregroundStyle(SPARCTheme.onSpark)
@@ -412,9 +425,10 @@ struct ControllerSetupView: View {
     }
 
     private func signalText(_ device: DiscoveredController) -> String {
-        guard device.rssi < 0 else { return "Nearby · Bluetooth" }
+        let identity = manager.isSavedController(device) ? "Saved on this iPhone" : "Nearby"
+        guard device.rssi < 0 else { return "\(identity) · Bluetooth" }
         let strength = device.rssi >= -60 ? "Strong signal" : device.rssi >= -75 ? "Good signal" : "Weak signal"
-        return "Nearby · \(strength)"
+        return "\(identity) · \(strength)"
     }
 
     /// The code is typed before connecting and used as soon as the controller asks for a key.
@@ -491,18 +505,12 @@ struct ControllerSetupView: View {
         let ready = key.count == 64 && !address.isEmpty && !working
         return VStack(alignment: .leading, spacing: 14) {
             Label("Pair on your home network", systemImage: "network").sparcFont(15, weight: .semibold)
-            Text("Connect your controller by Ethernet or Wi-Fi, then join the same network on your iPhone. Enter its .local hostname or private IPv4 address and its private setup key. Bluetooth is optional.")
-                .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
             setupField("sparc.local or local IP", text: $host, field: .host)
                 .keyboardType(.URL).accessibilityIdentifier("setup.host")
             SecureField("Private setup key", text: $setupKey)
                 .sparcFont(14, design: .monospaced).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .setupInput()
                 .focused($focused, equals: .lanKey).accessibilityIdentifier("setup.lanKey")
-            Text("Open the setup window on your controller before pairing. Your key is saved securely only after the controller responds with proof that it knows the key.")
-                .sparcFont(12).foregroundStyle(SPARCTheme.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
             SPARCActionButton(title: "Pair over home network", symbol: "lock.shield", kind: .secondary, height: 52, busy: working) {
                 focused = nil
                 startedHere = true
@@ -525,9 +533,10 @@ struct ControllerSetupView: View {
         return VStack(alignment: .leading, spacing: 14) {
             if manager.controllerForSetup?.bluetoothPeripheralID != nil {
                 Label("Reconnect over Bluetooth", systemImage: "antenna.radiowaves.left.and.right").sparcFont(15, weight: .semibold)
-                Text("Keep your Pi nearby and Bluetooth enabled on your iPhone.")
+                Text("Saved controller: \(manager.controllerForSetup?.bluetoothName ?? "your Pi")")
                     .sparcFont(13).foregroundStyle(SPARCTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("setup.savedName")
                 SPARCActionButton(title: "Connect over Bluetooth", symbol: "arrow.clockwise", kind: .tinted, height: 52, busy: working) {
                     focused = nil
                     startedHere = true
@@ -536,9 +545,6 @@ struct ControllerSetupView: View {
                 .accessibilityIdentifier("setup.connectBluetooth")
             } else {
                 Label("Reconnect your controller", systemImage: "network").sparcFont(15, weight: .semibold)
-                Text("Connect to your paired controller using its .local hostname or private IPv4 address.")
-                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
                 setupField("sparc.local or local IP", text: $host, field: .host)
                     .keyboardType(.URL).accessibilityIdentifier("setup.host")
                 SPARCActionButton(title: "Connect over home network", symbol: "network", kind: .tinted, height: 52, busy: working) {
@@ -635,6 +641,8 @@ private extension View {
 
 /// Three still rings around the Bluetooth mark. The single slow pulse runs only while searching.
 private struct SetupRadar: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let scanning: Bool
     let foundDot: Bool
 
@@ -643,7 +651,10 @@ private struct SetupRadar: View {
             Circle().strokeBorder(Color(white: 0.118), lineWidth: 1).frame(width: 280, height: 280)
             Circle().strokeBorder(Color(white: 0.118), lineWidth: 1).frame(width: 196, height: 196)
             Circle().strokeBorder(Color(white: 0.137), lineWidth: 1).frame(width: 112, height: 112)
-            if scanning { SetupPulse().frame(width: 280, height: 280) }
+            // The three still rings remain when motion is reduced or inactive.
+            if scanning && scenePhase == .active && !reduceMotion {
+                SetupPulse().frame(width: 280, height: 280)
+            }
             if foundDot {
                 Circle().fill(SPARCTheme.spark).frame(width: 14, height: 14)
                     .shadow(color: SPARCTheme.spark, radius: 8)
@@ -668,7 +679,7 @@ private struct SetupPulse: View {
     @State private var start = Date()
 
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { context in
             let elapsed = context.date.timeIntervalSince(start)
             let t = elapsed.truncatingRemainder(dividingBy: 3) / 3
             let eased = 1 - pow(1 - t, 3)

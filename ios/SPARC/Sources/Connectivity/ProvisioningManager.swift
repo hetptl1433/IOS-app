@@ -29,10 +29,11 @@ struct ControllerStatus: Equatable, Sendable {
     let wifi: WiFi?
 
     init?(_ body: [String: WireValue]) {
-        guard case .number(let uptime)? = body["uptimeSeconds"], case .bool(let bluetooth)? = body["bluetooth"] else { return nil }
-        uptimeSeconds = Int(uptime)
+        guard case .number(let uptime)? = body["uptimeSeconds"], uptime >= 0,
+              let seconds = Int(exactly: uptime), case .bool(let bluetooth)? = body["bluetooth"] else { return nil }
+        uptimeSeconds = seconds
         self.bluetooth = bluetooth
-        if case .number(let celsius)? = body["temperatureC"] { temperatureC = celsius } else { temperatureC = nil }
+        if case .number(let celsius)? = body["temperatureC"], celsius.isFinite, (-100...200).contains(celsius) { temperatureC = celsius } else { temperatureC = nil }
         if case .object(let fields)? = body["wifi"], case .bool(let connected)? = fields["connected"],
            case .bool(let canSetUp)? = fields["canSetUp"] {
             wifi = WiFi(connected: connected, ssid: fields["ssid"]?.string, canSetUp: canSetUp)
@@ -52,8 +53,9 @@ struct ControllerWiFiNetwork: Identifiable, Equatable, Sendable {
         guard case .array(let items)? = body["networks"] else { return [] }
         return items.compactMap { item in
             guard case .object(let fields) = item, let ssid = fields["ssid"]?.string, !ssid.isEmpty,
-                  case .number(let strength)? = fields["strength"], fields["secured"] == .bool(true) else { return nil }
-            return ControllerWiFiNetwork(ssid: ssid, strength: Int(strength))
+                  case .number(let strength)? = fields["strength"], (0...100).contains(strength),
+                  let percent = Int(exactly: strength), fields["secured"] == .bool(true) else { return nil }
+            return ControllerWiFiNetwork(ssid: ssid, strength: percent)
         }
     }
 }
@@ -64,6 +66,41 @@ struct DiscoveredController: Identifiable, Equatable {
     let rssi: Int
 }
 enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, paired, configuringWiFi, ready }
+
+/// A bounded FIFO for one radio. Cancelled views release their waiting request
+/// without keeping a continuation alive until a long network action finishes.
+@MainActor
+final class ControllerExchangeGate {
+    private let limit: Int
+    private var occupied = false
+    private var waiters: [(UUID, CheckedContinuation<Void, Error>)] = []
+    var waitingCount: Int { waiters.count }
+    init(limit: Int = 8) { self.limit = max(1, limit) }
+    func acquire() async throws {
+        try Task.checkCancellation()
+        if !occupied { occupied = true; return }
+        guard waiters.count < limit else { throw ControllerConnectionError.unavailable("The controller is busy. Wait for the current requests to finish.") }
+        let id = UUID()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                guard !Task.isCancelled else { continuation.resume(throwing: ControllerConnectionError.cancelled); return }
+                waiters.append((id, continuation))
+            }
+        }, onCancel: { [weak self] in Task { @MainActor in self?.cancel(id) } })
+    }
+    func release() {
+        if waiters.isEmpty { occupied = false }
+        else { waiters.removeFirst().1.resume() }
+    }
+    func cancelQueued() {
+        let queued = waiters; waiters.removeAll()
+        for (_, continuation) in queued { continuation.resume(throwing: ControllerConnectionError.cancelled) }
+    }
+    private func cancel(_ id: UUID) {
+        guard let index = waiters.firstIndex(where: { $0.0 == id }) else { return }
+        waiters.remove(at: index).1.resume(throwing: ControllerConnectionError.cancelled)
+    }
+}
 
 /// Core Bluetooth is deliberately initialized only after the user chooses Scan.
 @MainActor final class ProvisioningManager: NSObject, ObservableObject, BluetoothControllerTransport, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
@@ -85,6 +122,11 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     @Published private(set) var statusError: String?
     @Published private(set) var wifiNotice: String?
     var controllerForSetup: PairedController? { pendingController ?? savedController }
+    /// Copying an SD card does not copy its radio. Names alone must never
+    /// identify the saved controller while both original and replacement run.
+    func isSavedController(_ device: DiscoveredController) -> Bool {
+        savedController?.bluetoothPeripheralID.flatMap(UUID.init(uuidString:)) == device.id
+    }
     /// Status and Wi-Fi setup use the saved, encrypted Bluetooth pairing and never move it to the LAN.
     private var bluetoothController: PairedController? {
         savedController.flatMap { $0.bluetoothPeripheralID == nil ? nil : $0 }
@@ -106,7 +148,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     private var pendingResponse: Result<ControllerWireResponse, Error>?
     private var writeInFlight = false
     private var chunks: [Data] = []
-    private var receiveBuffer = ControllerFrameBuffer()
+    private var receiveBuffer = ControllerNotificationStream()
     private var timeoutTask: Task<Void, Never>?
     private var wantsScan = false
     private var reconnectCandidate: PairedController?
@@ -114,8 +156,14 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     private var challengeWaiter: CheckedContinuation<ControllerInfo, Error>?
     private var connectionAttemptID: UUID?
     private var challengeAttemptID: UUID?
-    private var exchangeInFlight = false
-    private var exchangeQueue: [CheckedContinuation<Void, Never>] = []
+    private let exchangeGate = ControllerExchangeGate()
+    /// True from Search until the owner pairs a controller, reconnects the saved one, or
+    /// cancels/leaves setup. The 15-second scan ends long before the owner taps a result,
+    /// and the app's background refresh (every 4 seconds, plus the refreshes each screen
+    /// runs when it appears) must not take the radio back to the saved controller in
+    /// between: that hid the found list behind "Connecting securely" and could switch the
+    /// screen to the saved Pi while the owner was choosing another one.
+    @Published private(set) var isChoosingController = false
 
     init(vault: any ControllerCredentialStore = ControllerVault.shared,
          verifyController: (@Sendable (PairedController) async throws -> Void)? = nil,
@@ -130,6 +178,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     /// Runtime polling must not replace this intent with an old saved peripheral.
     func prepareForBluetoothSetup() {
         cancel(); errorMessage = nil; devices = []; peripherals = [:]; wantsScan = true
+        isChoosingController = true
         stage = .scanning
         statusMessage = "Preparing to find your nearby controller…"
     }
@@ -145,18 +194,25 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         central?.scanForPeripherals(withServices: [Self.serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
-            guard !Task.isCancelled, let self, self.stage == .scanning else { return }
-            self.central?.stopScan(); self.stage = .idle; self.wantsScan = false
-            self.statusMessage = self.devices.isEmpty ? "No controller found. Bring it nearby and open its setup window, then scan again." : "Choose your controller below."
+            guard !Task.isCancelled, let self else { return }
+            self.finishScanning()
         }
+    }
+    /// Ends the 15-second scan. The list it found stays available while the owner chooses.
+    func finishScanning() {
+        guard stage == .scanning else { return }
+        central?.stopScan(); stage = .idle; wantsScan = false
+        statusMessage = devices.isEmpty ? "No controller found. Bring it nearby and open its setup window, then scan again." : "Choose your controller below."
     }
     func connect(_ device: DiscoveredController) {
         guard let candidate = peripherals[device.id], central?.state == .poweredOn else { return }
+        exchangeGate.cancelQueued()
         generation &+= 1; failConnectionWaiters(ControllerConnectionError.cancelled); failPending(ControllerConnectionError.cancelled); pendingController = nil; isWorking = false
         timeoutTask?.cancel(); central?.stopScan(); wantsScan = false; errorMessage = nil
         if let old = peripheral, old.identifier != candidate.identifier { central?.cancelPeripheralConnection(old) }
         peripheral = candidate; candidate.delegate = self; connectedDeviceName = device.name
         info = nil; codec = nil; infoCharacteristic = nil; writeCharacteristic = nil; notifyCharacteristic = nil
+        receiveBuffer = ControllerNotificationStream()
         stage = .connecting; statusMessage = "Connecting to \(device.name)…"
         central?.connect(candidate)
         timeoutTask = Task { [weak self] in
@@ -172,7 +228,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         let entered = setupKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let setupKey = ControllerPairingCode.setupKey(for: entered) ?? entered
         do {
-            codec = try ControllerWireCodec(setupKey: setupKey, info: info)
+            codec = try ControllerWireCodec(setupKey: setupKey, info: info, client: .current)
             let reply = try await exchange(operation: "pair")
             guard generation == attempt else { return }
             guard reply.body?["deviceId"]?.string == info.deviceId else { throw ControllerConnectionError.invalidMessage }
@@ -284,6 +340,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     }
     private func saveVerified(_ paired: PairedController) throws {
         try vault.save(paired); savedController = paired; pendingController = nil
+        isChoosingController = false
         if paired.bluetoothPeripheralID == nil { stopBluetooth() }
         stage = .ready
         statusMessage = paired.bluetoothPeripheralID == nil
@@ -296,6 +353,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         if paired.bluetoothPeripheralID == nil { await connectOnLAN(host: paired.host); return }
         let attempt = generation
         errorMessage = nil
+        // The owner picked the saved controller; if it can't be reached, they keep choosing.
+        let wasChoosing = isChoosingController
+        isChoosingController = false
         do {
             let proof = try await exchangeBLE(controller: paired, operation: "ping", body: [:])
             try Task.checkCancellation()
@@ -310,6 +370,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
             if Task.isCancelled || error is CancellationError { cancel(); return }
             errorMessage = error.localizedDescription
             stage = .idle
+            isChoosingController = wasChoosing
         }
     }
 
@@ -317,7 +378,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     /// Every operation obtains a fresh boot challenge and never retries a mutation.
     func exchangeBLE(controller: PairedController, operation: String,
                      body: [String: WireValue]) async throws -> [String: WireValue] {
-        try await routedExchange(controller: controller, operation: operation, body: body, timeout: 15)
+        let timeout: UInt64 = (operation.hasPrefix("tesla_") || operation == "activate_connection") ? 45
+            : (["check_smart_plug", "set_smart_plug_power"].contains(operation) ? 30 : 15)
+        return try await routedExchange(controller: controller, operation: operation, body: body, timeout: timeout)
     }
 
     /// Joining Wi-Fi can take the Pi up to a minute, so callers choose how long to wait.
@@ -325,10 +388,14 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
                                 body: [String: WireValue], timeout: UInt64) async throws -> [String: WireValue] {
         // Polling and a tapped control share one radio link: a control waits for
         // the in-flight poll instead of failing as busy. Nothing is retried.
-        if exchangeInFlight { await withCheckedContinuation { exchangeQueue.append($0) } }
-        else { exchangeInFlight = true }
-        defer { if exchangeQueue.isEmpty { exchangeInFlight = false } else { exchangeQueue.removeFirst().resume() } }
+        try await exchangeGate.acquire()
+        defer { exchangeGate.release() }
         try Task.checkCancellation()
+        // Covers every automatic path: the app-wide refresh loop, screen refreshes,
+        // history, Status and Wi-Fi all reach the radio through here.
+        guard !isChoosingController else {
+            throw ControllerConnectionError.unavailable("Finish choosing your controller in Settings, or cancel the search, then try again.")
+        }
         guard !wantsScan, (stage == .idle || stage == .ready),
               !isWorking, pending == nil, connectionWaiter == nil, challengeWaiter == nil else {
             throw ControllerConnectionError.unavailable("The Bluetooth controller is busy. Wait for the current request to finish.")
@@ -344,7 +411,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         guard generation == attempt else { throw ControllerConnectionError.cancelled }
         let challenge = try await readFreshChallenge()
         guard challenge.deviceId == controller.deviceID else { throw ControllerConnectionError.invalidMessage }
-        codec = try ControllerWireCodec(setupKey: controller.setupKey, info: challenge)
+        codec = try ControllerWireCodec(setupKey: controller.setupKey, info: challenge, client: .current)
         let response = try await exchange(operation: operation, body: body, timeout: timeout)
         try Task.checkCancellation()
         guard generation == attempt else { throw ControllerConnectionError.cancelled }
@@ -431,7 +498,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
     }
 
     func cancel() {
+        exchangeGate.cancelQueued()
         generation &+= 1; pendingController = nil; isWorking = false; errorMessage = nil
+        isChoosingController = false
         timeoutTask?.cancel(); timeoutTask = nil; wantsScan = false; central?.stopScan()
         failPending(ControllerConnectionError.cancelled)
         stopBluetooth()
@@ -443,7 +512,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         failConnectionWaiters(ControllerConnectionError.cancelled)
         let previous = peripheral
         peripheral = nil; infoCharacteristic = nil; writeCharacteristic = nil; notifyCharacteristic = nil; info = nil; codec = nil
-        connectedDeviceName = nil; receiveBuffer = ControllerFrameBuffer()
+        connectedDeviceName = nil; receiveBuffer = ControllerNotificationStream()
         if let previous { central?.cancelPeripheralConnection(previous) }
     }
     func forget() {
@@ -465,7 +534,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         // prepared writes; one ATT packet per chunk keeps every Pi write at offset 0.
         let mtu = max(20, min(peripheral.maximumWriteValueLength(for: .withoutResponse), 512))
         chunks = stride(from: 0, to: framed.count, by: mtu).map { Data(framed[$0..<min($0+mtu, framed.count)]) }
-        receiveBuffer = ControllerFrameBuffer(); pendingID = id
+        pendingID = id
         pendingResponse = nil; writeInFlight = false
         return try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { continuation in
@@ -570,6 +639,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         peripheral.readValue(for: info); peripheral.setNotifyValue(true, for: notify)
     }
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if characteristic.uuid == Self.notifyUUID { receiveBuffer = ControllerNotificationStream() }
         guard self.peripheral?.identifier == peripheral.identifier else { return }
         guard error == nil, characteristic.isNotifying else { connectionFailed(error ?? ControllerConnectionError.invalidMessage); return }
         finishDiscovery()
@@ -581,7 +651,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
         if let candidate = reconnectCandidate {
             do {
                 guard info?.deviceId == candidate.deviceID, let info else { throw ControllerConnectionError.invalidMessage }
-                codec = try ControllerWireCodec(setupKey: candidate.setupKey, info: info)
+                codec = try ControllerWireCodec(setupKey: candidate.setupKey, info: info, client: .current)
                 reconnectCandidate = nil; connectionAttemptID = nil
                 stage = .ready
                 statusMessage = "Your Bluetooth controller is connected."
@@ -590,6 +660,7 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
             } catch { connectionFailed(error) }
         } else {
             stage = .needsKey
+            #if DEBUG
             if info?.capabilities.contains("pairing-code") == true {
                 // Connect without typing; the code field appears only if this fails.
                 statusMessage = "Connecting to your controller…"
@@ -597,6 +668,9 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
             } else {
                 statusMessage = "Enter the setup key from this controller’s label or setup terminal."
             }
+            #else
+            statusMessage = "Enter the setup key from this controller’s label or setup terminal."
+            #endif
         }
     }
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
@@ -612,14 +686,16 @@ enum ProvisioningStage: String { case idle, scanning, connecting, needsKey, pair
                     waiter.resume(returning: decoded)
                 } else { finishDiscovery() }
             } catch { connectionFailed(error) }
-        } else if characteristic.uuid == Self.notifyUUID, pending != nil, let codec, let pendingID {
-            do {
-                guard let payload = try receiveBuffer.append(value) else { return }
-                let response = try codec.openResponse(payload, expectedID: pendingID)
+        } else if characteristic.uuid == Self.notifyUUID {
+            // Keep framing the shared stream even while this phone has no request.
+            for payload in receiveBuffer.append(value) {
+                guard pending != nil, let pendingID, let codec,
+                      let response = try? codec.openResponse(payload),
+                      response.id.caseInsensitiveCompare(pendingID) == .orderedSame else { continue }
                 pendingResponse = response.ok ? .success(response)
                     : .failure(ControllerConnectionError.unavailable(response.error?.message ?? "The controller could not complete this request."))
                 finishPendingResponse()
-            } catch { failPending(error, disconnect: true) }
+            }
         }
     }
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {

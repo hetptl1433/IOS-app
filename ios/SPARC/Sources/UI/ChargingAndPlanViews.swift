@@ -265,6 +265,12 @@ struct ChargingView: View {
     }
 
     var body: some View {
+        if store.profileConnectionMode == .tesla {
+            TeslaManualChargingView()
+        } else { virtualChargingBody }
+    }
+
+    private var virtualChargingBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -278,10 +284,6 @@ struct ChargingView: View {
                 sessionTiles.padding(.top, 10)
                 stateArea
                 limitRow.padding(.top, 12)
-                Text(footnote)
-                    .sparcFont(11.5).lineSpacing(2)
-                    .foregroundStyle(chargeFootnoteColor)
-                    .padding(.top, 14).padding(.horizontal, 4)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -352,7 +354,7 @@ struct ChargingView: View {
     }
 
     private var truck: some View {
-        CybertruckView(charging: charging)
+        ControllerVehicleView(charging: charging)
             .frame(maxWidth: .infinity)
             .background(alignment: .bottom) {
                 if charging {
@@ -464,7 +466,7 @@ struct ChargingView: View {
             SPARCStatTile(title: "To \(target)%",
                           value: hasReadings ? (store.snapshot.remainingMinutes > 0 ? SPARCFormat.duration(store.snapshot.remainingMinutes) : "Done") : "—")
             SPARCStatTile(title: "Cost so far",
-                          value: hasReadings ? SPARCFormat.money(store.snapshot.estimatedCost) : "—")
+                          value: hasReadings && store.snapshot.costAvailable != false ? SPARCFormat.money(store.snapshot.estimatedCost) : "—")
         }
     }
 
@@ -537,9 +539,9 @@ struct ChargingView: View {
     }
 
     private var resumeButton: some View {
-        SPARCActionButton(title: "Resume", symbol: "play.fill", kind: .primary, height: 58, busy: store.busy) { resume() }
+        SPARCActionButton(title: store.isDemo ? "Resume" : "Resume plan", symbol: "play.fill", kind: .primary, height: 58, busy: store.busy) { resume() }
             .shadow(color: SPARCTheme.spark.opacity(0.28), radius: 14, y: 10)
-            .accessibilityLabel("Resume charging")
+            .accessibilityLabel(store.isDemo ? "Resume charging" : "Resume smart charging plan")
             .accessibilityIdentifier("charge.resume")
     }
 
@@ -587,17 +589,8 @@ struct ChargingView: View {
         return "Ready by \(SPARCFormat.time(ready)) for your \(SPARCFormat.time(goal.departure)) drive"
     }
 
-    private var footnote: String {
-        var text = "Pausing or ending keeps your weekly plan."
-        if let planStartText { text += " It picks up again at \(planStartText)." }
-        return text + " Costs shown are estimates."
-    }
-
     private var endMessage: String {
-        var text = hasReadings ? "Your battery stays at \(store.snapshot.batteryPercent)%. " : ""
-        text += "Your weekly plan stays saved"
-        if let planStartText { text += " and starts again at \(planStartText)" }
-        return text + "."
+        hasReadings ? "Battery stays at \(store.snapshot.batteryPercent)%." : "Your weekly plan stays saved."
     }
 
     private func notice(_ text: String, symbol: String) -> some View {
@@ -627,7 +620,7 @@ struct ChargingView: View {
     private func resume() {
         Task { @MainActor in
             await store.resumeCharging()
-            if store.errorMessage == nil { toast("Charging resumed\(powerSuffix)") }
+            if store.errorMessage == nil { toast(state == .charging ? "Charging resumed\(powerSuffix)" : "Smart plan resumed") }
         }
     }
 
@@ -656,7 +649,14 @@ struct ChargingView: View {
 
 struct PlanView: View {
     @EnvironmentObject private var store: AppStore
-    var body: some View { PlanContent(initial: store.weekly) }
+    var body: some View {
+        VStack(spacing: 0) {
+            if !store.isDemo { ScheduleSourceControl(link: store.sleepCalendar) }
+            if store.sleepCalendarStatus?.enabled == true { AppleCalendarPlanView() }
+            else if !store.isDemo, store.campaign != nil { CampaignPlanView() }
+            else { PlanContent(initial: store.weekly) }
+        }
+    }
 }
 
 private struct PlanEstimate {
@@ -706,8 +706,6 @@ private struct PlanContent: View {
                     Text("Your charging rhythm.").sparcFont(30, weight: .bold).tracking(-0.9)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Less thinking about charging. More getting on with your day.")
-                        .sparcFont(14).foregroundStyle(SPARCTheme.muted)
                 }
                 tonightCard.padding(.top, 16)
                 WeeklyRoutineCard(draft: $draft, justSaved: justSaved, message: weeklyMessage,
@@ -719,9 +717,6 @@ private struct PlanContent: View {
                     .padding(.top, 12)
                 onceCard.padding(.top, 12)
                 goodHoursCard.padding(.top, 12)
-                Text("Times in Chicago time. Ready 30 minutes before you leave.")
-                    .sparcFont(11.5).foregroundStyle(chargeFootnoteColor)
-                    .padding(.top, 16).padding(.horizontal, 4)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -755,7 +750,7 @@ private struct PlanContent: View {
     private func makeEstimate() -> PlanEstimate {
         let now = Date()
         let calendar = ScheduleEngine.chicagoCalendar
-        let rates: HourlyRates? = store.isVirtualCarActive ? HourlyRates.model(now: now) : nil
+        let rates: HourlyRates? = (store.isDemo && store.isVirtualCarActive) ? HourlyRates.model(now: now) : nil
         var plan = PlanEstimate()
 
         guard let goal = ScheduleEngine.effectiveGoal(weekly: draft, today: store.today, now: now) else {
@@ -996,9 +991,6 @@ private struct PlanContent: View {
             } else {
                 onceEditor.padding(.top, 14).transition(.opacity)
             }
-            Text("Your weekly routine comes back after this departure.")
-                .sparcFont(12).foregroundStyle(chargeFootnoteColor)
-                .padding(.top, 12).padding(.horizontal, 2)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1097,9 +1089,10 @@ private struct PlanContent: View {
     // MARK: Good hours
 
     @ViewBuilder private var goodHoursCard: some View {
-        if store.isVirtualCarActive {
+        if (store.isDemo && store.isVirtualCarActive) {
             GoodHoursCard(rates: HourlyRates.model(), title: "Your good hours")
         } else {
+            RatePageButton {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Your good hours").sparcFont(17, weight: .semibold).tracking(-0.2)
@@ -1107,16 +1100,14 @@ private struct PlanContent: View {
                     Spacer(minLength: 8)
                     Text("¢ per kWh").sparcFont(12).foregroundStyle(SPARCTheme.tertiary)
                 }
-                Text(store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.currentRateCents, digits: 1))¢" : "—")
+                Text(store.currentCombinedRate.map { "\(SPARCFormat.decimal($0,digits: 1))¢" } ?? "—")
                     .sparcFont(34, weight: .bold).tracking(-1.2).monospacedDigit()
                     .foregroundStyle(SPARCTheme.spark)
-                Text("Current total rate. Hourly prices appear here when your controller provides them.")
-                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .sparcSurface(radius: 28)
+            }.buttonStyle(SPARCPressStyle()).accessibilityIdentifier("plan.rates")
         }
     }
 }
@@ -1520,16 +1511,25 @@ struct CurrentScheduleView: View {
     @Environment(\.sparcToast) private var toast
 
     var body: some View {
-        SchedulePage(title: "Current schedule.", subtitle: "A little planning. A calmer morning.") {
+        VStack(spacing: 0) {
+            if !store.isDemo { ScheduleSourceControl(link: store.sleepCalendar) }
+            if store.sleepCalendarStatus?.enabled == true { AppleCalendarPlanView() }
+            else if !store.isDemo, store.campaign != nil { CampaignPlanView() }
+            else { legacyBody }
+        }
+    }
+
+    private var legacyBody: some View {
+        SchedulePage(title: "Current schedule.") {
             if let error = store.errorMessage { ScheduleNote(text: error, symbol: "exclamationmark.circle", warning: true) }
             summaryCard
             NavigationLink(destination: TodayScheduleEditor()) {
-                SPARCNavigationButton(title: "Update just today", subtitle: "One departure. Your routine stays saved.", symbol: "calendar.badge.clock")
+                SPARCNavigationButton(title: "Update just today", symbol: "calendar.badge.clock")
             }
             .buttonStyle(SPARCPressStyle())
             .accessibilityIdentifier("schedule.today")
             NavigationLink(destination: WeeklyScheduleEditor()) {
-                SPARCNavigationButton(title: "Change weekly schedule", subtitle: "Update your recurring charging routine.", symbol: "calendar")
+                SPARCNavigationButton(title: "Change weekly schedule", symbol: "calendar")
             }
             .buttonStyle(SPARCPressStyle())
             .accessibilityIdentifier("schedule.weekly")
@@ -1548,9 +1548,6 @@ struct CurrentScheduleView: View {
                 .disabled(store.busy)
                 .accessibilityIdentifier("schedule.removeToday")
             }
-            Text("Ready 30 minutes before departure. A one-time update expires at departure automatically.")
-                .sparcFont(12).foregroundStyle(chargeFootnoteColor)
-                .padding(.horizontal, 2)
         }
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1568,7 +1565,6 @@ struct CurrentScheduleView: View {
                 metric("Target battery", store.displayedTarget)
                 metric("Ready by", store.displayedReadyTime)
             }
-            Text("Time zone · Chicago").sparcFont(12).foregroundStyle(SPARCTheme.tertiary)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1597,7 +1593,7 @@ struct TodayScheduleEditor: View {
     @State private var validation: String?
 
     var body: some View {
-        SchedulePage(title: "Just this departure.", subtitle: "Early start? Extra miles? Make one small change.") {
+        SchedulePage(title: "Just this departure.") {
             VStack(alignment: .leading, spacing: 18) {
                 RoutineTargetControl(target: $target, title: "Target battery")
                 Rectangle().fill(Color(white: 0.118)).frame(height: 1)
@@ -1608,13 +1604,10 @@ struct TodayScheduleEditor: View {
                     .tint(SPARCTheme.spark)
                     .environment(\.timeZone, SPARCFormat.zone)
                     .accessibilityIdentifier("schedule.departure")
-                Text("America/Chicago · ready 30 minutes earlier")
-                    .sparcFont(11.5).foregroundStyle(SPARCTheme.tertiary)
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .sparcSurface(radius: 28)
-            ScheduleNote(text: "Your saved weekly schedule resumes after this departure.", symbol: "calendar.badge.checkmark")
             if let message = validation ?? store.errorMessage {
                 Text(message).sparcFont(13).foregroundStyle(SPARCTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1653,12 +1646,11 @@ struct WeeklyScheduleEditor: View {
     @State private var validation: String?
 
     var body: some View {
-        SchedulePage(title: "Make it your routine.", subtitle: "The charge you want. The morning you need.") {
+        SchedulePage(title: "Make it your routine.") {
             WeeklyRoutineCard(draft: $draft, message: validation ?? store.errorMessage,
                               saveTitle: "Save routine", busy: store.busy,
                               onSave: save,
                               onBlockedDay: { validation = ScheduleValidationError.days.errorDescription })
-            ScheduleNote(text: "Ready 30 minutes before departure. All times in America/Chicago.", symbol: "checkmark.shield")
         }
         .navigationBarTitleDisplayMode(.inline)
         .disabled(store.busy)
@@ -1679,37 +1671,14 @@ struct WeeklyScheduleEditor: View {
 // MARK: - Prices (opened from Home)
 
 struct PricesView: View {
-    @EnvironmentObject private var store: AppStore
-
-    var body: some View {
-        SchedulePage(title: "Find your good hours.",
-                     subtitle: store.isVirtualCarActive ? "Estimated hourly prices · Chicago time" : "Rates reported by your home controller") {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(store.showsTelemetry ? "\(SPARCFormat.decimal(store.snapshot.currentRateCents, digits: 1))¢" : "—")
-                    .sparcFont(62, weight: .bold).tracking(-2.5).monospacedDigit()
-                    .foregroundStyle(SPARCTheme.spark)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                Text("Current total rate per kWh · estimated")
-                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
-            }
-            .padding(.top, 4)
-            .accessibilityElement(children: .combine)
-            if store.isVirtualCarActive {
-                GoodHoursCard(rates: HourlyRates.model(), title: "Hour by hour")
-            } else {
-                ScheduleNote(text: "The controller reports the current rate. Hourly history will appear when the controller provides it.",
-                             symbol: "chart.bar")
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-    }
+    var body: some View { ElectricityRatesView() }
 }
 
 // MARK: - Navigation row
 
 struct SPARCNavigationButton: View {
     let title: String
-    let subtitle: String
+    var subtitle: String? = nil
     var symbol: String
 
     var body: some View {
@@ -1722,8 +1691,10 @@ struct SPARCNavigationButton: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).sparcFont(15, weight: .semibold).foregroundStyle(.white)
-                Text(subtitle).sparcFont(12.5).foregroundStyle(SPARCTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(subtitle).sparcFont(12.5).foregroundStyle(SPARCTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 4)
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))

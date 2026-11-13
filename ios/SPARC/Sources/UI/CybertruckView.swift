@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Keep the approved truck art for that model; other vehicles use an honest
+/// generic silhouette until their own assets are available.
+struct ControllerVehicleView: View {
+    @EnvironmentObject private var store: AppStore
+    let charging: Bool
+    var body: some View {
+        if store.usesCybertruckArtwork {
+            CybertruckView(charging: charging)
+        } else {
+            ZStack {
+                Color.clear.aspectRatio(1.5, contentMode: .fit)
+                Image(systemName: "car.side.fill").resizable().scaledToFit()
+                    .foregroundStyle(LinearGradient(colors: [.white.opacity(0.9), Color(white: 0.4)], startPoint: .top, endPoint: .bottom))
+                    .padding(.horizontal, 24).padding(.vertical, 34)
+                if charging {
+                    Image(systemName: "bolt.fill").font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(SPARCTheme.spark).offset(y: 35)
+                }
+            }
+            .accessibilityLabel("\(store.displayVehicleName), generic vehicle illustration\(charging ? ", charging" : "")")
+            .accessibilityIdentifier("vehicle.genericModel")
+        }
+    }
+}
+
 /// The light uses the same normalized coordinates as the approved cutout asset.
 /// The image's light bar is off; only an actual charging state adds illumination.
 struct CybertruckView: View {

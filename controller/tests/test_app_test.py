@@ -157,7 +157,9 @@ class AppTestServiceTests(unittest.IsolatedAsyncioTestCase):
         await self.exchange('charge_now')
         weekly = await self.fixed_schedule()
         self.assertEqual((await self.snapshot())['state'], 'waiting')
-        self.assertEqual((await self.exchange('get_settings'))['body'], {'weekly': weekly, 'today': None, 'virtualCarEnabled': True})
+        settings=(await self.exchange('get_settings'))['body']
+        self.assertEqual({key:settings[key] for key in ('weekly','today','virtualCarEnabled')}, {'weekly': weekly, 'today': None, 'virtualCarEnabled': True})
+        self.assertEqual(settings['control']['operation'],'set_weekly')
         before = self.service.settings
         weekly = dict(weekly, targetPercent=90)
         with patch('sparc_controller.service.atomic_save', side_effect=OSError('test disk failure')):

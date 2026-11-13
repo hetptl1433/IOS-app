@@ -102,14 +102,15 @@ def render() -> tuple[str, str]:
     ])
     for index, target in enumerate(source_sets):
         settings: dict[str, object] = {
-            "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "1",
-            "MARKETING_VERSION": "0.1.0", "PRODUCT_NAME": "$(TARGET_NAME)",
+            "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "13",
+            "MARKETING_VERSION": "0.2.0", "PRODUCT_NAME": "$(TARGET_NAME)",
             "PRODUCT_BUNDLE_IDENTIFIER": "com.hetpatel.sparc" + ("" if target == "SPARC" else "." + target),
             "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator", "TARGETED_DEVICE_FAMILY": "1",
             "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
             "GENERATE_INFOPLIST_FILE": "YES" if target != "SPARC" else "NO",
         }
         if target == "SPARC":
+            settings["DEVELOPMENT_TEAM"] = "VN6463GX9K"
             settings.update({"INFOPLIST_FILE": "SPARC/Info.plist", "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon", "ENABLE_PREVIEWS": "YES"})
         elif target == "SPARCTests":
             settings.update({"BUNDLE_LOADER": "$(TEST_HOST)", "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/SPARC.app/SPARC"})
@@ -148,7 +149,7 @@ def render() -> tuple[str, str]:
       <TestableReference skipped="NO" parallelizable="NO">{ref(ui, "SPARCUITests", "SPARCUITests.xctest")}</TestableReference>
     </Testables>
   </TestAction>
-  <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{ref(app, "SPARC", "SPARC.app")}</BuildableProductRunnable></LaunchAction>
+  <LaunchAction buildConfiguration="Release" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{ref(app, "SPARC", "SPARC.app")}</BuildableProductRunnable></LaunchAction>
   <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">{ref(app, "SPARC", "SPARC.app")}</BuildableProductRunnable></ProfileAction>
   <AnalyzeAction buildConfiguration="Debug"/>
   <ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>

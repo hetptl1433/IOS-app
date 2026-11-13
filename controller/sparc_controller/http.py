@@ -29,7 +29,7 @@ class HTTPTransport:
             return
         self.active += 1
         try:
-            status, body = await asyncio.wait_for(self.request(reader), 12)
+            status, body = await asyncio.wait_for(self.request(reader), 45)
             payload = compact_json(body) if isinstance(body, dict) else body
             writer.write(f"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nContent-Length: {len(payload)}\r\nConnection: close\r\n\r\n".encode() + payload)
             await writer.drain()
@@ -42,7 +42,7 @@ class HTTPTransport:
             except ConnectionError: pass
 
     async def request(self, reader):
-        raw = await reader.readuntil(b"\r\n\r\n")
+        raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 10)
         if len(raw) > 8192: return "431 Request Header Fields Too Large", {"error": "headers_too_large"}
         lines = raw.decode("ascii").split("\r\n")
         first = lines[0].split(" ")
@@ -61,7 +61,7 @@ class HTTPTransport:
         if method != "POST" or path != "/v1/exchange": return "404 Not Found", {"error": "not_found"}
         length = int(headers.get("content-length", "0"))
         if not 1 <= length <= MAX_FRAME: return "413 Content Too Large", {"error": "invalid_length"}
-        data = await reader.readexactly(length)
+        data = await asyncio.wait_for(reader.readexactly(length), 10)
         try:
             return "200 OK", await self.service.handle(data, "lan")
         except ProtocolError:

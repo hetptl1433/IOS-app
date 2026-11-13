@@ -3,6 +3,20 @@ import CryptoKit
 @testable import SPARC
 
 final class ControllerProtocolTests: XCTestCase {
+    func testSmartPlugFollowVirtualEncodesAndDecodesAsOptional() throws {
+        let update = ConnectionSettingsUpdate(mode: .virtual,
+            smartPlug: .init(address: "192.168.1.80", vehicleSource: .virtual, followVirtual: true), expectedRevision: 3)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any]
+        let plug = json?["smartPlug"] as? [String: Any]
+        XCTAssertEqual(plug?["followVirtual"] as? Bool, true)
+        let omitted = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ConnectionSettingsUpdate(mode: .virtual,
+            smartPlug: .init(address: "192.168.1.80", vehicleSource: .virtual), expectedRevision: 3))) as? [String: Any]
+        XCTAssertNil((omitted?["smartPlug"] as? [String: Any])?["followVirtual"])
+        let decoded = try JSONDecoder().decode(ControllerConnections.SmartPlug.self,
+            from: Data(#"{"address":"192.168.1.80","vehicleSource":"virtual","status":"connected"}"#.utf8))
+        XCTAssertNil(decoded.followVirtual)
+    }
+
     private struct Fixture: Decodable {
         struct Request: Decodable {
             let id: String
@@ -435,6 +449,43 @@ final class ControllerProtocolTests: XCTestCase {
         XCTAssertEqual(lanOperations, ["get_settings", "get_snapshot", "set_weekly", "set_today", "pause", "set_virtual_car"])
     }
 
+    func testTeslaActivationAndCommandsUseSavedBluetoothAndValidateLimitBeforeSending() async throws {
+        var paired = pairedController()
+        paired.bluetoothPeripheralID = UUID().uuidString
+        let bluetooth = RecordingBluetoothTransport()
+        let lan = RecordingLANClient()
+        let client = ControllerClientRouter(vault: MemoryControllerCredentialStore(paired), bluetooth: bluetooth, lan: lan)
+        try await client.activateConnection(.tesla)
+        try await client.teslaCommand(.setLimit, value: 80)
+        do { try await client.teslaCommand(.setLimit, value: 49); XCTFail("An invalid charge limit was sent") } catch {}
+        do { try await client.teslaCommand(.start, value: 80); XCTFail("An unexpected command parameter was sent") } catch {}
+        do { try await client.activateConnection(.smartPlug); XCTFail("An unsupported provider was activated") } catch {}
+        let operations = await bluetooth.operations
+        let bodies = await bluetooth.bodies
+        let lanOperations = await lan.operations
+        XCTAssertEqual(operations, ["activate_connection", "tesla_command"])
+        XCTAssertEqual(bodies[0], ["mode": .string("tesla")])
+        XCTAssertEqual(bodies[1], ["command": .string("set_charge_limit"), "value": .number(80)])
+        XCTAssertTrue(lanOperations.isEmpty)
+    }
+
+    func testTeslaCommandRequiresMatchingAcceptedReceiptAndNeverRetries() async throws {
+        var paired = pairedController()
+        paired.bluetoothPeripheralID = UUID().uuidString
+        let invalidReceipts: [[String: WireValue]] = [[:], ["accepted": .bool(false), "command": .string("charge_start")],
+                                                     ["accepted": .bool(true), "command": .string("charge_stop")]]
+        for receipt in invalidReceipts {
+            let bluetooth = RecordingBluetoothTransport(receiptOverride: receipt)
+            let lan = RecordingLANClient()
+            let client = ControllerClientRouter(vault: MemoryControllerCredentialStore(paired), bluetooth: bluetooth, lan: lan)
+            do { try await client.teslaCommand(.start, value: nil); XCTFail("An unconfirmed Tesla command was accepted") } catch {}
+            let operations = await bluetooth.operations
+            let lanOperations = await lan.operations
+            XCTAssertEqual(operations, ["tesla_command"])
+            XCTAssertTrue(lanOperations.isEmpty)
+        }
+    }
+
     func testMalformedSavedBluetoothIdentityFailsBeforeEitherTransport() async throws {
         var paired = pairedController()
         paired.bluetoothPeripheralID = "not-a-peripheral-uuid"
@@ -468,6 +519,23 @@ final class ControllerProtocolTests: XCTestCase {
     }
 
     @MainActor
+    func testReplacementDistinguishesCopiedControllerNameBySavedRadioAndPreservesPairingOnCancel() throws {
+        let oldRadio = UUID()
+        var paired = pairedController()
+        paired.bluetoothPeripheralID = oldRadio.uuidString.lowercased()
+        let storage = MemoryControllerCredentialStore(paired)
+        let manager = ProvisioningManager(vault: storage)
+        let oldPi = DiscoveredController(id: oldRadio, name: "SPARC-D0D4", rssi: -65)
+        let newPi = DiscoveredController(id: UUID(), name: oldPi.name, rssi: -40)
+        XCTAssertTrue(manager.isSavedController(oldPi))
+        XCTAssertFalse(manager.isSavedController(newPi), "A copied name must not identify the saved radio")
+        manager.prepareForBluetoothSetup()
+        manager.cancel()
+        XCTAssertEqual(manager.savedController, paired)
+        XCTAssertEqual(try storage.load(), paired)
+    }
+
+    @MainActor
     func testSavedBLEPollingCannotReplaceAnOwnersNewBluetoothSetup() async throws {
         var paired = pairedController()
         paired.bluetoothPeripheralID = UUID().uuidString
@@ -491,6 +559,59 @@ final class ControllerProtocolTests: XCTestCase {
         XCTAssertEqual(try storage.load(), paired)
         manager.cancel()
         XCTAssertEqual(manager.stage, .idle)
+    }
+
+    @MainActor
+    func testSavedBLEPollingWaitsWhileOwnerChoosesFromTheFoundList() async throws {
+        var paired = pairedController()
+        paired.bluetoothPeripheralID = UUID().uuidString
+        let storage = MemoryControllerCredentialStore(paired)
+        let manager = ProvisioningManager(vault: storage)
+        manager.prepareForBluetoothSetup()
+        XCTAssertTrue(manager.isChoosingController)
+        // The 15-second scan ends; the list stays on screen while the owner chooses.
+        manager.finishScanning()
+        XCTAssertEqual(manager.stage, .idle)
+        // The app-wide refresh loop (every 4 seconds) reaches the radio through the router.
+        let router = ControllerClientRouter(vault: storage, bluetooth: manager, lan: RecordingLANClient())
+        do {
+            _ = try await router.fetchSnapshot()
+            XCTFail("A background poll took Bluetooth back to the saved controller while the owner was choosing")
+        } catch {}
+        do {
+            _ = try await manager.exchangeBLE(controller: paired, operation: "get_settings", body: [:])
+            XCTFail("A direct poll took Bluetooth back to the saved controller while the owner was choosing")
+        } catch {}
+        // Status & Wi-Fi refresh on their own when their screens appear.
+        await manager.refreshStatus()
+        XCTAssertNotNil(manager.statusError)
+        await manager.scanWiFi()
+        XCTAssertTrue(manager.wifiNetworks.isEmpty)
+        XCTAssertEqual(manager.stage, .idle, "The found list must stay usable, not switch to reconnecting")
+        XCTAssertFalse(manager.isWorking)
+        XCTAssertNil(manager.connectedDeviceName)
+        XCTAssertTrue(manager.isChoosingController)
+        XCTAssertEqual(manager.savedController, paired)
+        XCTAssertEqual(try storage.load(), paired)
+        // Leaving or cancelling setup lets polling use the saved controller again.
+        manager.cancel()
+        XCTAssertFalse(manager.isChoosingController)
+    }
+
+    @MainActor
+    func testNearbyListMarksTheSavedControllerAndNamesItLikeThePi() throws {
+        var paired = pairedController()
+        let savedPeripheral = UUID()
+        paired.bluetoothPeripheralID = savedPeripheral.uuidString.lowercased()
+        let manager = ProvisioningManager(vault: MemoryControllerCredentialStore(paired))
+        // The Pi advertises "SPARC-" + the first four characters of its ID, uppercased (bluez.py LocalName).
+        XCTAssertEqual(paired.bluetoothName, "SPARC-2DA0")
+        XCTAssertEqual(paired.displayName, "SPARC-2DA0 · SPARC Test Pi")
+        XCTAssertTrue(manager.isSavedController(DiscoveredController(id: savedPeripheral, name: "SPARC-2DA0", rssi: -60)))
+        XCTAssertFalse(manager.isSavedController(DiscoveredController(id: UUID(), name: "SPARC-8672", rssi: -40)))
+        let unsaved = ProvisioningManager(vault: MemoryControllerCredentialStore(nil))
+        XCTAssertFalse(unsaved.isSavedController(DiscoveredController(id: savedPeripheral, name: "SPARC-2DA0", rssi: -60)))
+        XCTAssertFalse(unsaved.isChoosingController)
     }
 
     @MainActor
@@ -712,13 +833,15 @@ private actor RecordingBluetoothTransport: BluetoothControllerTransport {
     private(set) var bodies: [[String: WireValue]] = []
     private(set) var deviceIDs: [String] = []
     private let fail: Bool
-    init(fail: Bool = false) { self.fail = fail }
+    private let receiptOverride: [String: WireValue]?
+    init(fail: Bool = false, receiptOverride: [String: WireValue]? = nil) { self.fail = fail; self.receiptOverride = receiptOverride }
     func exchangeBLE(controller: PairedController, operation: String, body: [String: WireValue]) async throws -> [String: WireValue] {
         operations.append(operation); bodies.append(body); deviceIDs.append(controller.deviceID)
         if fail { throw ControllerConnectionError.timeout }
         switch operation {
         case "get_settings": return try WireValue.dictionary(ControllerSettings(weekly: .default, today: nil))
         case "get_snapshot": return try WireValue.dictionary(ChargeSnapshot.demo())
+        case "tesla_command": return receiptOverride ?? ["accepted": .bool(true), "command": body["command"] ?? .null]
         default: return [:]
         }
     }

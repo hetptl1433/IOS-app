@@ -1,40 +1,72 @@
 import SwiftUI
+import UIKit
 
 struct SPARCRootView: View {
     @EnvironmentObject private var store: AppStore
     @State private var selectedTab: SPARCTab = .home
     @State private var sheet: HomeSheet?
+    @State private var tabBarTop: CGFloat?
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            // Tabs switch in place: no slide, no cross-fade.
-            Group {
-                switch selectedTab {
-                case .home:
-                    HomeView(onSettings: { sheet = .settings },
-                             onSchedule: { sheet = .schedule },
-                             onConnection: { sheet = .connection },
-                             onCharge: { selectedTab = .charge },
-                             onInsights: { selectedTab = .insights },
-                             onPlan: { selectedTab = .plan })
-                case .charge: ChargingView(onPlan: { selectedTab = .plan }, onConnection: { sheet = .connection })
-                case .plan: PlanView()
-                case .insights: InsightsView()
-                case .records: RecordsView()
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                profileSelector
+                // Tabs switch in place: no slide, no cross-fade.
+                Group {
+                    switch selectedTab {
+                    case .home:
+                        if store.profileConnectionMode == .tesla {
+                            TeslaManualChargingView(onSettings: { selectedTab = .settings })
+                        } else {
+                            HomeView(onSettings: { selectedTab = .settings },
+                                 onSchedule: { sheet = .schedule },
+                                 onConnection: { sheet = .connection },
+                                 onCharge: { selectedTab = .charge },
+                                 onInsights: { selectedTab = .insights },
+                                 onPlan: { selectedTab = .plan })
+                        }
+                    case .charge: ChargingView(onPlan: { selectedTab = .plan }, onConnection: { sheet = .connection })
+                    case .plan:
+                        if store.profileConnectionMode == .tesla {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    Text("Tesla charging is manual").sparcFont(30, weight: .bold)
+                                    Button("Open Tesla setup") { sheet = .connection }
+                                }.padding(16)
+                            }
+                        } else { PlanView() }
+                    case .insights: InsightsView()
+                    case .settings:
+                        NavigationStack {
+                            SettingsView()
+                                .toolbarBackground(.black, for: .navigationBar)
+                        }
+                    }
                 }
+                // Only the tab pages sit under the floating bar; sheets keep the default (nil).
+                .id(store.activeCarProfileID)
+                .environment(\.sparcTabBarTop, tabBarTop)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .padding(.top, topSafeAreaDeficit(geometry))
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
+        .background(Color.black.ignoresSafeArea())
         .foregroundStyle(.white)
+        .task(id: store.activeCarProfileID + (store.connectionsIsStale ? ":stale" : ":ready")) { await store.prepareCarProfile() }
+        .onChange(of: store.activeCarProfileID) { _, _ in sheet = nil }
         // The bar floats over the pages. As a bottom inset it also gives every page's scroll view the right content inset.
-        .safeAreaInset(edge: .bottom, spacing: 0) { tabBarArea }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            tabBarArea
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { tabBarTop = $0 }
+        }
         .ignoresSafeArea(.container, edges: .bottom)
         .sparcToastHost()
         .sheet(item: $sheet) { value in
             NavigationStack {
                 Group {
                     switch value {
-                    case .settings: SettingsView()
+                    case .cars: CarProfilesView()
                     case .schedule: CurrentScheduleView()
                     case .prices: PricesView()
                     case .connection: ConnectionView()
@@ -55,6 +87,39 @@ struct SPARCRootView: View {
         } message: { Text(store.errorMessage ?? "Please try again.") }
         .preferredColorScheme(.dark)
         .tint(.white)
+    }
+
+    // Some device windows report a smaller top inset than their scene's status bar.
+    // Add only that measured deficit; a correct native inset adds no padding.
+    private func topSafeAreaDeficit(_ geometry: GeometryProxy) -> CGFloat {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        let statusBarHeight = scene?.statusBarManager?.statusBarFrame.height ?? 0
+        return max(0, statusBarHeight - geometry.safeAreaInsets.top)
+    }
+
+    private var profileSelector: some View {
+        Menu {
+            Button { store.chooseCarProfile("virtual") } label: {
+                Label("Virtual " + (store.connections?.virtual.model.title ?? "car"), systemImage: store.profileConnectionMode == .virtual ? "checkmark.circle.fill" : "car.side")
+            }
+            ForEach(store.connections?.tesla.vehicles ?? []) { car in
+                Button { store.chooseCarProfile("tesla:" + car.id) } label: {
+                    Label(car.name(among: store.connections?.tesla.vehicles ?? []), systemImage: store.profileTeslaID == car.id ? "checkmark.circle.fill" : "car.side")
+                }
+            }
+            Divider()
+            Button("Manage cars and accounts", systemImage: "gearshape") { sheet = .connection }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "car.side.fill").foregroundStyle(SPARCTheme.spark)
+                Text(store.chargingCarName).sparcFont(15, weight: .semibold).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
+                Spacer()
+                if store.busy { ProgressView().tint(SPARCTheme.spark) }
+            }.padding(.horizontal, 20).frame(minHeight: 44).background(.black)
+        }.accessibilityLabel("Car profile: " + store.chargingCarName)
+            .accessibilityIdentifier("profile.currentCar")
     }
 
     // MARK: Floating tab bar
@@ -92,7 +157,7 @@ struct SPARCRootView: View {
             Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.07), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.6), radius: 20, y: 16)
-        // Large text sizes would crowd five tabs; the bar stays readable at the top of the normal range.
+        // Keep the floating bar readable at the top of the normal text-size range.
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
@@ -117,12 +182,12 @@ struct SPARCRootView: View {
         .buttonStyle(SPARCPressStyle())
         .accessibilityLabel(tab.rawValue)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("tab.\(tab.rawValue.lowercased())")
+        .accessibilityIdentifier("tab.\(tab == .insights ? "insights" : tab.rawValue.lowercased())")
     }
 }
 
 private enum SPARCTab: String, CaseIterable, Identifiable {
-    case home = "Home", charge = "Charge", plan = "Plan", insights = "Insights", records = "Records"
+    case home = "Home", charge = "Charge", plan = "Plan", insights = "Savings", settings = "Settings"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -130,13 +195,13 @@ private enum SPARCTab: String, CaseIterable, Identifiable {
         case .charge: return "bolt"
         case .plan: return "calendar"
         case .insights: return "chart.line.uptrend.xyaxis"
-        case .records: return "clock"
+        case .settings: return "gearshape"
         }
     }
 }
 
 private enum HomeSheet: String, Identifiable {
-    case settings, schedule, prices, connection
+    case schedule, prices, connection, cars
     var id: String { rawValue }
 }
 
@@ -157,6 +222,7 @@ private enum HomeTone {
 
 private struct HomeView: View {
     @EnvironmentObject private var store: AppStore
+    @AppStorage(SavingsComparison.storageKey) private var savingsComparison: SavingsComparison = .fixedPlan
     @EnvironmentObject private var provisioning: ProvisioningManager
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -185,9 +251,6 @@ private struct HomeView: View {
                     if store.smartNightStreak > 0 { streakCard.padding(.top, 12) }
                     tiles.padding(.top, 10)
                     planCard.padding(.top, 10)
-                    Text("Times in Chicago time. Pull down to refresh.")
-                        .sparcFont(11.5).foregroundStyle(HomeTone.footnote)
-                        .padding(.horizontal, 4).padding(.top, 16)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -430,13 +493,13 @@ private struct HomeView: View {
     }
 
     private var truckStage: some View {
-        CybertruckView(charging: isCharging)
+        ControllerVehicleView(charging: isCharging)
             .frame(maxWidth: .infinity)
             .background {
                 if isCharging {
                     // A still, soft glow under the truck while it charges.
                     GeometryReader { proxy in
-                        let width = proxy.size.width * 0.78
+                        let width = max(1, proxy.size.width * 0.78)
                         Circle()
                             .fill(RadialGradient(colors: [SPARCTheme.spark.opacity(0.55), SPARCTheme.spark.opacity(0)],
                                                  center: .center, startRadius: 0, endRadius: width / 2))
@@ -523,7 +586,7 @@ private struct HomeView: View {
             if store.effectiveGoal == nil { return "Your routine is paused. Charge now whenever you're ready." }
             if planStartsLater {
                 var text = "Starts at \(SPARCFormat.time(snapshot.windowStart))"
-                if store.isVirtualCarActive {
+                if (store.isDemo && store.isVirtualCarActive) {
                     let planned = VirtualCarState.exampleRate(at: snapshot.windowStart)
                     if planned < snapshot.currentRateCents { text += ", in the \(Self.cents(planned))¢ hours" }
                 }
@@ -540,7 +603,7 @@ private struct HomeView: View {
                     SPARCActionButton(title: "Pause", symbol: "pause.fill", kind: .secondary, height: 50, busy: store.busy, action: pause)
                         .accessibilityIdentifier("home.pause")
                 } else {
-                    SPARCActionButton(title: "Resume", symbol: "play.fill", kind: .tinted, height: 50, busy: store.busy, action: resume)
+                    SPARCActionButton(title: store.isDemo ? "Resume" : "Resume plan", symbol: "play.fill", kind: .tinted, height: 50, busy: store.busy, action: resume)
                         .accessibilityIdentifier("home.resume")
                 }
                 Button(action: onCharge) {
@@ -708,6 +771,12 @@ private struct HomeView: View {
     private var tiles: some View {
         HStack(alignment: .top, spacing: 10) {
             savingsTile
+                .overlay(alignment: .topTrailing) {
+                    SPARCInfoButton("How savings are calculated") {
+                        Text("Compared with charging right away at a fixed price.")
+                    }
+                    .padding(.top, 2).padding(.trailing, 2)
+                }
             rateTile
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -724,12 +793,16 @@ private struct HomeView: View {
         return store.showsTelemetry ? 0 : nil
     }
 
-    private var savingsCaption: String? {
-        let recent = recentRecords
-        let saved = recent.reduce(0) { $0 + $1.savings }
-        let spent = recent.reduce(0) { $0 + $1.cost }
-        guard saved > 0, saved + spent > 0 else { return nil }
-        return "\(Int((saved / (saved + spent) * 100).rounded()))% less than charging right away"
+    private var savingsTileValue: String {
+        if let report = store.combinedSavings { return report.totals(savingsComparison)?.savedPercent.map(SPARCFormat.percent) ?? "—" }
+        if store.isDemo { return monthSavings.map(SPARCFormat.money) ?? "—" }
+        return store.historyWeek?.savingsUSD.map(SPARCFormat.money) ?? "—"
+    }
+
+    private var savingsTileIsNegative: Bool {
+        if let report = store.combinedSavings { return (report.totals(savingsComparison)?.savedUSD ?? 0) < 0 }
+        if store.isDemo { return false }
+        return (store.historyWeek?.savingsUSD ?? 0) < 0
     }
 
     private var savingsTile: some View {
@@ -738,20 +811,15 @@ private struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Image(systemName: "leaf").font(.system(size: 12, weight: .semibold)).accessibilityHidden(true)
-                    Text("Saved this month")
+                    Text("Saved")
                 }
                 .sparcFont(12, weight: .semibold).foregroundStyle(SPARCTheme.muted)
-                Text(monthSavings.map(SPARCFormat.money) ?? "—")
+                Text(savingsTileValue)
                     .sparcFont(31, weight: .bold).tracking(-1.24).monospacedDigit()
-                    .foregroundStyle(SPARCTheme.spark)
+                    .foregroundStyle(savingsTileIsNegative ? SPARCTheme.warning : SPARCTheme.spark)
                     .lineLimit(1).minimumScaleFactor(0.6)
                     .padding(.top, 7)
-                if !records.isEmpty { savingsBars(records).padding(.top, 8) }
-                if let caption = savingsCaption {
-                    Text(caption).sparcFont(11.5).foregroundStyle(SPARCTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
-                }
+                if store.isDemo, !records.isEmpty { savingsBars(records).padding(.top, 8) }
             }
             .padding(15)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -760,7 +828,7 @@ private struct HomeView: View {
         }
         .buttonStyle(SPARCPressStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens Insights")
+        .accessibilityHint("Opens Savings")
         .accessibilityIdentifier("home.savings")
     }
 
@@ -779,16 +847,14 @@ private struct HomeView: View {
     }
 
     private var rateTile: some View {
-        let rates = hourlyRates
-        return Button(action: onPlan) {
+        return RatePageButton {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Rate now").sparcFont(12, weight: .semibold).foregroundStyle(SPARCTheme.muted)
+                HStack {
+                    Text("Rate now").sparcFont(12, weight: .semibold)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                }.foregroundStyle(SPARCTheme.muted)
                 rateValue.padding(.top, 7)
-                if let rates { rateBars(rates).padding(.top, 8) }
-                Text(rates.flatMap(Self.cheapRunText) ?? "per kWh · estimated")
-                    .sparcFont(11.5).foregroundStyle(SPARCTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
             }
             .padding(15)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -797,14 +863,14 @@ private struct HomeView: View {
         }
         .buttonStyle(SPARCPressStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens your plan")
+        .accessibilityHint("Opens rate breakdown and hourly history")
         .accessibilityIdentifier("home.rate")
     }
 
     @ViewBuilder private var rateValue: some View {
-        if store.showsTelemetry && snapshot.currentRateCents > 0 {
+        if let rate = store.currentCombinedRate {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(Self.cents(snapshot.currentRateCents)).sparcFont(31, weight: .bold).tracking(-1.24)
+                Text(Self.cents(rate)).sparcFont(31, weight: .bold).tracking(-1.24)
                 Text("¢").sparcFont(17, weight: .bold).foregroundStyle(SPARCTheme.muted)
             }
             .monospacedDigit()
@@ -817,7 +883,7 @@ private struct HomeView: View {
     /// Hourly prices by Chicago hour. The app only knows them when the controller runs its built-in price model
     /// (the same one the Prices page charts); a real controller reports just the current rate.
     private var hourlyRates: [Double]? {
-        guard store.isVirtualCarActive else { return nil }
+        guard (store.isDemo && store.isVirtualCarActive) else { return nil }
         let calendar = ScheduleEngine.chicagoCalendar
         let midnight = calendar.startOfDay(for: .now)
         return (0..<24).map { hour in
@@ -856,7 +922,7 @@ private struct HomeView: View {
 
     /// Whole cents without a decimal, otherwise one decimal place.
     private static func cents(_ value: Double) -> String {
-        abs(value - value.rounded()) < 0.05 ? "\(Int(value.rounded()))" : SPARCFormat.decimal(value, digits: 1)
+        SPARCFormat.cents(value)
     }
 
     // MARK: Tonight's plan
@@ -871,7 +937,8 @@ private struct HomeView: View {
     /// the cost of the energy still to come at the planned start.
     private var planCost: Double? {
         guard store.showsTelemetry else { return nil }
-        guard store.isVirtualCarActive else { return snapshot.estimatedCost }
+        guard snapshot.costAvailable != false else { return nil }
+        guard (store.isDemo && store.isVirtualCarActive) else { return snapshot.estimatedCost }
         let start = state == .charging ? Date.now : max(Date.now, hasPlanWindow ? snapshot.windowStart : .now)
         return snapshot.estimatedCost + Self.modelCost(energyKWh: energyToTarget, from: start)
     }
@@ -921,18 +988,34 @@ private struct HomeView: View {
     }
 
     @ViewBuilder private var planBody: some View {
-        if store.effectiveGoal == nil {
+        if !store.isDemo, let campaign = store.campaign {
+            if let window = store.campaignWindow {
+                Button(action: onSchedule) {
+                    HStack {
+                        Text(SPARCFormat.window(window.start, window.end)).sparcFont(22, weight: .bold)
+                            .foregroundStyle(SPARCTheme.spark).minimumScaleFactor(0.6).lineLimit(1)
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right").foregroundStyle(SPARCTheme.muted)
+                    }.frame(minHeight: 44)
+                }.buttonStyle(SPARCPressStyle()).accessibilityIdentifier("home.campaignSchedule")
+                Text("\(campaign.initialBatteryPercent)% → \(store.effectiveGoal?.targetPercent ?? campaign.targetBatteryPercent)% · \(campaign.nights) nights")
+                    .sparcFont(13).foregroundStyle(SPARCTheme.muted)
+                if store.campaignIsStale {
+                    Text("Saved schedule · reconnect to confirm")
+                        .sparcFont(12).foregroundStyle(SPARCTheme.tertiary).padding(.top, 6)
+                }
+            } else {
+                Text(campaign.enabled ? "Nightly run finished" : "Nightly schedule paused")
+                    .sparcFont(22, weight: .bold)
+                Button("Review nightly schedule", action: onSchedule).sparcFont(13).padding(.top, 8)
+            }
+        } else if store.effectiveGoal == nil {
             Text("Your routine is paused").sparcFont(22, weight: .bold).tracking(-0.44)
-            Text("Charge now remains available.").sparcFont(13).foregroundStyle(SPARCTheme.muted).padding(.top, 4)
         } else if state == .complete {
             Text("Already at \(snapshot.targetPercent)%").sparcFont(22, weight: .bold).tracking(-0.44)
             planFooter(note: "Nothing left to charge")
         } else {
             scheduleButton
-            if store.today != nil {
-                Text("Just this departure · your weekly routine stays saved")
-                    .sparcFont(12.5).foregroundStyle(SPARCTheme.tertiary).padding(.top, 2)
-            }
             if hasPlanWindow, let end = store.effectiveGoal?.departure, end > Date.now.addingTimeInterval(300) {
                 HomePlanTimeline(now: .now,
                                  end: max(end, snapshot.windowEnd),
@@ -972,7 +1055,7 @@ private struct HomeView: View {
 
     private func planFooter(note: String?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(note == nil ? "Estimated cost" : "Estimated cost").foregroundStyle(SPARCTheme.muted)
+            Text(store.isDemo ? "Estimated cost" : "Supply cost so far").foregroundStyle(SPARCTheme.muted)
             Spacer(minLength: 8)
             Text(note ?? planCostText).fontWeight(.semibold).monospacedDigit().multilineTextAlignment(.trailing)
         }
@@ -986,6 +1069,7 @@ private struct HomeView: View {
     private var planCostText: String {
         guard let cost = planCost else { return "—" }
         let money = SPARCFormat.money(cost)
+        if !store.isDemo { return money }
         guard store.effectiveGoal != nil, store.displayedReadyTime != "—", store.displayedReadyTime != "Not scheduled" else { return money }
         return "\(money) · ready by \(store.displayedReadyTime)"
     }
@@ -1024,7 +1108,7 @@ private struct HomeView: View {
         let later = planStartsLater
         if later { waitTitle = "Wait for \(SPARCFormat.time(snapshot.windowStart))" }
 
-        if store.isVirtualCarActive {
+        if (store.isDemo && store.isVirtualCarActive) {
             // The built-in price model: charge-now and planned costs from the same hourly prices the car uses.
             let energy = energyToTarget
             let now = Self.modelCost(energyKWh: energy, from: .now)
@@ -1043,8 +1127,8 @@ private struct HomeView: View {
                 }
             }
         } else {
-            if store.showsTelemetry, rate > 0 { sentence = "Power is \(Self.cents(rate))¢ per kWh right now." }
-            if later, snapshot.estimatedCost > 0 {
+            if store.showsTelemetry, snapshot.rateAvailable != false { sentence = "ComEd supply is \(Self.cents(rate))¢ per kWh right now." }
+            if store.isDemo, later, snapshot.estimatedCost > 0 {
                 rows.append(.init(title: waitTitle, value: SPARCFormat.money(snapshot.estimatedCost), saves: nil, highlighted: true))
             }
         }
@@ -1069,7 +1153,7 @@ private struct HomeView: View {
     private func resume() {
         Task {
             await store.resumeCharging()
-            if store.errorMessage == nil { toast("Charging resumed") }
+            if store.errorMessage == nil { toast(store.snapshot.state == .charging ? "Charging resumed" : "Smart plan resumed") }
         }
     }
 }

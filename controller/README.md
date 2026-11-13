@@ -18,15 +18,16 @@ joining fails, the Pi deletes only the attempted profile and returns to its
 previous network. The controller re-reads the network state every 30 seconds.
 Add `--no-wifi-provision` to turn Wi-Fi setup off entirely.
 
-`--app-test` is an explicit software control mode: it never contacts
-Tesla or any charger. A virtual car is enabled by default, plugged in at 40%.
+`--app-test` enables the software car by default, plugged in at 40%.
+Separately authorized Tesla setup and explicit activation can switch Home to
+real manual Tesla controls; see [Tesla setup](../docs/tesla-charging-setup.md).
 Its snapshots carry `virtualCar:true` and `controlOnly:false`; all battery,
 power, energy and prices are explicitly virtual examples. Without `--app-test`,
 snapshots and charging commands continue to fail
 until a real vehicle adapter is installed. The normal service never silently
 falls back to test data.
 
-In app-test mode:
+While Virtual Car is the active provider:
 
 - **Charge now / Resume** sets the confirmed software state to charging;
   **Pause** sets paused; **End** sets waiting. The iPhone's charging light follows
@@ -157,10 +158,10 @@ to open the hidden Developer sheet; turning it back on starts again at 40%.
 
 The default controller persists weekly schedules and one-time departures.
 First-time pairing works over the existing LAN with the controller's private
-setup key; Bluetooth is optional. Vehicle authorization, telemetry, planning
-execution and physical charging commands remain unfinished. Saving a schedule
-does not command a vehicle. The explicit app-test mode above only exercises
-software state through the physical app connection.
+setup key; Bluetooth is optional. Tesla authorization, explicit data refreshes
+and signed manual charging controls are available after setup. Automatic
+price-based charging execution and session accounting remain virtual-only.
+Saving a schedule does not command a real vehicle.
 
 These instructions target **Armbian 26.11.0 Minimal, Debian 13** on a Banana Pi
 Pro. Hardware inspection is pending: the board's exact interfaces, services,
