@@ -1,0 +1,894 @@
+{
+  "dataSource": "Norway Dataset 1 replays with 2025 ComEd prices",
+  "commonSessions": 33784,
+  "commonEnergyKwh": 431245.3569999988,
+  "sourceReports": 35377,
+  "cohortSha256": "ba6cdc2025c9abefb88dddf6b626267442a173914e644c3d69f1d3a801dc592f",
+  "exclusions": {
+    "No predicted charger power for this user. Choose an explicit what-if power.": 840,
+    "Incomplete historical prices for this window; choose another date or time.": 670,
+    "Ambiguous or nonexistent Chicago plug-in time in the mapped scenario.": 1,
+    "Reported energy exceeds the available estimated-power capacity.": 41,
+    "Ambiguous or nonexistent Europe/Oslo timestamp.": 3,
+    "Missing plug-out time; connection window is unknown.": 38
+  },
+  "normalization": {
+    "householdKwhPerMonth": 1000,
+    "accountCapacityKw": 2.5,
+    "glenviewCentsPerKwh": 0.556
+  },
+  "monthlySource": {
+    "file": "comed-electricity-cost-monthly.csv",
+    "sha256": "961c8b0f6b2f8e957d80b5f565c0977d4bff77c5c6046a49c5a0d16142ee2570",
+    "bundleSha256": "06fc5a707c4663f4019c8a7f475ae8f6a6971c88c787332bbfed8130ad3e2b28"
+  },
+  "sourceHashes": [
+    {
+      "file": "Dataset1_charging_reports (1).csv",
+      "sha256": "48c15189e2c1acca7a34d4e3789b1d615ddd091849a9803ae39aee8aec474ed2"
+    },
+    {
+      "file": "Dataset2_user_predictions.csv",
+      "sha256": "7596a444545b9d975821f2c61b0bf061a6d3610a1dff0f18dd5e3dc666c372fa"
+    },
+    {
+      "file": "Dataset3_session_predictions.csv",
+      "sha256": "50cc1be432cbe21b19a705264a62bcc920810db80e4463a414b2bdfdd70ebcc5"
+    },
+    {
+      "file": "Dataset4_hourly_predictions.csv",
+      "sha256": "4b021d6eda6c7296dc022727fe11e25ba408e38091aae9e7b782de1702f61aa8"
+    }
+  ],
+  "priceBundleHashes": {
+    "simulation-data.js": "d874ff72f78567e744904513d2a8b22fc9af02bd81bd7bebe449dae126348fa1",
+    "charging-history-data.js": "0145d4f055fc5ffef6a65ad8477d16b0dd49439c942839c8a0d59f882fd42ba9",
+    "residential-data.js": "50358bfcb025d5e7c149289a87d23415f3e371d241158428f239ef26b9d9c481"
+  },
+  "fiveMinuteFiles": [
+    {
+      "file": "comed-data/five_minute/2024.csv",
+      "sha256": "dd660ef166a45d4d804d4b31602c1008453e3ff4e9f6adafa84758c6f183975e",
+      "usedReadings": 25700
+    },
+    {
+      "file": "comed-data/five_minute/2025.csv",
+      "sha256": "cf2bff4a6325deaaa9411b7d2c0a06d352312a2237369ccf7adc84f777d621a8",
+      "usedReadings": 104456
+    },
+    {
+      "file": "comed-data/five_minute/2026.csv",
+      "sha256": "cdb65c0b4be67b65903ec5927ac35eba6db4b604587b464bac5e16d164dc02f4",
+      "usedReadings": 1006
+    }
+  ],
+  "liveCalibration": {
+    "startUtc": "2024-10-03T06:00:00.000Z",
+    "endExclusiveUtc": "2025-01-01T06:00:00.000Z",
+    "observations": 25424,
+    "decay": [
+      0.5959535189996761,
+      0.48596737693752545,
+      0.36048816372206793,
+      0.29534521020202803,
+      0.25265897562522605,
+      0.23371738055423355,
+      0.2042332315972256,
+      0.20669150334930655,
+      0.18558739762892026,
+      0.1807889106015092,
+      0.17638628372781096,
+      0.16987544877635616,
+      0.17342650438560578,
+      0.17857781426289415,
+      0.17339637227511032,
+      0.1728959030214697,
+      0.15978330680712613,
+      0.14703882146991476,
+      0.13586991953549443,
+      0.13710396520674537,
+      0.14452894167205313,
+      0.14364979400442413,
+      0.14623157008063775,
+      0.1416803015637065
+    ]
+  },
+  "monthlyRateNotes": {
+    "2025-01": "capacity_rate: assumed",
+    "2025-02": "capacity_rate: assumed",
+    "2025-03": "capacity_rate: assumed",
+    "2025-04": "capacity_rate: assumed",
+    "2025-05": "capacity_rate: assumed",
+    "2025-06": "",
+    "2025-07": "",
+    "2025-08": "",
+    "2025-09": "",
+    "2025-10": "",
+    "2025-11": "",
+    "2025-12": "",
+    "2026-01": ""
+  },
+  "fixedSupplyReference": {
+    "cost": 77333.55232156822,
+    "note": "Separate fixed-supply immediate baseline, with monthly standard distribution and Glenview tax; no extra hourly capacity charge."
+  },
+  "assumptions": [
+    "Exactly the original 33,784 completed sessions and charging schedules; only the bill calculation changes. No replanning against the added monthly charges.",
+    "The original settled hourly supply feeds and prior-period live calibration are retained; monthly-average market prices do not replace hourly variation.",
+    "Primary comparison preserves the original study distribution-facilities rates (standard 6.228 cents/kWh and the existing time-of-day bands). Monthly distribution facilities are not added again.",
+    "Added volume components follow the mapped charging calendar month: transmission, Illinois distribution charge, supplied riders and state electricity excise tax.",
+    "Glenview tax is a separate sensitivity using the user-confirmed Illinois location, not a fact about the original Norwegian addresses.",
+    "Tax normalization assumes a hypothetical 1,000 kWh household month, within the first state/Glenview tiers. The separate household scenarios are never aggregated into one tax account.",
+    "Account-charge sensitivity allocates each session's kWh / 1,000 times one monthly service fee and the capacity rate times an assumed 2.5 kW obligation. The mapped plug-in month fixes this allocation identically across strategies; no monthly bill is charged once per session.",
+    "Existing 2026 study delivery bands remain hypothetical in the 2025 scenario. historicalStandardDeliveryCost separately replaces standard 6.228 with monthly historical distribution; it has no invented historical time-of-day counterpart.",
+    "Hourly transmission uses the supplied fixed-plan proxy; hourly-specific PEA and procurement charges and percentage franchise adjustments are unavailable. Monthly rate notes flag source assumptions.",
+    "All costs aggregate independent sessions from multiple original Norwegian years, mapped to 2025. They are not annual household bills, an actual Norwegian tax calculation, or a simultaneous fleet bill."
+  ],
+  "results": [
+    {
+      "strategy": "charge-now",
+      "label": "Immediate charging",
+      "tariff": "standard",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 17496.742984324294,
+        "studyDelivery": 26857.960832332894,
+        "monthlyDistribution": 26142.187979269416,
+        "transmission": 7261.21313947685,
+        "illinoisDistribution": 539.0572651312988,
+        "riders": 3950.266428616453,
+        "stateTax": 1423.109678013029,
+        "glenviewTax": 2397.724184774686,
+        "allocatedService": 8396.347100281371,
+        "allocatedCapacity": 5507.4310990825,
+        "fixedSupplyWithPea": 27223.64654600511
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 17496.742984324294,
+          "baseline": 17496.742984324294,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "currentStudy": {
+          "cost": 44354.70381665719,
+          "baseline": 44354.70381665719,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 48175.537679444904,
+          "baseline": 48175.537679444904,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "monthlyVolume": {
+          "cost": 57528.35032789482,
+          "baseline": 57528.35032789482,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "monthlyWithAccounts": {
+          "cost": 71432.1285272587,
+          "baseline": 71432.1285272587,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "glenviewVolume": {
+          "cost": 59926.074512669504,
+          "baseline": 59926.074512669504,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "glenviewWithAccounts": {
+          "cost": 73829.85271203337,
+          "baseline": 73829.85271203337,
+          "saving": 0,
+          "savingPct": 0
+        }
+      },
+      "historicalStandardDeliveryCost": 73114.0798589699
+    },
+    {
+      "strategy": "timer-0100",
+      "label": "Timer 01:00",
+      "tariff": "standard",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 13164.54797574897,
+        "studyDelivery": 26857.960832332898,
+        "monthlyDistribution": 26142.572283767742,
+        "transmission": 7261.418390432826,
+        "illinoisDistribution": 539.0595802186489,
+        "riders": 3944.0268618542154,
+        "stateTax": 1423.1096780130222,
+        "glenviewTax": 2397.7241847747396,
+        "allocatedService": 8396.347100281371,
+        "allocatedCapacity": 5507.4310990825,
+        "fixedSupplyWithPea": 27233.799684223875
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 13164.54797574897,
+          "baseline": 17496.742984324294,
+          "saving": 4332.195008575323,
+          "savingPct": 24.760008262432784
+        },
+        "currentStudy": {
+          "cost": 40022.50880808187,
+          "baseline": 44354.70381665719,
+          "saving": 4332.19500857532,
+          "savingPct": 9.76716026891467
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 43843.342670869635,
+          "baseline": 48175.537679444904,
+          "saving": 4332.195008575269,
+          "savingPct": 8.992520306470166
+        },
+        "monthlyVolume": {
+          "cost": 53190.123318600585,
+          "baseline": 57528.35032789482,
+          "saving": 4338.227009294234,
+          "savingPct": 7.541024528893329
+        },
+        "monthlyWithAccounts": {
+          "cost": 67093.90151796446,
+          "baseline": 71432.1285272587,
+          "saving": 4338.227009294234,
+          "savingPct": 6.073215370642014
+        },
+        "glenviewVolume": {
+          "cost": 55587.84750337533,
+          "baseline": 59926.074512669504,
+          "saving": 4338.227009294176,
+          "savingPct": 7.239297825818698
+        },
+        "glenviewWithAccounts": {
+          "cost": 69491.6257027392,
+          "baseline": 73829.85271203337,
+          "saving": 4338.227009294176,
+          "savingPct": 5.875979498719896
+        }
+      },
+      "historicalStandardDeliveryCost": 68776.23715417404
+    },
+    {
+      "strategy": "day-ahead",
+      "label": "SPARC day-ahead",
+      "tariff": "standard",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 12082.116399056864,
+        "studyDelivery": 26857.960832332883,
+        "monthlyDistribution": 26142.700043830086,
+        "transmission": 7261.4338075824135,
+        "illinoisDistribution": 539.0603498575751,
+        "riders": 3941.681790416295,
+        "stateTax": 1423.109678013038,
+        "glenviewTax": 2397.7241847747077,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082497,
+        "fixedSupplyWithPea": 27232.40359299758
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 12082.116399056864,
+          "baseline": 17496.742984324294,
+          "saving": 5414.62658526743,
+          "savingPct": 30.946482954676245
+        },
+        "currentStudy": {
+          "cost": 38940.07723138975,
+          "baseline": 44354.70381665719,
+          "saving": 5414.6265852674405,
+          "savingPct": 12.207558881802305
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 42760.91109417749,
+          "baseline": 48175.537679444904,
+          "saving": 5414.626585267411,
+          "savingPct": 11.239369285913906
+        },
+        "monthlyVolume": {
+          "cost": 52105.36285725907,
+          "baseline": 57528.35032789482,
+          "saving": 5422.987470635751,
+          "savingPct": 9.42663476307995
+        },
+        "monthlyWithAccounts": {
+          "cost": 66009.14105662293,
+          "baseline": 71432.1285272587,
+          "saving": 5422.987470635766,
+          "savingPct": 7.5918043917259705
+        },
+        "glenviewVolume": {
+          "cost": 54503.087042033774,
+          "baseline": 59926.074512669504,
+          "saving": 5422.98747063573,
+          "savingPct": 9.049462216132993
+        },
+        "glenviewWithAccounts": {
+          "cost": 68406.86524139764,
+          "baseline": 73829.85271203337,
+          "saving": 5422.987470635737,
+          "savingPct": 7.345250290268905
+        }
+      },
+      "historicalStandardDeliveryCost": 67691.60445289484
+    },
+    {
+      "strategy": "live",
+      "label": "SPARC + live prices",
+      "tariff": "standard",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 11617.266586513595,
+        "studyDelivery": 26857.960832332894,
+        "monthlyDistribution": 26142.43132995917,
+        "transmission": 7261.585647225598,
+        "illinoisDistribution": 539.0587310993157,
+        "riders": 3946.114897126747,
+        "stateTax": 1423.109678013036,
+        "glenviewTax": 2397.7241847747096,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082499,
+        "fixedSupplyWithPea": 27234.856488714533
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 11617.266586513595,
+          "baseline": 17496.742984324294,
+          "saving": 5879.4763978106985,
+          "savingPct": 33.603262064706826
+        },
+        "currentStudy": {
+          "cost": 38475.22741884649,
+          "baseline": 44354.70381665719,
+          "saving": 5879.4763978107,
+          "savingPct": 13.255587101007068
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 42296.06128163423,
+          "baseline": 48175.537679444904,
+          "saving": 5879.476397810671,
+          "savingPct": 12.204277691578879
+        },
+        "monthlyVolume": {
+          "cost": 51645.096372311185,
+          "baseline": 57528.35032789482,
+          "saving": 5883.253955583634,
+          "savingPct": 10.226703741808695
+        },
+        "monthlyWithAccounts": {
+          "cost": 65548.87457167506,
+          "baseline": 71432.1285272587,
+          "saving": 5883.253955583641,
+          "savingPct": 8.236145382870083
+        },
+        "glenviewVolume": {
+          "cost": 54042.82055708589,
+          "baseline": 59926.074512669504,
+          "saving": 5883.253955583612,
+          "savingPct": 9.817519341000354
+        },
+        "glenviewWithAccounts": {
+          "cost": 67946.59875644976,
+          "baseline": 73829.85271203337,
+          "saving": 5883.253955583612,
+          "savingPct": 7.968665437449414
+        }
+      },
+      "historicalStandardDeliveryCost": 67231.06925407604
+    },
+    {
+      "strategy": "hindsight",
+      "label": "Perfect hindsight (reference)",
+      "tariff": "standard",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 9961.995835985212,
+        "studyDelivery": 26857.960832332883,
+        "monthlyDistribution": 26142.1879792701,
+        "transmission": 7261.484400598789,
+        "illinoisDistribution": 539.0572651313065,
+        "riders": 3947.9511740782423,
+        "stateTax": 1423.1096780130474,
+        "glenviewTax": 2397.7241847747123,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082499,
+        "fixedSupplyWithPea": 27228.50747020135
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 9961.995835985212,
+          "baseline": 17496.742984324294,
+          "saving": 7534.747148339082,
+          "savingPct": 43.063712801231766
+        },
+        "currentStudy": {
+          "cost": 36819.9566683181,
+          "baseline": 44354.70381665719,
+          "saving": 7534.747148339091,
+          "savingPct": 16.987481597181706
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 40640.79053110586,
+          "baseline": 48175.537679444904,
+          "saving": 7534.747148339047,
+          "savingPct": 15.64019315876552
+        },
+        "monthlyVolume": {
+          "cost": 49991.55918613948,
+          "baseline": 57528.35032789482,
+          "saving": 7536.7911417553405,
+          "savingPct": 13.101003416224922
+        },
+        "monthlyWithAccounts": {
+          "cost": 63895.33738550334,
+          "baseline": 71432.1285272587,
+          "saving": 7536.791141755355,
+          "savingPct": 10.550982166070124
+        },
+        "glenviewVolume": {
+          "cost": 52389.28337091419,
+          "baseline": 59926.074512669504,
+          "saving": 7536.791141755311,
+          "savingPct": 12.576814355096614
+        },
+        "glenviewWithAccounts": {
+          "cost": 66293.06157027806,
+          "baseline": 73829.85271203337,
+          "saving": 7536.791141755311,
+          "savingPct": 10.208324769591346
+        }
+      },
+      "historicalStandardDeliveryCost": 65577.28871721527
+    },
+    {
+      "strategy": "charge-now",
+      "label": "Immediate charging",
+      "tariff": "time-of-day",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 17496.742984324294,
+        "studyDelivery": 24668.5986039132,
+        "monthlyDistribution": 26142.187979269416,
+        "transmission": 7261.21313947685,
+        "illinoisDistribution": 539.0572651312988,
+        "riders": 3950.266428616453,
+        "stateTax": 1423.109678013029,
+        "glenviewTax": 2397.724184774686,
+        "allocatedService": 8396.347100281371,
+        "allocatedCapacity": 5507.4310990825,
+        "fixedSupplyWithPea": 27223.64654600511
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 17496.742984324294,
+          "baseline": 17496.742984324294,
+          "saving": 0,
+          "savingPct": 0
+        },
+        "currentStudy": {
+          "cost": 42165.3415882375,
+          "baseline": 44354.70381665719,
+          "saving": 2189.36222841969,
+          "savingPct": 4.936031672017356
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 45986.175451025214,
+          "baseline": 48175.537679444904,
+          "saving": 2189.36222841969,
+          "savingPct": 4.544551724544274
+        },
+        "monthlyVolume": {
+          "cost": 55338.98809947513,
+          "baseline": 57528.35032789482,
+          "saving": 2189.36222841969,
+          "savingPct": 3.805710081969957
+        },
+        "monthlyWithAccounts": {
+          "cost": 69242.76629883901,
+          "baseline": 71432.1285272587,
+          "saving": 2189.36222841969,
+          "savingPct": 3.064954486949417
+        },
+        "glenviewVolume": {
+          "cost": 57736.712284249814,
+          "baseline": 59926.074512669504,
+          "saving": 2189.36222841969,
+          "savingPct": 3.65343841762373
+        },
+        "glenviewWithAccounts": {
+          "cost": 71640.49048361368,
+          "baseline": 73829.85271203337,
+          "saving": 2189.36222841969,
+          "savingPct": 2.965415950319037
+        }
+      },
+      "historicalStandardDeliveryCost": null
+    },
+    {
+      "strategy": "timer-0100",
+      "label": "Timer 01:00",
+      "tariff": "time-of-day",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 13164.54797574897,
+        "studyDelivery": 18202.801402677862,
+        "monthlyDistribution": 26142.572283767742,
+        "transmission": 7261.418390432826,
+        "illinoisDistribution": 539.0595802186489,
+        "riders": 3944.0268618542154,
+        "stateTax": 1423.1096780130222,
+        "glenviewTax": 2397.7241847747396,
+        "allocatedService": 8396.347100281371,
+        "allocatedCapacity": 5507.4310990825,
+        "fixedSupplyWithPea": 27233.799684223875
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 13164.54797574897,
+          "baseline": 17496.742984324294,
+          "saving": 4332.195008575323,
+          "savingPct": 24.760008262432784
+        },
+        "currentStudy": {
+          "cost": 31367.349378426832,
+          "baseline": 44354.70381665719,
+          "saving": 12987.354438230355,
+          "savingPct": 29.280669964372567
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 35188.183241214596,
+          "baseline": 48175.537679444904,
+          "saving": 12987.354438230308,
+          "savingPct": 26.95840059875789
+        },
+        "monthlyVolume": {
+          "cost": 44534.96388894555,
+          "baseline": 57528.35032789482,
+          "saving": 12993.386438949266,
+          "savingPct": 22.586057769587956
+        },
+        "monthlyWithAccounts": {
+          "cost": 58438.742088309424,
+          "baseline": 71432.1285272587,
+          "saving": 12993.386438949274,
+          "savingPct": 18.189835171985617
+        },
+        "glenviewVolume": {
+          "cost": 46932.688073720296,
+          "baseline": 59926.074512669504,
+          "saving": 12993.386438949208,
+          "savingPct": 21.682358713821912
+        },
+        "glenviewWithAccounts": {
+          "cost": 60836.46627308417,
+          "baseline": 73829.85271203337,
+          "saving": 12993.386438949208,
+          "savingPct": 17.599095706757982
+        }
+      },
+      "historicalStandardDeliveryCost": null
+    },
+    {
+      "strategy": "day-ahead",
+      "label": "SPARC day-ahead",
+      "tariff": "time-of-day",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 12302.946828208924,
+        "studyDelivery": 17354.667611582292,
+        "monthlyDistribution": 26142.69388139937,
+        "transmission": 7261.433696213191,
+        "illinoisDistribution": 539.0603127344967,
+        "riders": 3941.3615409827253,
+        "stateTax": 1423.1096780130351,
+        "glenviewTax": 2397.7241847747096,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082497,
+        "fixedSupplyWithPea": 27231.725865204393
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 12302.946828208924,
+          "baseline": 17496.742984324294,
+          "saving": 5193.79615611537,
+          "savingPct": 29.684359887829427
+        },
+        "currentStudy": {
+          "cost": 29657.614439791214,
+          "baseline": 44354.70381665719,
+          "saving": 14697.089376865973,
+          "savingPct": 33.135356821719
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 33478.44830257896,
+          "baseline": 48175.537679444904,
+          "saving": 14697.089376865944,
+          "savingPct": 30.50736968346648
+        },
+        "monthlyVolume": {
+          "cost": 42822.57966773466,
+          "baseline": 57528.35032789482,
+          "saving": 14705.77066016016,
+          "savingPct": 25.562649678535116
+        },
+        "monthlyWithAccounts": {
+          "cost": 56726.35786709853,
+          "baseline": 71432.1285272587,
+          "saving": 14705.770660160168,
+          "savingPct": 20.587053701680478
+        },
+        "glenviewVolume": {
+          "cost": 45220.303852509365,
+          "baseline": 59926.074512669504,
+          "saving": 14705.770660160139,
+          "savingPct": 24.53985311027016
+        },
+        "glenviewWithAccounts": {
+          "cost": 59124.082051873236,
+          "baseline": 73829.85271203337,
+          "saving": 14705.770660160139,
+          "savingPct": 19.918461326908858
+        }
+      },
+      "historicalStandardDeliveryCost": null
+    },
+    {
+      "strategy": "live",
+      "label": "SPARC + live prices",
+      "tariff": "time-of-day",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 11855.12923201436,
+        "studyDelivery": 17433.74525808864,
+        "monthlyDistribution": 26142.584810328164,
+        "transmission": 7261.592203410804,
+        "illinoisDistribution": 539.059655679852,
+        "riders": 3943.9092190482193,
+        "stateTax": 1423.1096780130329,
+        "glenviewTax": 2397.724184774719,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082499,
+        "fixedSupplyWithPea": 27235.62232192344
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 11855.12923201436,
+          "baseline": 17496.742984324294,
+          "saving": 5641.613752309933,
+          "savingPct": 32.24379392990099
+        },
+        "currentStudy": {
+          "cost": 29288.874490103,
+          "baseline": 44354.70381665719,
+          "saving": 15065.829326554187,
+          "savingPct": 33.96670032750008
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 33109.70835289075,
+          "baseline": 48175.537679444904,
+          "saving": 15065.82932655415,
+          "savingPct": 31.272778784122007
+        },
+        "monthlyVolume": {
+          "cost": 42456.545246254915,
+          "baseline": 57528.35032789482,
+          "saving": 15071.805081639905,
+          "savingPct": 26.198917569746065
+        },
+        "monthlyWithAccounts": {
+          "cost": 56360.32344561878,
+          "baseline": 71432.1285272587,
+          "saving": 15071.805081639919,
+          "savingPct": 21.099476373419947
+        },
+        "glenviewVolume": {
+          "cost": 44854.269431029636,
+          "baseline": 59926.074512669504,
+          "saving": 15071.805081639868,
+          "savingPct": 25.15066305311456
+        },
+        "glenviewWithAccounts": {
+          "cost": 58758.0476303935,
+          "baseline": 73829.85271203337,
+          "saving": 15071.805081639875,
+          "savingPct": 20.41424238028224
+        }
+      },
+      "historicalStandardDeliveryCost": null
+    },
+    {
+      "strategy": "hindsight",
+      "label": "Perfect hindsight (reference)",
+      "tariff": "time-of-day",
+      "detail": {
+        "sessions": 33784,
+        "energyKwh": 431245.356973874,
+        "supply": 10419.019293055411,
+        "studyDelivery": 17465.99067388507,
+        "monthlyDistribution": 26142.258333020956,
+        "transmission": 7261.381681797101,
+        "illinoisDistribution": 539.0576889490836,
+        "riders": 3947.883725210545,
+        "stateTax": 1423.109678013042,
+        "glenviewTax": 2397.724184774712,
+        "allocatedService": 8396.34710028137,
+        "allocatedCapacity": 5507.431099082499,
+        "fixedSupplyWithPea": 27228.310652444976
+      },
+      "costs": {
+        "supplyOnly": {
+          "cost": 10419.019293055411,
+          "baseline": 17496.742984324294,
+          "saving": 7077.723691268882,
+          "savingPct": 40.451664047474246
+        },
+        "currentStudy": {
+          "cost": 27885.00996694048,
+          "baseline": 44354.70381665719,
+          "saving": 16469.693849716707,
+          "savingPct": 37.13178633273073
+        },
+        "stateAndGlenviewTaxes": {
+          "cost": 31705.843829728234,
+          "baseline": 48175.537679444904,
+          "saving": 16469.69384971667,
+          "savingPct": 34.18683971791727
+        },
+        "monthlyVolume": {
+          "cost": 41056.44274091025,
+          "baseline": 57528.35032789482,
+          "saving": 16471.90758698457,
+          "savingPct": 28.632678484780982
+        },
+        "monthlyWithAccounts": {
+          "cost": 54960.220940274114,
+          "baseline": 71432.1285272587,
+          "saving": 16471.907586984584,
+          "savingPct": 23.059522271828786
+        },
+        "glenviewVolume": {
+          "cost": 43454.166925684964,
+          "baseline": 59926.074512669504,
+          "saving": 16471.90758698454,
+          "savingPct": 27.48704586598955
+        },
+        "glenviewWithAccounts": {
+          "cost": 57357.945125048835,
+          "baseline": 73829.85271203337,
+          "saving": 16471.90758698454,
+          "savingPct": 22.310633140813266
+        }
+      },
+      "historicalStandardDeliveryCost": null
+    }
+  ],
+  "taxSources": {
+    "state": {
+      "id": "illinois-residential-excise",
+      "source": "Illinois Administrative Code §511.110",
+      "url": "https://www.ilga.gov/commission/jcar/admincode/086/086005110A01100R.html",
+      "revenueDepartmentUrl": "https://tax.illinois.gov/research/taxrates/excise.html",
+      "riderTaxUrl": "https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/bltb8485cefee950e7c/67b4f3aef14e110d1e948678/18_Rider_TAX.pdf?branch=prod_alias",
+      "basis": "monthly household kWh",
+      "status": "verified",
+      "tiers": [
+        {
+          "kwh": 2000,
+          "centsPerKwh": 0.33
+        },
+        {
+          "kwh": 48000,
+          "centsPerKwh": 0.319
+        },
+        {
+          "kwh": 50000,
+          "centsPerKwh": 0.303
+        },
+        {
+          "kwh": 400000,
+          "centsPerKwh": 0.297
+        },
+        {
+          "kwh": 500000,
+          "centsPerKwh": 0.286
+        },
+        {
+          "kwh": 2000000,
+          "centsPerKwh": 0.27
+        },
+        {
+          "kwh": 2000000,
+          "centsPerKwh": 0.254
+        },
+        {
+          "kwh": 5000000,
+          "centsPerKwh": 0.233
+        },
+        {
+          "kwh": 10000000,
+          "centsPerKwh": 0.207
+        },
+        {
+          "kwh": null,
+          "centsPerKwh": 0.202
+        }
+      ]
+    },
+    "planComparison": {
+      "source": "ComEd Hourly Pricing Billing FAQs",
+      "url": "https://hourlypricing.comed.com/faqs/",
+      "statement": "Residential taxes and fees use the same rates on fixed and hourly supply; supply, transmission and PEA differ.",
+      "status": "verified"
+    },
+    "municipal": {
+      "id": "glenview-electricity-use-tax",
+      "source": "ComEd Rider TAX, Glenview municipal tax additions, Sheet 261",
+      "url": "https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/blt86ebee5fe6ed02f8/6ad911e1630c34d7f475f5cd/2026_Ratebook.pdf#page=404",
+      "rider2025SourceUrl": "https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/bltb8485cefee950e7c/67b4f3aef14e110d1e948678/18_Rider_TAX.pdf?branch=prod_alias",
+      "earlierSourceUrl": "https://www.icc.illinois.gov/downloads/public/filing/4/350172.pdf",
+      "basis": "monthly household kWh",
+      "effectiveFrom": "2024-01-01",
+      "verifiedThrough": "2026-11-05",
+      "latestSheetEffectiveFrom": "2026-10-01",
+      "checkedThrough": "2026-11-05",
+      "tiers": [
+        {
+          "kwh": 2000,
+          "centsPerKwh": 0.556
+        },
+        {
+          "kwh": 48000,
+          "centsPerKwh": 0.366
+        },
+        {
+          "kwh": 50000,
+          "centsPerKwh": 0.346
+        },
+        {
+          "kwh": 400000,
+          "centsPerKwh": 0.345
+        },
+        {
+          "kwh": 500000,
+          "centsPerKwh": 0.34
+        },
+        {
+          "kwh": 2000000,
+          "centsPerKwh": 0.338
+        },
+        {
+          "kwh": 2000000,
+          "centsPerKwh": 0.294
+        },
+        {
+          "kwh": 5000000,
+          "centsPerKwh": 0.206
+        },
+        {
+          "kwh": 10000000,
+          "centsPerKwh": 0.144
+        },
+        {
+          "kwh": null,
+          "centsPerKwh": 0.082
+        }
+      ],
+      "collectionAdjustmentIncluded": true,
+      "note": "Same schedule on both supply plans; dates outside the verified source range are historical assumptions, not confirmed rate history."
+    }
+  }
+}

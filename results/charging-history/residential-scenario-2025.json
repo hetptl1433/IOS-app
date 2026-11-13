@@ -1,0 +1,513 @@
+{
+  "dataSource": "Dataset1",
+  "priceYear": 2025,
+  "tariff": "standard",
+  "power": "Dataset2 estimated user power",
+  "scenario": "Independent sessions; nearest same weekday within source month; Chicago plug-in clock; original elapsed duration",
+  "interpretation": "Retrospective scheduling with known energy and unplug deadline. Not Norwegian bills, fleet load, or an annual forecast.",
+  "sourceHashes": [
+    {
+      "file": "Dataset1_charging_reports (1).csv",
+      "sha256": "48c15189e2c1acca7a34d4e3789b1d615ddd091849a9803ae39aee8aec474ed2"
+    },
+    {
+      "file": "Dataset2_user_predictions.csv",
+      "sha256": "7596a444545b9d975821f2c61b0bf061a6d3610a1dff0f18dd5e3dc666c372fa"
+    },
+    {
+      "file": "Dataset3_session_predictions.csv",
+      "sha256": "50cc1be432cbe21b19a705264a62bcc920810db80e4463a414b2bdfdd70ebcc5"
+    },
+    {
+      "file": "Dataset4_hourly_predictions.csv",
+      "sha256": "4b021d6eda6c7296dc022727fe11e25ba408e38091aae9e7b782de1702f61aa8"
+    }
+  ],
+  "priceDataHashes": {
+    "simulation-data.js": "d874ff72f78567e744904513d2a8b22fc9af02bd81bd7bebe449dae126348fa1",
+    "charging-history-data.js": "0145d4f055fc5ffef6a65ad8477d16b0dd49439c942839c8a0d59f882fd42ba9"
+  },
+  "summary": {
+    "total": 35377,
+    "comparable": 33784,
+    "skipped": 1552,
+    "shortfall": 41,
+    "energyKwh": 431245.3569999988,
+    "baselineCost": 44354.703816656904,
+    "sparcCost": 38940.07723138983,
+    "saving": 5414.6265852676215,
+    "loggedCost": 0
+  },
+  "savingPct": 12.207558881802791,
+  "exclusionReasons": {
+    "No predicted charger power for this user. Choose an explicit what-if power.": 840,
+    "Incomplete historical prices for this window; choose another date or time.": 670,
+    "Ambiguous or nonexistent Chicago plug-in time in the mapped scenario.": 1,
+    "Ambiguous or nonexistent Europe/Oslo timestamp.": 3,
+    "Missing plug-out time; connection window is unknown.": 38
+  },
+  "shortfalls": [
+    {
+      "sessionId": "OSL_S_2088",
+      "requiredKwh": 15.8,
+      "powerKw": 2.204651,
+      "connectedCapacityKwh": 15.799998833333335,
+      "immediateKwh": 15.799998833333362,
+      "sparcKwh": 15.799998833333362
+    },
+    {
+      "sessionId": "OSL_S_5708",
+      "requiredKwh": 0.27,
+      "powerKw": 3.9,
+      "connectedCapacityKwh": 0.26,
+      "immediateKwh": 0.26,
+      "sparcKwh": 0.26
+    },
+    {
+      "sessionId": "ASK_6619",
+      "requiredKwh": 63.73,
+      "powerKw": 3.483871,
+      "connectedCapacityKwh": 30.19354866666667,
+      "immediateKwh": 30.193548666666583,
+      "sparcKwh": 30.193548666666583
+    },
+    {
+      "sessionId": "ASK_6755",
+      "requiredKwh": 7.11,
+      "powerKw": 10.93846,
+      "connectedCapacityKwh": 7.109998999999999,
+      "immediateKwh": 7.109999,
+      "sparcKwh": 7.109999
+    },
+    {
+      "sessionId": "OSL_S_8902",
+      "requiredKwh": 34.72,
+      "powerKw": 2.905439,
+      "connectedCapacityKwh": 34.71999605,
+      "immediateKwh": 34.71999605000001,
+      "sparcKwh": 34.71999605000001
+    },
+    {
+      "sessionId": "TRO_9305",
+      "requiredKwh": 69.69,
+      "powerKw": 10.63969,
+      "connectedCapacityKwh": 69.6899695,
+      "immediateKwh": 69.68996949999992,
+      "sparcKwh": 69.68996949999992
+    },
+    {
+      "sessionId": "TRO_10572",
+      "requiredKwh": 49.07,
+      "powerKw": 10.70618,
+      "connectedCapacityKwh": 49.06999166666667,
+      "immediateKwh": 49.06999166666663,
+      "sparcKwh": 49.06999166666663
+    },
+    {
+      "sessionId": "TRO_11402",
+      "requiredKwh": 12.53,
+      "powerKw": 3.982,
+      "connectedCapacityKwh": 9.689533333333333,
+      "immediateKwh": 9.689533333333332,
+      "sparcKwh": 9.689533333333332
+    },
+    {
+      "sessionId": "TRO_12186",
+      "requiredKwh": 25,
+      "powerKw": 10.20408,
+      "connectedCapacityKwh": 24.999996,
+      "immediateKwh": 24.99999599999999,
+      "sparcKwh": 24.999995999999985
+    },
+    {
+      "sessionId": "TRO_R_2115",
+      "requiredKwh": 20.28,
+      "powerKw": 3.680766,
+      "connectedCapacityKwh": 20.279998225,
+      "immediateKwh": 20.279998225000025,
+      "sparcKwh": 20.279998225000025
+    },
+    {
+      "sessionId": "TRO_R_2525",
+      "requiredKwh": 38.23,
+      "powerKw": 7.443777,
+      "connectedCapacityKwh": 38.2299980425,
+      "immediateKwh": 38.22999804249996,
+      "sparcKwh": 38.22999804249996
+    },
+    {
+      "sessionId": "TRO_R_2970",
+      "requiredKwh": 69.28,
+      "powerKw": 6.916856,
+      "connectedCapacityKwh": 69.27999823555555,
+      "immediateKwh": 69.27999823555558,
+      "sparcKwh": 69.27999823555558
+    },
+    {
+      "sessionId": "TRO_16767",
+      "requiredKwh": 21.91,
+      "powerKw": 6.741538,
+      "connectedCapacityKwh": 21.9099985,
+      "immediateKwh": 21.909998500000015,
+      "sparcKwh": 21.909998500000015
+    },
+    {
+      "sessionId": "OSL_1_16801",
+      "requiredKwh": 10.92,
+      "powerKw": 3.453737,
+      "connectedCapacityKwh": 5.525979199999999,
+      "immediateKwh": 5.525979199999999,
+      "sparcKwh": 5.525979199999999
+    },
+    {
+      "sessionId": "TRO_R_3611",
+      "requiredKwh": 21.47,
+      "powerKw": 6.260996,
+      "connectedCapacityKwh": 21.469998783333335,
+      "immediateKwh": 21.469998783333313,
+      "sparcKwh": 21.469998783333313
+    },
+    {
+      "sessionId": "OSL_1_17389",
+      "requiredKwh": 5.46,
+      "powerKw": 3.072362,
+      "connectedCapacityKwh": 3.328392166666667,
+      "immediateKwh": 3.3283921666666667,
+      "sparcKwh": 3.3283921666666667
+    },
+    {
+      "sessionId": "BER_18343",
+      "requiredKwh": 13.22,
+      "powerKw": 3.110588,
+      "connectedCapacityKwh": 13.219999,
+      "immediateKwh": 13.21999899999999,
+      "sparcKwh": 13.21999899999999
+    },
+    {
+      "sessionId": "BOD_19050",
+      "requiredKwh": 5.27,
+      "powerKw": 7.846364,
+      "connectedCapacityKwh": 4.053954733333334,
+      "immediateKwh": 4.053954733333334,
+      "sparcKwh": 4.053954733333334
+    },
+    {
+      "sessionId": "TRO_19370",
+      "requiredKwh": 7.9,
+      "powerKw": 6.763636,
+      "connectedCapacityKwh": 5.4109088000000005,
+      "immediateKwh": 5.4109088,
+      "sparcKwh": 5.4109088
+    },
+    {
+      "sessionId": "TRO_R_5328",
+      "requiredKwh": 27.91,
+      "powerKw": 7.179934,
+      "connectedCapacityKwh": 27.909998998888888,
+      "immediateKwh": 27.909998998888856,
+      "sparcKwh": 27.909998998888856
+    },
+    {
+      "sessionId": "TRO_R_5431",
+      "requiredKwh": 10.48,
+      "powerKw": 3.754403,
+      "connectedCapacityKwh": 10.479998818611111,
+      "immediateKwh": 10.479998818611117,
+      "sparcKwh": 10.479998818611117
+    },
+    {
+      "sessionId": "TRO_R_5498",
+      "requiredKwh": 23.84,
+      "powerKw": 7.316,
+      "connectedCapacityKwh": 23.83999888888889,
+      "immediateKwh": 23.839998888888868,
+      "sparcKwh": 23.839998888888868
+    },
+    {
+      "sessionId": "TRO_R_5782",
+      "requiredKwh": 30.01,
+      "powerKw": 7.279563,
+      "connectedCapacityKwh": 30.009998467499997,
+      "immediateKwh": 30.009998467499972,
+      "sparcKwh": 30.009998467499972
+    },
+    {
+      "sessionId": "OSL_1_20590",
+      "requiredKwh": 32.09,
+      "powerKw": 6.9,
+      "connectedCapacityKwh": 24.15,
+      "immediateKwh": 24.149999999999984,
+      "sparcKwh": 24.149999999999984
+    },
+    {
+      "sessionId": "OSL_1_20635",
+      "requiredKwh": 49.46,
+      "powerKw": 9.603883,
+      "connectedCapacityKwh": 49.45999745,
+      "immediateKwh": 49.45999744999997,
+      "sparcKwh": 49.45999744999997
+    },
+    {
+      "sessionId": "TRO_20699",
+      "requiredKwh": 7.59,
+      "powerKw": 3.398507,
+      "connectedCapacityKwh": 7.589998966666666,
+      "immediateKwh": 7.589998966666662,
+      "sparcKwh": 7.589998966666662
+    },
+    {
+      "sessionId": "BER_20930",
+      "requiredKwh": 12.01,
+      "powerKw": 3.481159,
+      "connectedCapacityKwh": 12.00999855,
+      "immediateKwh": 12.009998550000011,
+      "sparcKwh": 12.009998550000011
+    },
+    {
+      "sessionId": "TRO_21260",
+      "requiredKwh": 22.46,
+      "powerKw": 3.681967,
+      "connectedCapacityKwh": 22.4599987,
+      "immediateKwh": 22.4599987,
+      "sparcKwh": 22.4599987
+    },
+    {
+      "sessionId": "TRO_R_6628",
+      "requiredKwh": 11.14,
+      "powerKw": 3.333841,
+      "connectedCapacityKwh": 7.747476057222222,
+      "immediateKwh": 7.747476057222221,
+      "sparcKwh": 7.7474760572222205
+    },
+    {
+      "sessionId": "TRO_R_6708",
+      "requiredKwh": 10.88,
+      "powerKw": 3.569163,
+      "connectedCapacityKwh": 10.879998545000001,
+      "immediateKwh": 10.879998544999994,
+      "sparcKwh": 10.879998544999994
+    },
+    {
+      "sessionId": "OSL_S_21574",
+      "requiredKwh": 38.61,
+      "powerKw": 3.586068,
+      "connectedCapacityKwh": 38.6099988,
+      "immediateKwh": 38.60999880000005,
+      "sparcKwh": 38.60999880000005
+    },
+    {
+      "sessionId": "BOD_21612",
+      "requiredKwh": 2.93,
+      "powerKw": 2.384615,
+      "connectedCapacityKwh": 1.5102561666666667,
+      "immediateKwh": 1.5102561666666663,
+      "sparcKwh": 1.5102561666666663
+    },
+    {
+      "sessionId": "ASK_21731",
+      "requiredKwh": 56.73,
+      "powerKw": 3.214925,
+      "connectedCapacityKwh": 42.86566666666666,
+      "immediateKwh": 42.865666666666606,
+      "sparcKwh": 42.865666666666606
+    },
+    {
+      "sessionId": "OSL_T_966",
+      "requiredKwh": 17.84,
+      "powerKw": 6.464384,
+      "connectedCapacityKwh": 10.235274666666667,
+      "immediateKwh": 10.235274666666669,
+      "sparcKwh": 10.235274666666669
+    },
+    {
+      "sessionId": "OSL_T_1667",
+      "requiredKwh": 3.1,
+      "powerKw": 3.805348,
+      "connectedCapacityKwh": 1.9660964666666667,
+      "immediateKwh": 1.9660964666666665,
+      "sparcKwh": 1.9660964666666665
+    },
+    {
+      "sessionId": "OSL_T_2480",
+      "requiredKwh": 14.12,
+      "powerKw": 5.103614,
+      "connectedCapacityKwh": 14.119998733333334,
+      "immediateKwh": 14.119998733333341,
+      "sparcKwh": 14.119998733333341
+    },
+    {
+      "sessionId": "OSL_T_3315",
+      "requiredKwh": 20.13,
+      "powerKw": 3.460714,
+      "connectedCapacityKwh": 16.72678433333333,
+      "immediateKwh": 16.72678433333332,
+      "sparcKwh": 16.72678433333332
+    },
+    {
+      "sessionId": "OSL_T_3713",
+      "requiredKwh": 14.64,
+      "powerKw": 6.654545,
+      "connectedCapacityKwh": 14.639999,
+      "immediateKwh": 14.639999,
+      "sparcKwh": 14.639999
+    },
+    {
+      "sessionId": "OSL_T_4520",
+      "requiredKwh": 20.74,
+      "powerKw": 6.763043,
+      "connectedCapacityKwh": 20.739998533333335,
+      "immediateKwh": 20.739998533333324,
+      "sparcKwh": 20.739998533333324
+    },
+    {
+      "sessionId": "OSL_T_4726",
+      "requiredKwh": 31.09,
+      "powerKw": 7.009091,
+      "connectedCapacityKwh": 21.260909366666667,
+      "immediateKwh": 21.260909366666667,
+      "sparcKwh": 21.260909366666667
+    },
+    {
+      "sessionId": "KRO_347",
+      "requiredKwh": 23.68,
+      "powerKw": 5.95829027712541,
+      "connectedCapacityKwh": 13.083412400187878,
+      "immediateKwh": 13.083412400187871,
+      "sparcKwh": 13.083412400187871
+    }
+  ],
+  "byLocation": {
+    "OSL_S": {
+      "total": 9757,
+      "comparable": 8990,
+      "skipped": 763,
+      "shortfall": 4,
+      "energyKwh": 114360.64000000012,
+      "baselineCost": 11253.073920186942,
+      "sparcCost": 10330.604598733771,
+      "saving": 922.4693214531254,
+      "loggedCost": 0
+    },
+    "BAR": {
+      "total": 1969,
+      "comparable": 1921,
+      "skipped": 48,
+      "shortfall": 0,
+      "energyKwh": 20597.439999999995,
+      "baselineCost": 2178.0929786665074,
+      "sparcCost": 1818.2010738526776,
+      "saving": 359.89190481382576,
+      "loggedCost": 0
+    },
+    "BOD": {
+      "total": 508,
+      "comparable": 493,
+      "skipped": 13,
+      "shortfall": 2,
+      "energyKwh": 8205.68,
+      "baselineCost": 865.1572566152408,
+      "sparcCost": 745.9886646049226,
+      "saving": 119.16859201031679,
+      "loggedCost": 0
+    },
+    "ASK": {
+      "total": 6372,
+      "comparable": 6259,
+      "skipped": 110,
+      "shortfall": 3,
+      "energyKwh": 63105.059999999954,
+      "baselineCost": 6647.652037965409,
+      "sparcCost": 5679.549133583315,
+      "saving": 968.1029043820985,
+      "loggedCost": 0
+    },
+    "TRO_R": {
+      "total": 6706,
+      "comparable": 6482,
+      "skipped": 214,
+      "shortfall": 10,
+      "energyKwh": 83359.63,
+      "baselineCost": 8739.979242814414,
+      "sparcCost": 7721.019834046487,
+      "saving": 1018.9594087679002,
+      "loggedCost": 0
+    },
+    "TRO": {
+      "total": 2168,
+      "comparable": 2113,
+      "skipped": 47,
+      "shortfall": 8,
+      "energyKwh": 28200.48999999996,
+      "baselineCost": 2994.3200152860854,
+      "sparcCost": 2497.1919541862876,
+      "saving": 497.12806109978845,
+      "loggedCost": 0
+    },
+    "OSL_1": {
+      "total": 464,
+      "comparable": 422,
+      "skipped": 38,
+      "shortfall": 4,
+      "energyKwh": 8952.740000000002,
+      "baselineCost": 882.1066015030407,
+      "sparcCost": 816.7824272088851,
+      "saving": 65.32417429415565,
+      "loggedCost": 0
+    },
+    "BER": {
+      "total": 308,
+      "comparable": 300,
+      "skipped": 6,
+      "shortfall": 2,
+      "energyKwh": 4044.1400000000017,
+      "baselineCost": 408.2465368765353,
+      "sparcCost": 366.30191012305187,
+      "saving": 41.94462675348347,
+      "loggedCost": 0
+    },
+    "OSL_T": {
+      "total": 5478,
+      "comparable": 5205,
+      "skipped": 266,
+      "shortfall": 7,
+      "energyKwh": 72720.21999999996,
+      "baselineCost": 7532.03596243598,
+      "sparcCost": 6515.196583016829,
+      "saving": 1016.8393794191429,
+      "loggedCost": 0
+    },
+    "OSL_2": {
+      "total": 127,
+      "comparable": 122,
+      "skipped": 5,
+      "shortfall": 0,
+      "energyKwh": 2318.53,
+      "baselineCost": 229.93687349087998,
+      "sparcCost": 212.24554617707992,
+      "saving": 17.691327313799995,
+      "loggedCost": 0
+    },
+    "BAR_2": {
+      "total": 1028,
+      "comparable": 1006,
+      "skipped": 22,
+      "shortfall": 0,
+      "energyKwh": 16742.25999999998,
+      "baselineCost": 1742.2461925558925,
+      "sparcCost": 1483.5385317725447,
+      "saving": 258.70766078334856,
+      "loggedCost": 0
+    },
+    "KRO": {
+      "total": 492,
+      "comparable": 471,
+      "skipped": 20,
+      "shortfall": 1,
+      "energyKwh": 8638.526999999998,
+      "baselineCost": 881.8561982604721,
+      "sparcCost": 753.456974083857,
+      "saving": 128.39922417661435,
+      "loggedCost": 0
+    }
+  }
+}

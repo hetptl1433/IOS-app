@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f4ec">
+  <meta name="description" content="Replay the sparc-lite Model X home-charging history with ComEd supply, delivery, taxes, riders and monthly account charges.">
+  <title>ComEd bill simulation · SPARC Night Shift</title>
+  <link rel="stylesheet" href="simulation.css">
+  <link rel="stylesheet" href="comed-costs.css">
+  <script src="comed-cost-data.js" defer></script>
+  <script src="comed-cost-engine.js" defer></script>
+  <script src="comed-costs.js" defer></script>
+</head>
+<body class="comed-page">
+  <header class="site-header">
+    <a class="brand" href="simulation.html" aria-label="SPARC Night Shift home"><span class="brand-symbol" aria-hidden="true">↗</span>SPARC<span class="brand-divider"></span><span class="brand-product">NIGHT SHIFT</span></a>
+    <nav aria-label="Main navigation"><a href="simulation.html">Night simulator</a><a href="charging-history.html">Charging history</a><a class="nav-current" href="comed-costs.html" aria-current="page"><span class="status-dot" aria-hidden="true"></span>ComEd bill simulation</a></nav>
+  </header>
+  <main class="page-shell cc-shell">
+    <section class="cc-intro" aria-labelledby="cc-title">
+      <p class="eyebrow">SPARC-LITE DATA · MODEL X HOME CHARGING</p>
+      <h1 id="cc-title">The price is only<br><span>part of the bill.</span></h1>
+      <p class="cc-lead">Replay your home-charging history with delivery, transmission, taxes, riders, and a share of monthly account charges.</p>
+      <p class="cc-origin">Daily energy comes from the sparc-lite Model X trace, for a home inside Glenview. Plug-in times are a scenario: charging is available from <strong>8 p.m. to 8 a.m.</strong>, in Chicago time.</p>
+    </section>
+
+    <aside class="cc-notice" aria-label="Estimate limitations"><strong>Estimated costs using the supplied ComEd rate data and Glenview’s filed tax tiers.</strong><p>Hourly-plan transmission uses the fixed-plan rate as a proxy. Hourly-specific adjustments and procurement charges are unavailable. Historical rates include estimates; Glenview’s 2024–2026 filed tax tiers are carried back into 2022–2023 as an assumption. Franchise adjustments are unavailable. These results are a comparison, not a reproduction of your utility bill.</p></aside>
+
+    <section class="cc-card cc-settings" aria-labelledby="cc-settings-title">
+      <div class="cc-heading"><div><p class="eyebrow">MAKE THE ASSUMPTIONS VISIBLE</p><h2 id="cc-settings-title">Set up the bill estimate.</h2></div><span class="cc-pill">STANDARD DELIVERY</span></div>
+      <form id="cc-form">
+        <div class="cc-fields">
+          <div><label for="cc-from">From</label><input id="cc-from" name="from" type="date" required></div>
+          <div><label for="cc-to">Through</label><input id="cc-to" name="to" type="date" required></div>
+          <div><label for="cc-power">Charger power <span>kW</span></label><input id="cc-power" name="power" type="number" min="0.1" max="50" step="0.1" value="11.5" required></div>
+          <div><label for="cc-home">Other home usage <span>kWh/month</span></label><input id="cc-home" name="home" type="number" min="0" max="1000000" step="1" value="600" required></div>
+          <div><label for="cc-capacity">Account capacity obligation <span>kW</span></label><input id="cc-capacity" name="capacity" type="number" min="0" max="1000" step="0.1" value="2.5" required></div>
+          <div><label for="cc-fixed-local-tax">Fixed local-tax override <span>¢/kWh · optional</span></label><input id="cc-fixed-local-tax" name="fixedMunicipal" type="number" min="0" max="100" step="0.001" placeholder="Glenview filed tiers"></div>
+          <div><label for="cc-hourly-local-tax">Hourly local-tax override <span>¢/kWh · optional</span></label><input id="cc-hourly-local-tax" name="hourlyMunicipal" type="number" min="0" max="100" step="0.001" placeholder="Glenview filed tiers"></div>
+        </div>
+        <div class="cc-form-actions"><button id="cc-run" class="button button-primary" type="submit">Run bill simulation <span aria-hidden="true">↗</span></button><p>Leave local-tax overrides blank to use Glenview’s filed tiers on both plans. Entered overrides, including zero, are scenario assumptions. Other home usage determines monthly tax tiers and the EV share of account fees.</p></div>
+      </form>
+    </section>
+
+    <p id="cc-status" class="cc-status" role="status" aria-live="polite">Loading the ComEd history…</p>
+    <p id="cc-error" class="cc-error" role="alert" hidden></p>
+    <noscript><p class="cc-error">Enable JavaScript to run the ComEd bill simulation.</p></noscript>
+
+    <div id="cc-results" hidden>
+      <section class="cc-highlights" aria-label="Simulation results">
+        <article class="cc-highlight cc-highlight-best"><span class="cc-small-label">SPARC · ALLOCATED EV COST</span><strong id="cc-sparc-cost">—</strong><p id="cc-sparc-detail">Volume charges plus the EV share of account charges</p></article>
+        <article class="cc-highlight"><span class="cc-small-label">SAVINGS FROM CHARGING TIME</span><strong id="cc-timing-saving">—</strong><p id="cc-timing-note">Hourly immediate versus hourly SPARC · volume charges only</p></article>
+        <article class="cc-highlight"><span class="cc-small-label">SAVINGS VERSUS FIXED PRICING</span><strong id="cc-plan-saving">—</strong><p id="cc-plan-note">Fixed immediate versus hourly SPARC</p></article>
+      </section>
+      <p id="cc-cohort" class="cc-cohort"></p>
+
+      <section class="cc-card cc-tax-card" aria-labelledby="cc-tax-title">
+        <div class="cc-heading"><div><p class="eyebrow">TAX SOURCES · FIXED AND HOURLY</p><h2 id="cc-tax-title">Which tax applies to each plan?</h2></div><span class="cc-pill">PER kWh · NOT A SUPPLY PERCENTAGE</span></div>
+        <p class="cc-help cc-tax-explanation">ComEd states that taxes and fees use the same rates on fixed and hourly pricing. The Illinois residential excise tax is based on monthly household kWh, not the electricity supply price. <a href="https://hourlypricing.comed.com/faqs/" target="_blank" rel="noopener noreferrer">ComEd billing FAQ</a> · <a href="https://www.ilga.gov/commission/jcar/admincode/086/086005110A01100R.html" target="_blank" rel="noopener noreferrer">Illinois tax rule §511.110</a></p>
+        <div class="cc-table-scroll" tabindex="0" role="region" aria-label="Tax rates, sources, and modeled taxes for fixed and hourly pricing">
+          <table class="cc-table cc-tax-table"><caption class="sr-only">State tax rules and independently entered local-tax scenarios for each supply plan.</caption><thead><tr><th scope="col">Tax treatment</th><th scope="col">Fixed pricing</th><th scope="col">Hourly pricing</th></tr></thead><tbody id="cc-tax-treatment"></tbody></table>
+        </div>
+        <p class="cc-help cc-tax-scope">State and default Glenview amounts are the added household tax from EV charging: tax with EV kWh minus tax without EV kWh. Glenview’s filed schedule starts at <strong>0.556¢/kWh for the first 2,000 monthly kWh</strong> and <strong>0.366¢/kWh for the next 48,000</strong>, confirmed in the 2024, 2025, and 2026 filings. The current sheet is effective October 1, 2026. Its 3% collection compensation is already included. The same schedule in 2022–2023 is a flagged historical assumption. Different entered overrides do not establish different legal rates. <a href="https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/blt86ebee5fe6ed02f8/6ad911e1630c34d7f475f5cd/2026_Ratebook.pdf#page=404" target="_blank" rel="noopener noreferrer">2026 ComEd Rider TAX · Glenview, sheet 261</a> · <a href="https://www.comed.com/cdn/assets/v3/assets/blt3ebb3fed6084be2a/bltb8485cefee950e7c/67b4f3aef14e110d1e948678/18_Rider_TAX.pdf?branch=prod_alias" target="_blank" rel="noopener noreferrer">2025 Rider TAX filing</a></p>
+        <details class="cc-charge-differences"><summary>Which charges can differ between plans?</summary><div class="cc-table-scroll" tabindex="0" role="region" aria-label="Treatment of charges that differ between fixed and hourly pricing"><table class="cc-table cc-tax-table"><caption class="sr-only">Supply-plan charges and data limitations, distinct from the state tax rule.</caption><thead><tr><th scope="col">Charge</th><th scope="col">Fixed pricing</th><th scope="col">Hourly pricing</th></tr></thead><tbody><tr><th scope="row">Supply</th><td>Historical fixed supply rate</td><td>Settled hourly price</td></tr><tr><th scope="row">Purchased Electricity Adjustment</th><td>Historical fixed-plan adjustment included</td><td>Separate hourly adjustment unavailable; omitted</td></tr><tr><th scope="row">Transmission</th><td>Historical fixed-plan rate</td><td>Fixed-plan rate used as an estimate; actual rate differs</td></tr><tr><th scope="row">Capacity</th><td>Included in supply</td><td>Separate monthly account charge, using the entered obligation</td></tr><tr><th scope="row">Procurement</th><td>Included in fixed supply</td><td>Separate hourly procurement charge unavailable; omitted</td></tr></tbody></table></div><p class="cc-help">These are supply-plan charges, separate from the Illinois excise-tax rule. <a href="https://hourlypricing.comed.com/faqs/" target="_blank" rel="noopener noreferrer">ComEd explains the billing differences</a>.</p></details>
+      </section>
+
+      <section class="cc-card" aria-labelledby="cc-options-title">
+        <div class="cc-heading"><div><p class="eyebrow">ONE ENERGY TARGET · THREE OPTIONS</p><h2 id="cc-options-title">Where the money goes.</h2></div><button id="cc-download" class="cc-download" type="button">Download monthly CSV <span aria-hidden="true">↗</span></button></div>
+        <p class="cc-help">Every option delivers the same home-charging energy on the same completed days. Credits remain negative.</p>
+        <div id="cc-cost-bars" class="cc-cost-bars" aria-label="Estimated cost by charging option"></div>
+        <div class="cc-table-scroll" tabindex="0" role="region" aria-label="Bill components; scroll horizontally on small screens">
+          <table class="cc-table"><caption class="sr-only">Estimated costs in US dollars, including allocated monthly account charges.</caption><thead><tr><th scope="col">Bill component</th><th scope="col">Fixed · immediate</th><th scope="col">Hourly · immediate</th><th scope="col">Hourly · SPARC</th></tr></thead><tbody id="cc-breakdown"></tbody></table>
+        </div>
+        <p class="cc-allocation" id="cc-allocation"></p>
+      </section>
+
+      <section class="cc-card" aria-labelledby="cc-monthly-title">
+        <div class="cc-heading"><div><p class="eyebrow">RATES CHANGE THROUGH THE YEAR</p><h2 id="cc-monthly-title">Month by month.</h2></div><span class="cc-pill">US DOLLARS</span></div>
+        <p class="cc-help">Costs follow the calendar month when charging occurs. An overnight charge can shift energy between months; the energy column shows SPARC’s kWh. Timing savings cover volume charges only.</p>
+        <div class="cc-table-scroll" tabindex="0" role="region" aria-label="Monthly estimated charging costs; scroll horizontally on small screens">
+          <table class="cc-table cc-monthly-table"><caption class="sr-only">Monthly estimated cost comparison; all three options deliver equal total energy across the selected period.</caption><thead><tr><th scope="col">Month</th><th scope="col">SPARC kWh</th><th scope="col">Fixed · immediate</th><th scope="col">Hourly · immediate</th><th scope="col">Hourly · SPARC</th><th scope="col">Timing savings</th></tr></thead><tbody id="cc-monthly"></tbody></table>
+        </div>
+      </section>
+
+      <section class="cc-method-grid" aria-label="Data and modeling assumptions">
+        <div><p class="eyebrow">THE COST OF A WHOLE ACCOUNT</p><h2>Keep monthly fees in perspective.</h2><p id="cc-account-summary"></p><p>SPARC timing does not automatically reduce your capacity obligation. The same entered obligation applies to both hourly strategies. Capacity is already included in fixed supply.</p></div>
+        <details class="cc-method"><summary>How the simulation works</summary><div>
+          <p><strong>Actual daily energy, assumed hours.</strong> The trace contains daily home kWh, not connection timestamps. Each positive day is modeled independently from 8 p.m. to 8 a.m. at the selected power. Home kWh is used directly, with no added charging-loss factor. Supercharger and other-location energy are excluded.</p>
+          <p><strong>Prices available at the time.</strong> SPARC schedules using the supplied day-ahead forecasts, with a modeled 5 p.m. publication on the preceding day. Final cost uses each hour’s average of all twelve five-minute readings. Incomplete prices and infeasible energy targets are excluded from every option.</p>
+          <p><strong>Itemized bill components.</strong> Supply, fixed-plan purchased electricity adjustments, transmission, distribution, state distribution charge, and the supplied riders are applied using the charging month. State excise tax is the incremental household tax after adding the EV’s monthly energy. This uses calendar months and an assumed household base; actual billing-cycle dates are unavailable.</p>
+          <p><strong>Monthly charges.</strong> Customer, metering, low-income recovery, and hourly-plan capacity charges are allocated by the EV’s share of modeled total household kWh. This is an accounting assumption, not a claim that EV charging causes those entire fees. <span id="cc-partial-month-note"></span></p>
+          <p><strong>Data limits.</strong> Historical rate assumptions and backfills are preserved. Glenview’s municipal tax tiers are confirmed in 2024–2026 filings and apply by default to this confirmed Glenview address; their use in 2022–2023 is an assumption. Optional per-plan overrides are user scenarios, not a sourced difference between supply plans. Chicago-only taxes are not applied. Franchise adjustments and unavailable hourly-specific charges are excluded.</p>
+          <p><a href="https://www.ilga.gov/commission/jcar/admincode/086/086005110A01100R.html" target="_blank" rel="noopener noreferrer">Illinois electricity excise-tax tiers</a> · <a href="https://hourlypricing.comed.com/faqs/" target="_blank" rel="noopener noreferrer">ComEd billing FAQ</a> · <a href="https://hourlypricing.comed.com/capacity-charge-updates/" target="_blank" rel="noopener noreferrer">Capacity charges</a></p>
+        </div></details>
+      </section>
+
+      <details class="cc-card cc-data-details"><summary>Coverage, exclusions, and source files</summary><div><p id="cc-coverage"></p><ul id="cc-exclusions"></ul><p id="cc-source"></p><div id="cc-source-hashes" class="cc-source-hashes"></div><h3>Historical rate notes</h3><p class="cc-help">Notes come from the supplied monthly rates. They identify estimates, placeholders, and backfilled values.</p><ul id="cc-rate-notes"></ul></div></details>
+    </div>
+    <footer class="cc-footer"><span>SPARC / NIGHT SHIFT · COMED BILL SIMULATION</span><a href="simulation.html">Back to the night simulator ↗</a></footer>
+  </main>
+</body>
+</html>

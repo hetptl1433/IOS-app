@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SPARC Model Tests</title>
     <link rel="stylesheet" href="/home.css" />
+    <link rel="stylesheet" href="/simulation/comed-overview.css" />
     <script src="/home.js" defer></script>
+    <script src="/simulation/comed-cost-summary.js" defer></script>
+    <script src="/simulation/comed-overview.js" defer></script>
   </head>
   <body>
     <header class="bar">
@@ -13,6 +16,8 @@
         <a class="brand" href="/"><strong>SPARC</strong><span>EV charging on ComEd Hourly Pricing</span></a>
         <nav class="nav" aria-label="Pages">
           <a href="/" aria-current="page">Test models</a>
+          <a href="/simulation/charging-history.html">Charging history</a>
+          <a href="/simulation/comed-costs.html">ComEd bill costs</a>
           <a href="/results/index.html">Results</a>
           <a href="/results/accuracy.html">Accuracy</a>
           <a href="/results/how-it-works.html">How it works</a>
@@ -31,6 +36,11 @@
           <b>Run test</b>. Everything runs on this computer, and nothing starts until you press a button.
         </p>
       </section>
+
+    <section id="comed-cost-overview" class="comed-overview" aria-labelledby="comed-overview-title">
+      <div class="co-heading"><div><p class="co-eyebrow">COMED · BEYOND THE ENERGY PRICE</p><h2 id="comed-overview-title">What would the charging bill cost?</h2><p>Replay the Model X home-charging totals from sparc-lite with delivery, transmission, state tax, riders and credits, plus a stated share of monthly service and capacity charges.</p></div><a class="co-link" href="/simulation/comed-costs.html">Explore the bill simulation ↗</a></div>
+      <p class="co-limit">Estimated EV costs for an address inside Glenview. State and Glenview municipal tax use the same filed kWh rules for fixed and hourly service; the detailed view shows each plan’s tax treatment and source. Historical tax carry-forward assumptions are disclosed. Hourly-specific procurement and PEA and local franchise charges remain absent; hourly transmission uses a fixed-plan proxy.</p>
+    </section>
 
       <section class="step" id="step-data" aria-labelledby="step-data-title">
         <div class="step-head">

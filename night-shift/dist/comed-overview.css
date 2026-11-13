@@ -1,0 +1,18 @@
+.comed-overview { margin: 24px 0; padding: clamp(22px, 4vw, 38px); border: 1px solid #d6dfcb; border-radius: 18px; background: #f0f3e8; color: #233c2c; }
+.comed-overview * { box-sizing: border-box; }
+.comed-overview .co-heading { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 20px; }
+.comed-overview .co-eyebrow { margin: 0 0 9px; font: 700 11px/1.4 system-ui, sans-serif; letter-spacing: .14em; color: #536b41; }
+.comed-overview h2 { margin: 0 0 10px; font-size: clamp(24px, 3vw, 32px); line-height: 1.15; letter-spacing: -.025em; }
+.comed-overview p { max-width: 75ch; margin: 8px 0; line-height: 1.6; }
+.comed-overview .co-link { flex-shrink: 0; display: inline-block; padding: 12px 18px; border-radius: 9px; background: #345630; color: #fff; text-decoration: none; font: 650 14px/1.4 system-ui, sans-serif; }
+.comed-overview .co-link:hover { background: #244420; }
+.comed-overview a:focus-visible { outline: 3px solid #6a8e39; outline-offset: 4px; }
+.comed-overview .co-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0 16px; }
+.comed-overview .co-total { padding: 18px; border: 1px solid #d6dfcb; border-radius: 10px; background: #fafbf6; }
+.comed-overview .co-total:last-child { background: #e1eccb; border-color: #b7cd95; }
+.comed-overview .co-total span { display: block; font: 600 12px/1.5 system-ui, sans-serif; color: #4e624a; }
+.comed-overview .co-total strong { display: block; margin-top: 7px; font: 650 clamp(21px, 3vw, 32px)/1.2 system-ui, sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.comed-overview .co-context { font-size: 13px; color: #52624d; }
+.comed-overview .co-limit { padding-top: 12px; border-top: 1px solid #d6dfcb; font-size: 12px; color: #52624d; }
+.comed-overview [hidden] { display: none !important; }
+@media(max-width: 600px) { .comed-overview .co-totals { grid-template-columns: 1fr; gap: 8px; } .comed-overview .co-total { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px; } .comed-overview .co-total strong { margin: 0; } }

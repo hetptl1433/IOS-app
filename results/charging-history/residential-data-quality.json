@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "source": "Dataset1_charging_reports (1).csv",
+  "sources": [
+    {
+      "file": "Dataset1_charging_reports (1).csv",
+      "sha256": "48c15189e2c1acca7a34d4e3789b1d615ddd091849a9803ae39aee8aec474ed2"
+    },
+    {
+      "file": "Dataset2_user_predictions.csv",
+      "sha256": "7596a444545b9d975821f2c61b0bf061a6d3610a1dff0f18dd5e3dc666c372fa"
+    },
+    {
+      "file": "Dataset3_session_predictions.csv",
+      "sha256": "50cc1be432cbe21b19a705264a62bcc920810db80e4463a414b2bdfdd70ebcc5"
+    },
+    {
+      "file": "Dataset4_hourly_predictions.csv",
+      "sha256": "4b021d6eda6c7296dc022727fe11e25ba408e38091aae9e7b782de1702f61aa8"
+    }
+  ],
+  "sourceTimezone": "Europe/Oslo",
+  "timezone": "America/Chicago",
+  "citation": "https://doi.org/10.5281/zenodo.12730566",
+  "methodology": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11404051/",
+  "defaultPriceYear": 2025,
+  "priceYears": [
+    2025,
+    2026
+  ],
+  "stats": {
+    "sessions": 35377,
+    "users": 267,
+    "usersWithPower": 261,
+    "sessionPredictions": 34537,
+    "hourly": {
+      "rows": 469897,
+      "unkeyedRows": 6710
+    },
+    "hourlySessions": 34537,
+    "issues": {
+      "Missing plug-out time; connection window is unknown.": 38,
+      "Ambiguous or nonexistent Europe/Oslo timestamp.": 3
+    },
+    "flags": {
+      "predicted_power_cannot_finish": 17,
+      "reported_duration_differs_from_elapsed": 114,
+      "missing_predicted_power": 840
+    }
+  }
+}

@@ -94,6 +94,30 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/nothing")[0], 404)
         self.assertEqual(self.request("DELETE", "/api/state")[0], 405)
 
+    def test_simulation_and_charging_history(self):
+        status, _, response = self.request("GET", "/simulation")
+        self.assertEqual(status, 307)
+        self.assertEqual(response.getheader("Location"), "/simulation/")
+        for path in ("/simulation/", "/simulation/simulation.html", "/simulation/charging-history.html",
+                     "/simulation/simulation-engine.js", "/simulation/charging-history-engine.js",
+                     "/simulation/charging-history-data.js", "/simulation/charging-history.js",
+                     "/simulation/residential-data.js", "/simulation/residential-engine.js",
+                     "/simulation/norway.html", "/simulation/norway-comparison.js",
+                     "/simulation/norway-comparison.css", "/simulation/norway-comparison-data.js",
+                     "/simulation/norway-local.html", "/simulation/norway-local.js",
+                     "/simulation/norway-local.css", "/simulation/norway-local-engine.js", "/simulation/norway-local-data.js",
+                     "/simulation/comed-costs.html", "/simulation/comed-costs.js", "/simulation/comed-costs.css",
+                     "/simulation/comed-cost-engine.js", "/simulation/comed-cost-data.js",
+                     "/simulation/comed-cost-summary.js", "/simulation/comed-overview.js", "/simulation/comed-overview.css",
+                     "/simulation/charging-history.css"):
+            status, content, response = self.request("GET", path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(content, path)
+            self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
+        for path in ("/simulation/../README.md", "/simulation/%2e%2e/README.md",
+                     "/simulation/missing.html", "/simulation/.openai/hosting.json"):
+            self.assertEqual(self.request("GET", path)[0], 404, path)
+
     def test_home_page_and_results_pages(self):
         status, page, _ = self.request("GET", "/")
         self.assertEqual(status, 200)

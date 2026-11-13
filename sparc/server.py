@@ -36,6 +36,7 @@ from .weather import WeatherError
 
 WEB = Path(__file__).with_name("web")
 RESULTS = Path(__file__).resolve().parents[1] / "results"
+NIGHT_SHIFT = Path(__file__).resolve().parents[1] / "night-shift" / "dist"
 STATIC = {"/": ("home.html", "text/html; charset=utf-8"),
           "/home.js": ("home.js", "text/javascript; charset=utf-8"),
           "/home.css": ("home.css", "text/css; charset=utf-8"),
@@ -57,6 +58,7 @@ RESULT_TYPES = {"html": "text/html; charset=utf-8", "js": "text/javascript; char
                 "css": "text/css; charset=utf-8", "json": "application/json; charset=utf-8",
                 "md": "text/markdown; charset=utf-8"}
 RESULT_FILE = re.compile(r"/results/((?:model-tests/)?[\w-]+(?:\.[\w-]+)*\.(html|js|css|json|md))")
+SIMULATION_FILE = re.compile(r"/simulation/([\w-]+\.(html|js|css|md))")
 MAX_BODY = 1_000_000
 FIRST_FETCH_DATE = date(2007, 1, 1)
 NEW_PRICES_FROM = date(2024, 1, 1)  # where "Update prices" starts when there are none yet
@@ -373,6 +375,16 @@ class Handler(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             if method == "GET" and path in STATIC:
                 return self.send_static(*STATIC[path])
+            if method == "GET" and path == "/simulation":
+                return self.send_bytes(HTTPStatus.TEMPORARY_REDIRECT, b"", "text/html; charset=utf-8",
+                                       {"Location": "/simulation/"})
+            if method == "GET" and path == "/simulation/":
+                path = "/simulation/index.html"
+            if method == "GET" and (match := SIMULATION_FILE.fullmatch(path)):
+                asset = NIGHT_SHIFT / match[1]
+                if not asset.is_file():
+                    raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
+                return self.send_bytes(HTTPStatus.OK, asset.read_bytes(), RESULT_TYPES[match[2]])
             if method == "GET" and path in ("/results", "/results/"):
                 path = "/results/index.html"
             if method == "GET" and (match := RESULT_FILE.fullmatch(path)):
