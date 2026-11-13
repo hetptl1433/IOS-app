@@ -1,0 +1,2 @@
+# 8 MB raw replay output; out/norway.csv has the same per-night costs. Rebuild with replay_norway.py.
+out/norway.json

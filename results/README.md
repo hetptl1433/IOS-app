@@ -10,6 +10,7 @@ The headline results, written to be easy to read. Open `index.html` in a browser
 | `how-it-works.html` | How a kWh is priced, how a night's cost and a year's saving are worked out, one real night added up hour by hour, and how the simulation works, step by step |
 | `details.html` | Every study with its error bars, for reviewers |
 | Test models | In SPARC only (`./start.command`, then the home page): test AI forecasters yourself with one click |
+| `sparc-live-replay/` | The Pi's own planner replayed on real nights (a Cybertruck, a TeslaMate car, three Tesla Charge Stats cars and 267 Norwegian households) against fixed and hourly plans starting at 6 PM or 11 PM, with no peeking at future prices |
 | `charging-history/daily-savings.csv` | Daily and cumulative savings on the custom charging dataset: standard immediate charging versus SPARC time-of-day delivery. Dates are grouped by session start in Chicago time. |
 
 How the files fit together:

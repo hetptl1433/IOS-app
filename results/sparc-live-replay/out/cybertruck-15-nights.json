@@ -1,0 +1,417 @@
+{
+ "energyKWhPerNight": 54.66666666666667,
+ "nights": [
+  {
+   "night": "2026-10-29",
+   "A_fixed_now": 6.358280000000001,
+   "B_hourly_now": 4.054673333333334,
+   "C_hourly_sparc": 2.905423333287891,
+   "D_hourlyTOD_now": 3.912631666666667,
+   "E_hourlyTOD_sparc": 2.1744474999652943,
+   "H_hourlyTOD_hindsight": 2.07096,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "19"
+   ],
+   "reasons_E": {
+    "price_plan": 132
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-10-30",
+   "A_fixed_now": 6.358280000000001,
+   "B_hourly_now": 3.275173333333334,
+   "C_hourly_sparc": 2.760964999968068,
+   "D_hourlyTOD_now": 3.1331316666666673,
+   "E_hourlyTOD_sparc": 2.022418333312138,
+   "H_hourlyTOD_hindsight": 1.8696266666666668,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "03",
+    "04",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 129
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-10-31",
+   "A_fixed_now": 6.358280000000001,
+   "B_hourly_now": 3.514006666666667,
+   "C_hourly_sparc": 3.3601283332905454,
+   "D_hourlyTOD_now": 3.3719650000000003,
+   "E_hourlyTOD_sparc": 2.6527416666341623,
+   "H_hourlyTOD_hindsight": 2.429243333333334,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "01",
+    "02",
+    "03",
+    "04"
+   ],
+   "reasons_E": {
+    "price_plan": 120,
+    "day_ahead_plan_live_reading_missing": 24
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-01",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.797253333333334,
+   "C_hourly_sparc": 3.797253333288162,
+   "D_hourlyTOD_now": 3.660841666666667,
+   "E_hourlyTOD_sparc": 3.6608416666317787,
+   "H_hourlyTOD_hindsight": 2.0635333333333334,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "18",
+    "19",
+    "20",
+    "21",
+    "22"
+   ],
+   "reasons_E": {
+    "missing_forecast_deadline_protection": 58
+   },
+   "fallback_steps_E": 58,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-02",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 2.53142,
+   "C_hourly_sparc": 2.2682116666310312,
+   "D_hourlyTOD_now": 2.3950083333333336,
+   "E_hourlyTOD_sparc": 1.5608249999746484,
+   "H_hourlyTOD_hindsight": 1.3555333333333335,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "21",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 98,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-03",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 2.37042,
+   "C_hourly_sparc": 2.1891699999731067,
+   "D_hourlyTOD_now": 2.2340083333333336,
+   "E_hourlyTOD_sparc": 1.452324999978622,
+   "H_hourlyTOD_hindsight": 1.1052258333333334,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.66666666587194,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "21",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 108,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-04",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 2.819086666666667,
+   "C_hourly_sparc": 2.2410866666365945,
+   "D_hourlyTOD_now": 2.682675,
+   "E_hourlyTOD_sparc": 1.5336999999802114,
+   "H_hourlyTOD_hindsight": 1.3642000000000003,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "21",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 115,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-05",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.17292,
+   "C_hourly_sparc": 2.8426283332905453,
+   "D_hourlyTOD_now": 3.0365083333333334,
+   "E_hourlyTOD_sparc": 2.1352416666341627,
+   "H_hourlyTOD_hindsight": 1.9867933333333336,
+   "kwh_E": 54.66666666587194,
+   "kwh_C": 54.66666666587194,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "03",
+    "04",
+    "21",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 132
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-06",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.785086666666667,
+   "C_hourly_sparc": 3.2005866666143428,
+   "D_hourlyTOD_now": 3.6486750000000003,
+   "E_hourlyTOD_sparc": 2.4931999999579593,
+   "H_hourlyTOD_hindsight": 2.425866666666667,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 126
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-07",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.567086666666667,
+   "C_hourly_sparc": 2.326669999964365,
+   "D_hourlyTOD_now": 3.430675,
+   "E_hourlyTOD_sparc": 1.6163666666421097,
+   "H_hourlyTOD_hindsight": 1.5856999999999999,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05"
+   ],
+   "reasons_E": {
+    "price_plan": 139,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-08",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.51792,
+   "C_hourly_sparc": 2.8285866666175212,
+   "D_hourlyTOD_now": 3.3815083333333336,
+   "E_hourlyTOD_sparc": 2.121199999961138,
+   "H_hourlyTOD_hindsight": 2.084626666666667,
+   "kwh_E": 54.66666666587194,
+   "kwh_C": 54.66666666587194,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 106,
+    "day_ahead_plan_live_reading_missing": 3
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-09",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.0609200000000003,
+   "C_hourly_sparc": 2.5050866666278524,
+   "D_hourlyTOD_now": 2.9245083333333337,
+   "E_hourlyTOD_sparc": 1.7976999999714693,
+   "H_hourlyTOD_hindsight": 1.7670333333333332,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "21",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 99,
+    "day_ahead_plan_live_reading_missing": 5
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-10",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 5.277086666666667,
+   "C_hourly_sparc": 4.100461666614342,
+   "D_hourlyTOD_now": 5.140675,
+   "E_hourlyTOD_sparc": 3.3930749999579595,
+   "H_hourlyTOD_hindsight": 2.9209758333333338,
+   "kwh_E": 54.66666666587194,
+   "kwh_C": 54.66666666587194,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "22"
+   ],
+   "reasons_E": {
+    "price_plan": 129,
+    "day_ahead_plan_live_reading_missing": 3
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-11",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.5787533333333332,
+   "C_hourly_sparc": 3.3632533332857775,
+   "D_hourlyTOD_now": 3.4423416666666666,
+   "E_hourlyTOD_sparc": 2.6558666666293944,
+   "H_hourlyTOD_hindsight": 2.457533333333333,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04"
+   ],
+   "reasons_E": {
+    "price_plan": 131,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  },
+  {
+   "night": "2026-11-12",
+   "A_fixed_now": 6.285026666666667,
+   "B_hourly_now": 3.233586666666667,
+   "C_hourly_sparc": 3.062336666619111,
+   "D_hourlyTOD_now": 3.0971750000000005,
+   "E_hourlyTOD_sparc": 2.3549499999627272,
+   "H_hourlyTOD_hindsight": 2.261866666666667,
+   "kwh_E": 54.666666665871944,
+   "kwh_C": 54.666666665871944,
+   "kwh_now": 54.66666666666667,
+   "battery_E": 89.99999999941859,
+   "battery_C": 89.99999999941859,
+   "hours_E": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "22",
+    "23"
+   ],
+   "reasons_E": {
+    "price_plan": 115,
+    "day_ahead_plan_live_reading_missing": 1
+   },
+   "fallback_steps_E": 0,
+   "avg_supply_E": null
+  }
+ ]
+}
