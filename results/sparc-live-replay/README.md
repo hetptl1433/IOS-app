@@ -19,10 +19,14 @@ settled hourly prices.
 - **Perfect hindsight**: the cheapest possible hours on hourly + Time-of-Day delivery, knowing every
   price in advance. Not possible in real life; shows the ceiling.
 - Fixed price: that month's ComEd fixed rate (8.413¢ for Oct 2026 onward). Delivery: 2026 standard and
-  Time-of-Day rates on every night (no Time-of-Day delivery history is in the repo).
-- Cost is energy supply plus delivery. The hourly-plan capacity charge, which the fixed price already
-  includes, is left out, so savings against the fixed plan are somewhat overstated. Savings against the
-  hourly baselines are not affected (the capacity charge doesn't depend on when you charge).
+  Time-of-Day rates on every night (no Time-of-Day delivery history is in the repo), for a single-family
+  home with electric space heat, the Pi's default delivery class. A gas-heated home pays about twice the
+  delivery rate per kWh, so Time-of-Day delivery would save it more than shown here.
+- Cost is energy supply plus delivery. Charges that don't depend on when you charge (transmission, taxes,
+  monthly fees) and the fixed plan's monthly Purchased Electricity Adjustment are left out. The hourly-plan
+  capacity charge, which the fixed price already includes, is also left out, so savings against the fixed
+  plan are somewhat overstated. Savings against the hourly baselines are not affected (the capacity charge
+  doesn't depend on when you charge).
 - **Known Pi bug, kept in:** on every fall-back daylight-saving day (Nov 6 2022, Nov 5 2023, Nov 3 2024,
   Nov 2 2025, Nov 1 2026) ComEd's table has 24 rows for a 25-hour day. The Pi's parser rejects it, the
   planner has no forecast for one evening hour, and it falls back to charging right away from 6 PM.
@@ -61,8 +65,8 @@ settled hourly prices.
 
 - Each night's real home kWh from `charging-history-data/charging_sessions_tm1.csv` (TeslaMate, average
   14 kWh), grouped noon to noon so a 1 AM session counts toward the night before.
-- TeslaMate doesn't record plug-in or unplug times, and 19% of this car's energy was really charged in
-  the daytime. The replay moves it all into the 6 PM – 7 AM window.
+- TeslaMate doesn't record plug-in or unplug times, and about 18% of this car's energy was really charged
+  between 7 AM and 6 PM. The replay moves it all into the 6 PM – 7 AM window.
 - Hourly from 6 PM costs more than fixed: short charges all land in the evening price peak.
 - 4 nights left out for missing prices.
 
