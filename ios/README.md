@@ -76,6 +76,11 @@ network**. Keep the controller's setup window open for first pairing. The app
 authenticates encrypted pairing and ping responses before saving to Keychain.
 Later connections use the saved identity and key without opening a setup window.
 
+When replacing the Raspberry Pi, use **Replace controller** or scan for the new
+controller from setup. The original radio is labeled **Saved controller** and
+the previous pairing is kept until the new one is authenticated. See the
+[Pi 5 migration steps](../docs/ios/PI5_MIGRATION.md).
+
 Bluetooth supports ongoing controls and schedules when the controller has a working BlueZ
 adapter. A Bluetooth pairing authenticates pair and ping over Bluetooth before
 saving; it does not need a LAN connection. Wi-Fi configuration remains optional. Choose **Search for controllers**, enter its setup key, and optionally
